@@ -1,8 +1,19 @@
 export interface PredictionResult {
   predicted_code: string | null;
+  predicted_pps_code: string | null;
   reasoning: string;
   confidence: number;
-  predicted_at?: string;
+  predicted_at: string;
+}
+
+export interface PredictionCandidates {
+  predictions: PredictionResult[];
+}
+
+export interface PredictionSession {
+  candidates: PredictionResult[];
+  selectedIndex: number;
+  predicted_at: string;
 }
 
 interface BatchItemResult {
@@ -17,7 +28,7 @@ interface BatchItemResult {
     pps_code: string;
     kbims_code: string;
   };
-  prediction: PredictionResult | null;
+  prediction: PredictionCandidates | null;
   error: string | null;
 }
 
