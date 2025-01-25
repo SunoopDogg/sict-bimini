@@ -1,6 +1,6 @@
 import type { BIMObjectInput } from '@/src/5entities/bim-object';
 import type { HealthStatus } from '@/src/5entities/health';
-import type { BatchPredictResult, PredictionResult } from '@/src/5entities/prediction';
+import type { BatchPredictResult, PredictionCandidates } from '@/src/5entities/prediction';
 import type { XLSXConversionResult } from '@/src/5entities/xlsx-file';
 
 import type { APIResponse } from './types';
@@ -73,7 +73,7 @@ export async function batchPredictCode(
 export async function predictSingleCode(
   input: BIMObjectInput,
   topK: number = 3,
-): Promise<APIResponse<PredictionResult>> {
+): Promise<APIResponse<PredictionCandidates>> {
   return apiRequest(
     `${BACKEND_URL}${API_VERSION}/predict?top_k=${topK}`,
     {
