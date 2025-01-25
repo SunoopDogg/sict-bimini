@@ -18,7 +18,7 @@ import {
   savePredictionsAction,
 } from '@/src/4features/predict-code';
 import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import type { PredictionResult } from '@/src/5entities/prediction';
+import type { PredictionCandidates, PredictionSession } from '@/src/5entities/prediction';
 import type { XlsxFileInfo } from '@/src/5entities/xlsx-file';
 import { batchPredictCode, predictSingleCode } from '@/src/6shared/api';
 import { Alert, AlertDescription } from '@/src/6shared/ui/primitive/alert';
@@ -30,13 +30,21 @@ import {
 } from '@/src/6shared/ui/primitive/card';
 
 function predictionMapToRecord(
-  map: Map<number, PredictionResult[]>,
-): Record<string, PredictionResult[]> {
-  const record: Record<string, PredictionResult[]> = {};
+  map: Map<number, PredictionSession[]>,
+): Record<string, PredictionSession[]> {
+  const record: Record<string, PredictionSession[]> = {};
   for (const [key, value] of map) {
     record[String(key)] = value;
   }
   return record;
+}
+
+function toSession(candidates: PredictionCandidates): PredictionSession {
+  return {
+    candidates: candidates.predictions,
+    selectedIndex: 0,
+    predicted_at: new Date().toISOString(),
+  };
 }
 
 export default function PredictPage() {
@@ -44,7 +52,7 @@ export default function PredictPage() {
   const [selectedFile, setSelectedFile] = useState<string>();
   const [objects, setObjects] = useState<BIMObjectInput[]>([]);
   const [predictionMap, setPredictionMap] = useState<
-    Map<number, PredictionResult[]>
+    Map<number, PredictionSession[]>
   >(new Map());
   const [selectedObjectIndex, setSelectedObjectIndex] = useState<number | null>(
     null,
@@ -58,15 +66,35 @@ export default function PredictPage() {
     new Set(),
   );
 
-  const appendPredictions = (
-    entries: { index: number; prediction: PredictionResult }[],
+  const appendSessions = (
+    entries: { index: number; session: PredictionSession }[],
   ) => {
-    const now = new Date().toISOString();
     const nextMap = new Map(predictionMap);
-    for (const { index, prediction } of entries) {
+    for (const { index, session } of entries) {
       const existing = nextMap.get(index) ?? [];
-      nextMap.set(index, [...existing, { ...prediction, predicted_at: now }]);
+      nextMap.set(index, [...existing, session]);
     }
+    setPredictionMap(nextMap);
+    if (selectedFile) {
+      savePredictionsAction(selectedFile, predictionMapToRecord(nextMap));
+    }
+  };
+
+  const handleSelectCandidate = (
+    objectIndex: number,
+    sessionIndex: number,
+    candidateIndex: number,
+  ) => {
+    const sessions = predictionMap.get(objectIndex);
+    if (!sessions || !sessions[sessionIndex]) return;
+
+    const nextMap = new Map(predictionMap);
+    const updatedSessions = [...sessions];
+    updatedSessions[sessionIndex] = {
+      ...updatedSessions[sessionIndex],
+      selectedIndex: candidateIndex,
+    };
+    nextMap.set(objectIndex, updatedSessions);
     setPredictionMap(nextMap);
     if (selectedFile) {
       savePredictionsAction(selectedFile, predictionMapToRecord(nextMap));
@@ -113,14 +141,14 @@ export default function PredictPage() {
         const entries = response.data.results
           .map((item, i) =>
             item.prediction
-              ? { index: selectedIndicesArray[i], prediction: item.prediction }
+              ? { index: selectedIndicesArray[i], session: toSession(item.prediction) }
               : null,
           )
           .filter(
-            (e): e is { index: number; prediction: PredictionResult } =>
+            (e): e is { index: number; session: PredictionSession } =>
               e !== null,
           );
-        appendPredictions(entries);
+        appendSessions(entries);
         setSelectedIndices(new Set());
       } else {
         setError(response.error || '예측에 실패했습니다.');
@@ -135,7 +163,7 @@ export default function PredictPage() {
       const response = await predictSingleCode(objects[index]);
 
       if (response.success && response.data) {
-        appendPredictions([{ index, prediction: response.data }]);
+        appendSessions([{ index, session: toSession(response.data) }]);
       } else {
         setError(response.error || '예측에 실패했습니다.');
       }
@@ -170,7 +198,7 @@ export default function PredictPage() {
 
       const predResult = await loadPredictionsAction(selectedFile);
       if (predResult.success && predResult.data) {
-        const map = new Map<number, PredictionResult[]>();
+        const map = new Map<number, PredictionSession[]>();
         for (const [key, value] of Object.entries(predResult.data)) {
           map.set(Number(key), value);
         }
@@ -250,7 +278,7 @@ export default function PredictPage() {
                 ? (objects[selectedObjectIndex] ?? null)
                 : null
             }
-            predictions={
+            sessions={
               selectedObjectIndex !== null
                 ? (predictionMap.get(selectedObjectIndex) ?? [])
                 : []
@@ -261,6 +289,11 @@ export default function PredictPage() {
             onPredict={() => {
               if (selectedObjectIndex !== null) {
                 handleSinglePredict(selectedObjectIndex);
+              }
+            }}
+            onSelectCandidate={(sessionIndex, candidateIndex) => {
+              if (selectedObjectIndex !== null) {
+                handleSelectCandidate(selectedObjectIndex, sessionIndex, candidateIndex);
               }
             }}
           />
