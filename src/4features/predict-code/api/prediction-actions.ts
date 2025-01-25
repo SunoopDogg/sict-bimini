@@ -2,7 +2,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 
-import type { PredictionResult } from '@/src/5entities/prediction';
+import type { PredictionSession } from '@/src/5entities/prediction';
 import { toErrorResponse } from '@/src/6shared/lib/toErrorResponse';
 
 import type { PredictionLoadResult, PredictionSaveResult } from './types';
@@ -15,7 +15,7 @@ import {
 
 export async function savePredictionsAction(
   xlsxFileName: string,
-  predictions: Record<string, PredictionResult[]>,
+  predictions: Record<string, PredictionSession[]>,
 ): Promise<PredictionSaveResult> {
   try {
     if (!isValidXlsxFileName(xlsxFileName)) {
@@ -51,7 +51,7 @@ export async function loadPredictionsAction(
     }
 
     const content = readFileSync(predFilePath, 'utf-8');
-    const predictions: Record<string, PredictionResult[]> = JSON.parse(content);
+    const predictions: Record<string, PredictionSession[]> = JSON.parse(content);
 
     return { success: true, data: predictions, error: null };
   } catch (error) {
