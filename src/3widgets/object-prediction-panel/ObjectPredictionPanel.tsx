@@ -3,7 +3,7 @@
 import { Loader2 } from 'lucide-react';
 
 import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import type { PredictionResult } from '@/src/5entities/prediction';
+import type { PredictionSession } from '@/src/5entities/prediction';
 import { Badge } from '@/src/6shared/ui/primitive/badge';
 import { Button } from '@/src/6shared/ui/primitive/button';
 import {
@@ -12,12 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/src/6shared/ui/primitive/card';
+import { cn } from '@/src/6shared/lib/cn';
 
 interface ObjectPredictionPanelProps {
   object: BIMObjectInput | null;
-  predictions: PredictionResult[];
+  sessions: PredictionSession[];
   isPredicting: boolean;
   onPredict: () => void;
+  onSelectCandidate: (sessionIndex: number, candidateIndex: number) => void;
 }
 
 function getConfidenceColorClass(confidence: number): string {
@@ -52,9 +54,10 @@ function ObjectInfo({ object }: { object: BIMObjectInput }) {
 
 export function ObjectPredictionPanel({
   object,
-  predictions,
+  sessions,
   isPredicting,
   onPredict,
+  onSelectCandidate,
 }: ObjectPredictionPanelProps) {
   // State 1: No object selected
   if (object === null) {
@@ -75,7 +78,7 @@ export function ObjectPredictionPanel({
   }
 
   // State 2: Object selected, no predictions yet
-  if (predictions.length === 0) {
+  if (sessions.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -107,36 +110,73 @@ export function ObjectPredictionPanel({
       <CardContent>
         <div className="space-y-4">
           <ObjectInfo object={object} />
-          {[...predictions].reverse().map((prediction, i) => (
-            <div key={i} className="space-y-3 rounded-lg border p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-muted-foreground text-sm font-medium">
-                  예측 결과 #{predictions.length - i}
-                </h3>
-                {prediction.predicted_at && (
+          {[...sessions].reverse().map((session, reverseIdx) => {
+            const sessionIndex = sessions.length - 1 - reverseIdx;
+            return (
+              <div key={reverseIdx} className="space-y-3 rounded-lg border p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-muted-foreground text-sm font-medium">
+                    예측 #{sessionIndex + 1}
+                  </h3>
                   <span className="text-muted-foreground text-xs">
-                    {new Date(prediction.predicted_at).toLocaleString('ko-KR')}
+                    {new Date(session.predicted_at).toLocaleString('ko-KR')}
                   </span>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-semibold">
-                  {prediction.predicted_code || '-'}
-                </span>
-                <Badge
-                  className={getConfidenceColorClass(prediction.confidence)}
-                >
-                  {(prediction.confidence * 100).toFixed(0)}%
-                </Badge>
-              </div>
-              {prediction.reasoning && (
-                <div>
-                  <p className="text-muted-foreground mb-1 text-sm">추론</p>
-                  <p className="text-sm">{prediction.reasoning}</p>
                 </div>
-              )}
-            </div>
-          ))}
+                <div className="space-y-2">
+                  {session.candidates.map((candidate, candidateIdx) => (
+                    <button
+                      key={candidateIdx}
+                      type="button"
+                      onClick={() => onSelectCandidate(sessionIndex, candidateIdx)}
+                      className={cn(
+                        'w-full rounded-lg border p-3 text-left transition-colors',
+                        session.selectedIndex === candidateIdx
+                          ? 'border-primary bg-primary/5'
+                          : 'hover:bg-muted/50',
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-muted-foreground text-xs font-medium">
+                            {candidateIdx + 1}순위
+                          </span>
+                          <Badge
+                            className={getConfidenceColorClass(candidate.confidence)}
+                          >
+                            {(candidate.confidence * 100).toFixed(0)}%
+                          </Badge>
+                        </div>
+                        {session.selectedIndex === candidateIdx && (
+                          <span className="text-primary text-xs font-medium">
+                            선택됨
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground text-xs w-14">부위코드</span>
+                          <span className="text-sm font-semibold">
+                            {candidate.predicted_code || '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground text-xs w-14">PPS 코드</span>
+                          <span className="text-sm font-semibold">
+                            {candidate.predicted_pps_code || '-'}
+                          </span>
+                        </div>
+                      </div>
+                      {candidate.reasoning && (
+                        <p className="text-muted-foreground mt-2 text-xs line-clamp-2">
+                          {candidate.reasoning}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
           <div className="flex justify-center">
             <Button onClick={onPredict} disabled={isPredicting}>
               {isPredicting && (
