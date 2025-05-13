@@ -1,0 +1,9 @@
+name: sict-mvp
+
+services:
+  python:
+    build: .
+    container_name: sict-mvp-python
+    tty: true
+    volumes:
+      - .:/root/sict-mvp
