@@ -1,3 +1,8 @@
 {
-  "cSpell.words": ["sict"]
+    "cSpell.words": [
+        "langchain",
+        "Ollama",
+        "sict",
+        "skiprows"
+    ]
 }

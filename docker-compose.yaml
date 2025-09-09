@@ -1,9 +1,28 @@
-name: sict-mvp
-
 services:
-  python:
-    build: .
-    container_name: sict-mvp-python
+  sict-bimini:
+    build:
+      context: .
+    image: python3.13.7:slim-debian13-uv
+    container_name: sict-bimini
     tty: true
+    ipc: host
+    environment:
+      - DISPLAY=${DISPLAY:-host.docker.internal:0}
+      - QT_X11_NO_MITSHM=1
     volumes:
-      - .:/root/sict-mvp
+      - .:/root/sict-bimini
+      - /tmp/.X11-unix:/tmp/.X11-unix
+
+  sict-bimini-gpu:
+    extends:
+      service: sict-bimini
+    container_name: sict-bimini-gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles:
+      - gpu
