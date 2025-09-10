@@ -1,6 +1,10 @@
 {
     "cSpell.words": [
+        "dotenv",
+        "FAISS",
+        "KBIMS",
         "langchain",
+        "llms",
         "Ollama",
         "sict",
         "skiprows"
