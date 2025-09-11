@@ -85,5 +85,6 @@ def bim_xlsx_to_json(file_name: str):
 
 
 if __name__ == '__main__':
-    for file_name in FILE_NAMES:
-        json_data = bim_xlsx_to_json(file_name)
+    # for file_name in FILE_NAMES:
+    #     json_data = bim_xlsx_to_json(file_name)
+    json_data = bim_xlsx_to_json("속성테이블(경희대)")
