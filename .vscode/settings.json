@@ -5,6 +5,7 @@
         "KBIMS",
         "langchain",
         "llms",
+        "ndarray",
         "Ollama",
         "sict",
         "skiprows"
