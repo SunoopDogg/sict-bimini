@@ -1,10 +1,17 @@
+import json
 import logging
-from typing import List, Dict, Any, Optional
+from pathlib import Path
+from typing import List, Dict, Any
 
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 
 from bim_vector_store import BIMVectorStore, MILVUS_DB_PATH
+from utils import (
+    load_prompt,
+    parse_json_response,
+    format_prediction_result,
+)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -16,41 +23,32 @@ DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_TOP_K = 5
 DEFAULT_TEMPERATURE = 0.3
 
-# Korean prompt template for KBIMS part code prediction
-KBIMS_PREDICTION_PROMPT = """당신은 건축 BIM 객체 분류 전문가입니다. KBIMS(한국 BIM 표준) 부위코드를 예측하는 것이 당신의 역할입니다.
 
-아래는 입력된 BIM 객체와 유사한 기존 BIM 객체들입니다:
+def format_bim_object_for_prediction(obj: dict) -> str:
+    """
+    BIM JSON 객체를 예측용 문자열로 변환
 
-[검색된 유사 BIM 객체]
-{context}
+    Args:
+        obj: BIM 객체 딕셔너리 (JSON에서 로드된 형태)
 
-[입력 BIM 객체 정보]
-{query}
+    Returns:
+        예측에 사용할 문자열
+    """
+    other = obj.get("Other", {})
+    parts = []
 
-위의 유사 객체들을 참고하여 입력된 BIM 객체에 가장 적합한 KBIMS 부위코드를 예측하세요.
+    if obj.get("ObjectType"):
+        parts.append(f"ObjectType: {obj['ObjectType']}")
+    if other.get("Category"):
+        parts.append(f"Category: {other['Category']}")
+    if other.get("Family Name"):
+        parts.append(f"Family Name: {other['Family Name']}")
+    if other.get("Family"):
+        parts.append(f"Family: {other['Family']}")
+    if other.get("Type"):
+        parts.append(f"Type: {other['Type']}")
 
-응답 형식:
-- 예측 부위코드: [코드]
-- 근거: [유사 객체와의 비교를 통한 근거 설명]
-- 신뢰도: [높음/중간/낮음]
-
-예측 결과:"""
-
-# Chat prompt template for general Q&A
-CHAT_PROMPT = """당신은 건축 BIM(Building Information Modeling) 전문가입니다.
-KBIMS(한국 BIM 표준) 분류 체계에 대한 질문에 답변합니다.
-
-아래는 질문과 관련된 BIM 객체 정보입니다:
-
-[관련 BIM 객체]
-{context}
-
-[질문]
-{question}
-
-위 정보를 바탕으로 질문에 상세하게 답변하세요.
-
-답변:"""
+    return ", ".join(parts) if parts else str(obj)
 
 
 class BIMRAGSystem:
@@ -89,15 +87,11 @@ class BIMRAGSystem:
             base_url=ollama_url
         )
 
-        # Initialize prompt templates
+        # Load prompt templates from files
+        logger.info("Loading prompt templates from files...")
         self.prediction_prompt = PromptTemplate(
             input_variables=["context", "query"],
-            template=KBIMS_PREDICTION_PROMPT
-        )
-
-        self.chat_prompt = PromptTemplate(
-            input_variables=["context", "question"],
-            template=CHAT_PROMPT
+            template=load_prompt("kbims_prediction")
         )
 
         logger.info("BIM RAG System initialized successfully")
@@ -150,7 +144,7 @@ class BIMRAGSystem:
 
     def predict_part_code(self,
                           bim_object_info: str,
-                          top_k: int = DEFAULT_TOP_K) -> str:
+                          top_k: int = DEFAULT_TOP_K) -> Dict[str, Any]:
         """
         Predict KBIMS part code for a BIM object.
 
@@ -159,7 +153,10 @@ class BIMRAGSystem:
             top_k: Number of similar objects to retrieve
 
         Returns:
-            LLM response with predicted part code and reasoning
+            Dictionary with keys:
+                - predicted_code: Predicted KBIMS part code
+                - reasoning: Explanation for the prediction
+                - confidence: Confidence score (0.0 to 1.0)
         """
         logger.info(f"Predicting part code for: '{bim_object_info}'")
 
@@ -178,45 +175,16 @@ class BIMRAGSystem:
         logger.info("Generating prediction with LLM...")
         response = self.llm.invoke(prompt)
 
+        # Step 4: Parse JSON response
+        logger.info("Parsing JSON response...")
+        result = parse_json_response(response)
+
         logger.info("Prediction complete")
-        return response
-
-    def chat(self,
-             question: str,
-             top_k: int = DEFAULT_TOP_K) -> str:
-        """
-        Answer a question about BIM objects using RAG.
-
-        Args:
-            question: User question
-            top_k: Number of relevant objects to retrieve
-
-        Returns:
-            LLM response to the question
-        """
-        logger.info(f"Processing question: '{question}'")
-
-        # Step 1: Retrieve relevant BIM objects
-        search_results = self.search(question, top_k=top_k)
-
-        # Step 2: Format context
-        context = self._format_search_results(search_results)
-
-        # Step 3: Generate answer using LLM
-        prompt = self.chat_prompt.format(
-            context=context,
-            question=question
-        )
-
-        logger.info("Generating answer with LLM...")
-        response = self.llm.invoke(prompt)
-
-        logger.info("Answer generation complete")
-        return response
+        return result
 
     def batch_predict(self,
                       bim_objects: List[str],
-                      top_k: int = DEFAULT_TOP_K) -> List[Dict[str, str]]:
+                      top_k: int = DEFAULT_TOP_K) -> List[Dict[str, Any]]:
         """
         Predict part codes for multiple BIM objects.
 
@@ -225,7 +193,7 @@ class BIMRAGSystem:
             top_k: Number of similar objects to retrieve per query
 
         Returns:
-            List of dictionaries with input and prediction
+            List of dictionaries with input and prediction result (JSON dict)
         """
         results = []
         total = len(bim_objects)
@@ -233,31 +201,23 @@ class BIMRAGSystem:
         for i, bim_info in enumerate(bim_objects, 1):
             logger.info(f"Processing {i}/{total}: {bim_info[:50]}...")
 
-            prediction = self.predict_part_code(bim_info, top_k=top_k)
-
-            results.append({
-                "input": bim_info,
-                "prediction": prediction
-            })
+            try:
+                prediction = self.predict_part_code(bim_info, top_k=top_k)
+                results.append({
+                    "input": bim_info,
+                    "prediction": prediction
+                })
+                logger.info(format_prediction_result(prediction))  # For logging purposes
+            except ValueError as e:
+                logger.error(f"Failed to parse prediction for: {bim_info[:50]}... Error: {e}")
+                results.append({
+                    "input": bim_info,
+                    "prediction": None,
+                    "error": str(e)
+                })
 
         logger.info(f"Batch prediction complete: {total} objects processed")
         return results
-
-    def get_stats(self) -> Dict[str, Any]:
-        """
-        Get system statistics.
-
-        Returns:
-            Dictionary with system stats
-        """
-        vector_stats = self.vector_store.get_stats()
-
-        return {
-            "vector_store": vector_stats,
-            "llm_model": DEFAULT_OLLAMA_MODEL,
-            "ollama_url": DEFAULT_OLLAMA_URL,
-            "temperature": DEFAULT_TEMPERATURE
-        }
 
     def close(self) -> None:
         """Close connections and cleanup resources."""
@@ -271,11 +231,9 @@ def main():
 
     parser = argparse.ArgumentParser(description="BIM RAG System CLI")
     parser.add_argument("--predict", type=str, help="BIM object info for part code prediction")
-    parser.add_argument("--chat", type=str, help="Question for chat mode")
     parser.add_argument("--search", type=str, help="Search query for similar objects")
     parser.add_argument("--top-k", type=int, default=5, help="Number of results to retrieve")
     parser.add_argument("--model", type=str, default=DEFAULT_OLLAMA_MODEL, help="Ollama model name")
-    parser.add_argument("--stats", action="store_true", help="Show system stats")
 
     args = parser.parse_args()
 
@@ -283,18 +241,6 @@ def main():
     rag = BIMRAGSystem(ollama_model=args.model)
 
     try:
-        if args.stats:
-            stats = rag.get_stats()
-            print("\nSystem Statistics:")
-            print("=" * 50)
-            print(f"Vector Store:")
-            for key, value in stats["vector_store"].items():
-                print(f"  {key}: {value}")
-            print(f"\nLLM Model: {stats['llm_model']}")
-            print(f"Ollama URL: {stats['ollama_url']}")
-            print(f"Temperature: {stats['temperature']}")
-            print("=" * 50)
-
         if args.search:
             print(f"\nSearching for: '{args.search}'")
             print("=" * 50)
@@ -309,28 +255,63 @@ def main():
                 print(f"   Type: {result.get('type', 'N/A')}")
 
         if args.predict:
-            print(f"\nPredicting part code for: '{args.predict}'")
-            print("=" * 50)
-            prediction = rag.predict_part_code(args.predict, top_k=args.top_k)
-            print("\nPrediction Result:")
-            print(prediction)
+            predict_path = Path(args.predict)
 
-        if args.chat:
-            print(f"\nQuestion: '{args.chat}'")
-            print("=" * 50)
-            answer = rag.chat(args.chat, top_k=args.top_k)
-            print("\nAnswer:")
-            print(answer)
+            if predict_path.is_file():
+                # 파일 경로인 경우 - 배치 예측
+                print(f"\nBatch predicting from file: '{args.predict}'")
+                print("=" * 50)
+
+                with open(predict_path, 'r', encoding='utf-8') as f:
+                    objects = json.load(f)
+
+                print(f"Loaded {len(objects)} objects from file")
+
+                # 각 객체에서 예측용 문자열 생성
+                bim_infos = [format_bim_object_for_prediction(obj) for obj in objects]
+
+                # 배치 예측 수행
+                results = rag.batch_predict(bim_infos, top_k=args.top_k)
+
+                # 결과 출력
+                print(f"\n=== Batch Prediction Results ({len(results)} objects) ===\n")
+                for i, result in enumerate(results, 1):
+                    print(f"[{i}/{len(results)}] Input: {result['input'][:80]}...")
+                    if result.get('prediction'):
+                        print(
+                            f"  Predicted Code: {result['prediction'].get('predicted_code', 'N/A')}")
+                        print(f"  Confidence: {result['prediction'].get('confidence', 'N/A')}")
+                        print(
+                            f"  Reasoning: {result['prediction'].get('reasoning', 'N/A')[:100]}...")
+                    else:
+                        print(f"  Error: {result.get('error', 'Unknown error')}")
+                    print()
+
+                # 결과를 파일로 저장
+                output_path = predict_path.parent / f"{predict_path.stem}_predictions.json"
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(results, f, ensure_ascii=False, indent=2)
+                print(f"\nResults saved to: {output_path}")
+
+            else:
+                # 텍스트 문자열인 경우 - 단일 예측
+                print(f"\nPredicting part code for: '{args.predict}'")
+                print("=" * 50)
+                try:
+                    prediction = rag.predict_part_code(args.predict, top_k=args.top_k)
+                    print("\nPrediction Result:")
+                    print(format_prediction_result(prediction))
+                except ValueError as e:
+                    print(f"\nError: {e}")
 
         # If no specific action, show help
-        if not any([args.stats, args.search, args.predict, args.chat]):
+        if not any([args.search, args.predict]):
             print("\nBIM RAG System Ready")
             print("Use --help to see available options")
             print("\nExamples:")
-            print("  --predict '콘크리트 기둥 RC기둥-600x600'")
-            print("  --chat '기초의 종류에는 무엇이 있나요?'")
+            print("  --predict '콘크리트 기둥 RC기둥-600x600'  # 텍스트 단일 예측")
+            print("  --predict data/json/no_kbims_objects.json  # JSON 파일 배치 예측")
             print("  --search '철근콘크리트 보'")
-            print("  --stats")
 
     finally:
         rag.close()
