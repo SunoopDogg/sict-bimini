@@ -2,7 +2,7 @@ services:
   sict-bimini:
     build:
       context: .
-    image: python3.13.7:slim-debian13-uv
+    image: node22.20.0-python3.13.9:trixie-slim-uv
     container_name: sict-bimini
     tty: true
     ipc: host
