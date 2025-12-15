@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BIMAttribute:
     """Data class representing extracted BIM object attributes."""
+    ifc_type: str
     category: str
     family_name: str
     kbims_code: str
@@ -35,6 +36,7 @@ class BIMAttribute:
     def is_valid(self) -> bool:
         """Check if at least one attribute has a value."""
         return any([
+            self.ifc_type,
             self.category,
             self.family_name,
             self.kbims_code,
@@ -46,6 +48,7 @@ class BIMAttribute:
     def __hash__(self):
         """Make hashable for deduplication."""
         return hash((
+            self.ifc_type,
             self.category,
             self.family_name,
             self.kbims_code,
@@ -59,6 +62,7 @@ class BIMAttribute:
         if not isinstance(other, BIMAttribute):
             return False
         return (
+            self.ifc_type == other.ifc_type and
             self.category == other.category and
             self.family_name == other.family_name and
             self.kbims_code == other.kbims_code and
@@ -73,6 +77,7 @@ class BIMAttributeExtractor:
     Extracts BIM object attributes from JSON files and exports to CSV.
 
     Focuses on extracting these 6 attributes from the "Other" field:
+    - IFCType
     - Category
     - Family Name
     - KBIMS-부위코드 (KBIMS code)
@@ -83,6 +88,7 @@ class BIMAttributeExtractor:
 
     # Mapping from JSON field names to CSV column names
     FIELD_MAPPING = {
+        'IFCType': 'ifc_type',
         'Category': 'category',
         'Family Name': 'family_name',
         'KBIMS-부위코드': 'kbims_code',
@@ -133,6 +139,7 @@ class BIMAttributeExtractor:
 
         # Extract each attribute
         attribute = BIMAttribute(
+            ifc_type=str(obj.get('IFCType', '')).strip(),
             category=str(other.get('Category', '')).strip(),
             family_name=str(other.get('Family Name', '')).strip(),
             kbims_code=str(other.get('KBIMS-부위코드', '')).strip(),
@@ -197,11 +204,13 @@ class BIMAttributeExtractor:
                 if attribute:
                     all_attributes.append(attribute)
 
-        logger.info(f"Processed {total_objects} objects, extracted {len(all_attributes)} valid attributes")
+        logger.info(
+            f"Processed {total_objects} objects, extracted {len(all_attributes)} valid attributes")
 
         if deduplicate:
             unique_attributes = list(set(all_attributes))
-            logger.info(f"After deduplication: {len(unique_attributes)} unique attribute combinations")
+            logger.info(
+                f"After deduplication: {len(unique_attributes)} unique attribute combinations")
             return unique_attributes
 
         return all_attributes
@@ -229,7 +238,8 @@ class BIMAttributeExtractor:
         output_path = self.output_directory / output_filename
 
         # Write to CSV
-        fieldnames = ['category', 'family_name', 'kbims_code', 'family', 'type', 'type_id']
+        fieldnames = ['ifc_type', 'category', 'family_name',
+                      'kbims_code', 'family', 'type', 'type_id']
 
         with open(output_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -254,6 +264,7 @@ class BIMAttributeExtractor:
         unique_attributes = list(set(attributes))
 
         # Count unique values for each field
+        ifc_types = set(attr.ifc_type for attr in attributes if attr.ifc_type)
         categories = set(attr.category for attr in attributes if attr.category)
         family_names = set(attr.family_name for attr in attributes if attr.family_name)
         kbims_codes = set(attr.kbims_code for attr in attributes if attr.kbims_code)
@@ -264,12 +275,14 @@ class BIMAttributeExtractor:
         return {
             'total_objects': len(attributes),
             'unique_combinations': len(unique_attributes),
+            'unique_ifc_types': len(ifc_types),
             'unique_categories': len(categories),
             'unique_family_names': len(family_names),
             'unique_kbims_codes': len(kbims_codes),
             'unique_families': len(families),
             'unique_types': len(types),
             'unique_type_ids': len(type_ids),
+            'ifc_types': sorted(ifc_types),
             'categories': sorted(categories),
             'kbims_codes': sorted(kbims_codes)
         }
@@ -309,13 +322,15 @@ def convert_json_to_csv(
         print(f"Total objects processed: {stats['total_objects']}")
         print(f"Unique attribute combinations: {stats['unique_combinations']}")
         print(f"\nUnique values per field:")
+        print(f"  - IFC Types: {stats['unique_ifc_types']}")
         print(f"  - Categories: {stats['unique_categories']}")
         print(f"  - Family Names: {stats['unique_family_names']}")
         print(f"  - KBIMS Codes: {stats['unique_kbims_codes']}")
         print(f"  - Families: {stats['unique_families']}")
         print(f"  - Types: {stats['unique_types']}")
         print(f"  - Type IDs: {stats['unique_type_ids']}")
-        print(f"\nCategories found: {stats['categories']}")
+        print(f"\nIFC Types found: {stats['ifc_types']}")
+        print(f"Categories found: {stats['categories']}")
         print(f"KBIMS Codes found: {stats['kbims_codes']}")
         print("=" * 60)
 
