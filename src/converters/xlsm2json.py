@@ -9,6 +9,7 @@ FILE_NAMES = [
     "속성테이블(법규검토용)",
 ]
 
+
 def bim_xlsx_to_json(file_name: str):
     """
     엑셀 파일을 JSON 파일로 변환하는 함수
@@ -56,6 +57,7 @@ def bim_xlsx_to_json(file_name: str):
         # step 2: 객체 정보를 설정
         elif step == 2:
             step = 3
+            item["IFCType"] = "Ifc{}".format(object_type)
             item["ObjectType"] = object_type
             item["GlobalID"] = global_id
             item["Name"] = row_dict["객체명"]

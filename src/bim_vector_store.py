@@ -27,6 +27,7 @@ CSV_PATH = "./data/csv/bim_attributes.csv"
 @dataclass
 class BIMAttribute:
     """Data class for BIM object attributes."""
+    ifc_type: str
     category: str
     family_name: str
     kbims_code: str
@@ -37,6 +38,7 @@ class BIMAttribute:
     def to_text(self) -> str:
         """Convert attributes to text for embedding."""
         parts = [
+            self.ifc_type,
             self.category,
             self.family_name,
             self.kbims_code,
@@ -49,6 +51,7 @@ class BIMAttribute:
     def to_dict(self) -> Dict[str, str]:
         """Convert to dictionary."""
         return {
+            "ifc_type": self.ifc_type,
             "category": self.category,
             "family_name": self.family_name,
             "kbims_code": self.kbims_code,
@@ -115,6 +118,7 @@ class BIMVectorStore:
 
         # Add fields
         schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True)
+        schema.add_field(field_name="ifc_type", datatype=DataType.VARCHAR, max_length=256)
         schema.add_field(field_name="category", datatype=DataType.VARCHAR, max_length=256)
         schema.add_field(field_name="family_name", datatype=DataType.VARCHAR, max_length=512)
         schema.add_field(field_name="kbims_code", datatype=DataType.VARCHAR, max_length=64)
@@ -174,6 +178,7 @@ class BIMVectorStore:
                 # Strip whitespace from keys and filter out None keys (from trailing commas)
                 row = {k.strip(): v for k, v in row.items() if k is not None}
                 attr = BIMAttribute(
+                    ifc_type=row.get('ifc_type', ''),
                     category=row.get('category', ''),
                     family_name=row.get('family_name', ''),
                     kbims_code=row.get('kbims_code', ''),
@@ -230,8 +235,8 @@ class BIMVectorStore:
             List of search results with scores
         """
         if output_fields is None:
-            output_fields = ["category", "family_name", "kbims_code",
-                          "family", "type", "type_id"]
+            output_fields = ["ifc_type", "category", "family_name", "kbims_code",
+                             "family", "type", "type_id"]
 
         # Generate query embedding
         query_embedding = self._generate_embedding(query)
@@ -252,6 +257,7 @@ class BIMVectorStore:
             result = {
                 "id": hit.get("id"),
                 "score": hit.get("distance", 0.0),
+                "ifc_type": entity.get("ifc_type", ""),
                 "category": entity.get("category", ""),
                 "family_name": entity.get("family_name", ""),
                 "kbims_code": entity.get("kbims_code", ""),

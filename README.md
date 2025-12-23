@@ -10,8 +10,6 @@
 4. [주요 기능](#주요-기능)
 5. [설치 및 설정](#설치-및-설정)
 6. [사용법](#사용법)
-7. [Docker 배포](#docker-배포)
-8. [트러블슈팅](#트러블슈팅)
 
 ## 프로젝트 개요
 
@@ -67,26 +65,35 @@ sict-bimini/
 ├── src/
 │   ├── bim_vector_store.py       # 벡터 스토어 구현
 │   ├── rag.py                    # RAG 시스템
-│   └── converters/
-│       ├── __init__.py
-│       ├── json_to_csv.py        # JSON to CSV 변환
-│       ├── xlsm2json.py          # XLSM to JSON 변환
-│       └── xlsx2csv.py           # XLSX to CSV 변환
+│   ├── converters/               # 데이터 변환 유틸리티
+│   │   ├── __init__.py
+│   │   ├── json_to_csv.py        # JSON to CSV 변환
+│   │   ├── xlsm2json.py          # XLSM to JSON 변환
+│   │   └── remove_kbims_property.py  # KBIMS 속성 제거
+│   ├── utils/                    # 유틸리티 모듈
+│   │   ├── __init__.py
+│   │   ├── prompt.py             # 프롬프트 템플릿 로더
+│   │   ├── parsing.py            # JSON 응답 파서
+│   │   └── formatters.py         # 결과 포맷터
+│   └── legacy/                   # 레거시 코드 (참조용)
 │
 ├── data/
 │   ├── json/                     # JSON 소스 파일
 │   ├── csv/                      # 처리된 CSV 파일
 │   └── xlsx/                     # Excel 소스 파일
 │
-├── script/
-│   └── ollama.sh                # Ollama 설정 스크립트
+├── prompts/                      # LLM 프롬프트 템플릿
+│   └── kbims_prediction.txt      # KBIMS 예측 프롬프트
 │
-├── milvus_data/                 # 벡터 데이터베이스 저장소
-├── pyproject.toml               # 프로젝트 메타데이터
-├── uv.lock                      # 의존성 락 파일
-├── Dockerfile                   # 컨테이너 이미지 정의
-├── docker-compose.yaml          # 멀티 서비스 오케스트레이션
-└── .exemple.env                 # 환경변수 템플릿
+├── script/
+│   └── ollama.sh                 # Ollama 설정 스크립트
+│
+├── milvus_data/                  # 벡터 데이터베이스 저장소
+├── pyproject.toml                # 프로젝트 메타데이터
+├── uv.lock                       # 의존성 락 파일
+├── Dockerfile                    # 컨테이너 이미지 정의
+├── docker-compose.yaml           # 멀티 서비스 오케스트레이션
+└── .exemple.env                  # 환경변수 템플릿
 ```
 
 ### 디렉토리 설명
@@ -95,11 +102,16 @@ sict-bimini/
   - `bim_vector_store.py`: Milvus 데이터베이스 작업 및 벡터 임베딩 처리
   - `rag.py`: KBIMS 예측을 위한 RAG 시스템
   - `converters/`: 데이터 형식 변환 유틸리티
+  - `utils/`: 프롬프트 로딩, 응답 파싱, 결과 포맷팅 유틸리티
+  - `legacy/`: 이전 버전 코드 참조용
 
 - **data/**: 데이터 저장소
   - `json/`: JSON 형식의 원본 BIM 데이터
   - `csv/`: 벡터 임베딩용 처리된 CSV 파일
   - `xlsx/`: BIM 속성이 포함된 Excel 소스 파일
+
+- **prompts/**: LLM 프롬프트 템플릿 저장소
+  - `kbims_prediction.txt`: KBIMS 부위코드 예측용 프롬프트
 
 - **milvus_data/**: 벡터 데이터베이스 영속 계층
 
@@ -134,10 +146,12 @@ RAG 시스템은 벡터 검색과 LLM 추론을 결합하여 지능형 예측을
 - **시맨틱 검색**: 유사한 BIM 객체 검색
 - **배치 처리**: 여러 객체를 효율적으로 처리
 
-**프롬프팅 전략:**
+**프롬프팅 시스템:**
+- 모듈화된 프롬프트 템플릿 (`prompts/` 디렉토리)
 - 도메인 이해를 위해 최적화된 한국어 프롬프트
 - 검색된 유사 객체를 사용한 컨텍스트 인식 생성
 - 신뢰도 점수 (높음/중간/낮음)
+- 커스텀 프롬프트 템플릿 추가 가능
 
 ### 3. 데이터 변환기 (`converters/`)
 
@@ -152,11 +166,27 @@ RAG 시스템은 벡터 검색과 LLM 추론을 결합하여 지능형 예측을
 - 계층 구조 보존
 - 속성 집합 및 메타데이터 처리
 
-#### XLSX to CSV 변환기 (`xlsx2csv.py`)
-- KBIMS Excel 시트의 배치 변환
-- 컬럼 선택 및 커스텀 매핑
-- 시트 탐색 및 처리
-- 한국어 문자를 위한 UTF-8 인코딩
+#### KBIMS 속성 제거 (`remove_kbims_property.py`)
+- JSON 파일에서 KBIMS 관련 속성 제거
+- 테스트 데이터 생성용
+
+### 4. 유틸리티 모듈 (`utils/`)
+
+RAG 시스템의 모듈화된 유틸리티 함수들을 제공합니다.
+
+#### 프롬프트 로더 (`prompt.py`)
+- `load_prompt(prompt_name)`: `prompts/` 디렉토리에서 템플릿 로드
+- 확장자 없이 파일명만 전달 (예: `"kbims_prediction"`)
+- UTF-8 인코딩 지원
+
+#### JSON 응답 파서 (`parsing.py`)
+- `parse_json_response(response)`: LLM 응답에서 JSON 추출 및 파싱
+- 마크다운 코드 블록 내 JSON 자동 처리
+- 파싱 실패 시 상세 에러 메시지 제공
+
+#### 결과 포맷터 (`formatters.py`)
+- `format_prediction_result(result)`: 예측 결과를 구조화된 텍스트로 포맷
+- 예측 코드, 신뢰도, 근거를 보기 좋게 출력
 
 ## 설치 및 설정
 
@@ -225,13 +255,6 @@ docker compose --profile gpu build sict-bimini-gpu
 ## 사용법
 
 ### 1. 데이터 준비
-
-#### Excel을 CSV로 변환
-
-```bash
-python src/converters/xlsx2csv.py
-# data/xlsx/KBIMS.xlsx의 모든 시트를 data/csv/로 변환
-```
 
 #### JSON을 CSV로 변환
 
