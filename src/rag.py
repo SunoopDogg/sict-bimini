@@ -21,12 +21,14 @@ logger = logging.getLogger(__name__)
 DEFAULT_OLLAMA_MODEL = "gpt-oss:20b"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_TOP_K = 5
-DEFAULT_TEMPERATURE = 0.3
+DEFAULT_TEMPERATURE = 0.8
 
 
 def format_bim_object_for_prediction(obj: dict) -> str:
     """
     BIM JSON 객체를 예측용 문자열로 변환
+
+    Supports both English and Korean property keys for bilingual compatibility.
 
     Args:
         obj: BIM 객체 딕셔너리 (JSON에서 로드된 형태)
@@ -34,19 +36,39 @@ def format_bim_object_for_prediction(obj: dict) -> str:
     Returns:
         예측에 사용할 문자열
     """
-    other = obj.get("Other", {})
+    def get_bilingual(data: dict, en_key: str, ko_key: str) -> str:
+        """Get value using English key with Korean fallback."""
+        return str(data.get(en_key, '') or data.get(ko_key, '')).strip()
+
+    other = obj.get("Other", {}) or obj.get("기타", {})
     parts = []
 
     if obj.get("ObjectType"):
         parts.append(f"ObjectType: {obj['ObjectType']}")
-    if other.get("Category"):
-        parts.append(f"Category: {other['Category']}")
-    if other.get("Family Name"):
-        parts.append(f"Family Name: {other['Family Name']}")
-    if other.get("Family"):
-        parts.append(f"Family: {other['Family']}")
-    if other.get("Type"):
-        parts.append(f"Type: {other['Type']}")
+
+    category = get_bilingual(other, "Category", "카테고리")
+    if category:
+        parts.append(f"Category: {category}")
+
+    family_name = get_bilingual(other, "Family Name", "패밀리 이름")
+    if family_name:
+        parts.append(f"Family Name: {family_name}")
+
+    family = get_bilingual(other, "Family", "패밀리")
+    if family:
+        parts.append(f"Family: {family}")
+
+    type_val = get_bilingual(other, "Type", "유형")
+    if type_val:
+        parts.append(f"Type: {type_val}")
+
+    type_id = get_bilingual(other, "Type Id", "유형 ID")
+    if type_id:
+        parts.append(f"Type ID: {type_id}")
+
+    pps_code = str(other.get("조달청표준공사코드", '')).strip()
+    if pps_code:
+        parts.append(f"조달청표준공사코드: {pps_code}")
 
     return ", ".join(parts) if parts else str(obj)
 
