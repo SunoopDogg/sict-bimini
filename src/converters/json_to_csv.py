@@ -13,18 +13,24 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 
+# Constants
+JSON_DIRECTORY = "/root/sict-bimini/data/json"
+OUTPUT_DIRECTORY = "/root/sict-bimini/data/csv"
+OUTPUT_FILENAME = "bim_attributes.csv"
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class BIMAttribute:
     """Data class representing extracted BIM object attributes."""
     ifc_type: str
     category: str
     family_name: str
     kbims_code: str
+    pps_code: str
     family: str
     type: str
     type_id: str
@@ -34,92 +40,43 @@ class BIMAttribute:
         return asdict(self)
 
     def is_valid(self) -> bool:
-        """Check if at least one attribute has a value."""
-        return any([
-            self.ifc_type,
-            self.category,
-            self.family_name,
-            self.kbims_code,
-            self.family,
-            self.type,
-            self.type_id
-        ])
-
-    def __hash__(self):
-        """Make hashable for deduplication."""
-        return hash((
-            self.ifc_type,
-            self.category,
-            self.family_name,
-            self.kbims_code,
-            self.family,
-            self.type,
-            self.type_id
-        ))
-
-    def __eq__(self, other):
-        """Equality comparison for deduplication."""
-        if not isinstance(other, BIMAttribute):
-            return False
-        return (
-            self.ifc_type == other.ifc_type and
-            self.category == other.category and
-            self.family_name == other.family_name and
-            self.kbims_code == other.kbims_code and
-            self.family == other.family and
-            self.type == other.type and
-            self.type_id == other.type_id
-        )
+        """Check if at least one code (KBIMS or PPS) has a value."""
+        return bool(self.kbims_code or self.pps_code)
 
 
 class BIMAttributeExtractor:
     """
     Extracts BIM object attributes from JSON files and exports to CSV.
 
-    Focuses on extracting these 6 attributes from the "Other" field:
+    Focuses on extracting these 8 attributes from the "Other" field:
     - IFCType
     - Category
     - Family Name
     - KBIMS-부위코드 (KBIMS code)
+    - 조달청표준공사코드 (PPS code)
     - Family
     - Type
     - Type Id
     """
 
-    # Mapping from JSON field names to CSV column names
-    FIELD_MAPPING = {
-        'IFCType': 'ifc_type',
-        'Category': 'category',
-        'Family Name': 'family_name',
-        'KBIMS-부위코드': 'kbims_code',
-        'Family': 'family',
-        'Type': 'type',
-        'Type Id': 'type_id'
-    }
-
-    def __init__(self, json_directory: str, output_directory: str):
-        """
-        Initialize the extractor.
-
-        Args:
-            json_directory: Directory containing JSON files
-            output_directory: Directory for CSV output
-        """
-        self.json_directory = Path(json_directory)
-        self.output_directory = Path(output_directory)
+    def __init__(self):
+        """Initialize the extractor with default directories."""
+        self.json_directory = Path(JSON_DIRECTORY)
+        self.output_directory = Path(OUTPUT_DIRECTORY)
+        self._cached_attributes: Optional[List[BIMAttribute]] = None
 
         # Ensure directories exist
         if not self.json_directory.exists():
-            raise FileNotFoundError(f"JSON directory not found: {json_directory}")
+            raise FileNotFoundError(f"JSON directory not found: {JSON_DIRECTORY}")
 
         self.output_directory.mkdir(parents=True, exist_ok=True)
 
         # Find JSON files
         self.json_files = list(self.json_directory.glob("*.json"))
         if not self.json_files:
-            raise FileNotFoundError(f"No JSON files found in {json_directory}")
+            raise FileNotFoundError(f"No JSON files found in {JSON_DIRECTORY}")
 
-        logger.info(f"Found {len(self.json_files)} JSON files in {json_directory}")
+        logger.info(f"Found {len(self.json_files)} JSON files in {JSON_DIRECTORY}")
 
     def extract_from_object(self, obj: Dict[str, Any]) -> Optional[BIMAttribute]:
         """
@@ -132,7 +89,7 @@ class BIMAttributeExtractor:
             BIMAttribute instance or None if no valid data
         """
         # Get the "Other" field
-        other = obj.get('Other', {})
+        other = obj.get('Other', {}) or obj.get('기타', {})
 
         if not other:
             return None
@@ -140,12 +97,13 @@ class BIMAttributeExtractor:
         # Extract each attribute
         attribute = BIMAttribute(
             ifc_type=str(obj.get('IFCType', '')).strip(),
-            category=str(other.get('Category', '')).strip(),
-            family_name=str(other.get('Family Name', '')).strip(),
+            category=str(other.get('Category', '') or other.get('카테고리', '')).strip(),
+            family_name=str(other.get('Family Name', '') or other.get('패밀리 이름', '')).strip(),
             kbims_code=str(other.get('KBIMS-부위코드', '')).strip(),
-            family=str(other.get('Family', '')).strip(),
-            type=str(other.get('Type', '')).strip(),
-            type_id=str(other.get('Type Id', '')).strip()
+            pps_code=str(other.get('조달청표준공사코드', '')).strip(),
+            family=str(other.get('Family', '') or other.get('패밀리', '')).strip(),
+            type=str(other.get('Type', '') or other.get('유형', '')).strip(),
+            type_id=str(other.get('Type Id', '') or other.get('유형 ID', '')).strip()
         )
 
         return attribute if attribute.is_valid() else None
@@ -180,16 +138,16 @@ class BIMAttributeExtractor:
             logger.error(f"Error loading {file_path.name}: {e}")
             return []
 
-    def extract_all(self, deduplicate: bool = True) -> List[BIMAttribute]:
+    def extract_all(self) -> List[BIMAttribute]:
         """
-        Extract attributes from all JSON files.
-
-        Args:
-            deduplicate: Remove duplicate attribute combinations
+        Extract attributes from all JSON files with deduplication.
 
         Returns:
-            List of BIMAttribute instances
+            List of unique BIMAttribute instances (cached after first call)
         """
+        if self._cached_attributes is not None:
+            return self._cached_attributes
+
         all_attributes = []
         total_objects = 0
 
@@ -207,39 +165,33 @@ class BIMAttributeExtractor:
         logger.info(
             f"Processed {total_objects} objects, extracted {len(all_attributes)} valid attributes")
 
-        if deduplicate:
-            unique_attributes = list(set(all_attributes))
-            logger.info(
-                f"After deduplication: {len(unique_attributes)} unique attribute combinations")
-            return unique_attributes
+        # Always deduplicate
+        unique_attributes = list(set(all_attributes))
+        logger.info(
+            f"After deduplication: {len(unique_attributes)} unique attribute combinations")
 
-        return all_attributes
+        self._cached_attributes = unique_attributes
+        return unique_attributes
 
-    def to_csv(self,
-               output_filename: str = "bim_attributes.csv",
-               deduplicate: bool = True) -> Path:
+    def to_csv(self) -> Path:
         """
         Extract attributes and save to CSV file.
-
-        Args:
-            output_filename: Name of output CSV file
-            deduplicate: Remove duplicate attribute combinations
 
         Returns:
             Path to created CSV file
         """
         # Extract all attributes
-        attributes = self.extract_all(deduplicate=deduplicate)
+        attributes = self.extract_all()
 
         if not attributes:
             logger.warning("No attributes extracted, CSV file will be empty")
 
         # Create output path
-        output_path = self.output_directory / output_filename
+        output_path = self.output_directory / OUTPUT_FILENAME
 
         # Write to CSV
         fieldnames = ['ifc_type', 'category', 'family_name',
-                      'kbims_code', 'family', 'type', 'type_id']
+                      'kbims_code', 'pps_code', 'family', 'type', 'type_id']
 
         with open(output_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -260,58 +212,49 @@ class BIMAttributeExtractor:
         Returns:
             Dictionary with statistics
         """
-        attributes = self.extract_all(deduplicate=False)
-        unique_attributes = list(set(attributes))
+        attributes = self.extract_all()
 
         # Count unique values for each field
         ifc_types = set(attr.ifc_type for attr in attributes if attr.ifc_type)
         categories = set(attr.category for attr in attributes if attr.category)
         family_names = set(attr.family_name for attr in attributes if attr.family_name)
         kbims_codes = set(attr.kbims_code for attr in attributes if attr.kbims_code)
+        pps_codes = set(attr.pps_code for attr in attributes if attr.pps_code)
         families = set(attr.family for attr in attributes if attr.family)
         types = set(attr.type for attr in attributes if attr.type)
         type_ids = set(attr.type_id for attr in attributes if attr.type_id)
 
         return {
-            'total_objects': len(attributes),
-            'unique_combinations': len(unique_attributes),
+            'unique_combinations': len(attributes),
             'unique_ifc_types': len(ifc_types),
             'unique_categories': len(categories),
             'unique_family_names': len(family_names),
             'unique_kbims_codes': len(kbims_codes),
+            'unique_pps_codes': len(pps_codes),
             'unique_families': len(families),
             'unique_types': len(types),
             'unique_type_ids': len(type_ids),
             'ifc_types': sorted(ifc_types),
             'categories': sorted(categories),
-            'kbims_codes': sorted(kbims_codes)
+            'kbims_codes': sorted(kbims_codes),
+            'pps_codes': sorted(pps_codes)
         }
 
 
-def convert_json_to_csv(
-    json_directory: str = "/root/sict-bimini/data/json",
-    output_directory: str = "/root/sict-bimini/data/csv",
-    output_filename: str = "bim_attributes.csv",
-    deduplicate: bool = True,
-    show_stats: bool = True
-) -> Path:
+def convert_json_to_csv(show_stats: bool = True) -> Path:
     """
-    Convenience function to convert BIM JSON files to CSV.
+    Convert BIM JSON files to CSV.
 
     Args:
-        json_directory: Directory containing JSON files
-        output_directory: Directory for CSV output
-        output_filename: Name of output CSV file
-        deduplicate: Remove duplicate attribute combinations
         show_stats: Print statistics after conversion
 
     Returns:
         Path to created CSV file
     """
-    extractor = BIMAttributeExtractor(json_directory, output_directory)
+    extractor = BIMAttributeExtractor()
 
     # Convert to CSV
-    output_path = extractor.to_csv(output_filename, deduplicate)
+    output_path = extractor.to_csv()
 
     # Show statistics
     if show_stats:
@@ -319,70 +262,29 @@ def convert_json_to_csv(
         print("\n" + "=" * 60)
         print("BIM Attribute Extraction Statistics")
         print("=" * 60)
-        print(f"Total objects processed: {stats['total_objects']}")
         print(f"Unique attribute combinations: {stats['unique_combinations']}")
         print(f"\nUnique values per field:")
         print(f"  - IFC Types: {stats['unique_ifc_types']}")
         print(f"  - Categories: {stats['unique_categories']}")
         print(f"  - Family Names: {stats['unique_family_names']}")
         print(f"  - KBIMS Codes: {stats['unique_kbims_codes']}")
+        print(f"  - PPS Codes: {stats['unique_pps_codes']}")
         print(f"  - Families: {stats['unique_families']}")
         print(f"  - Types: {stats['unique_types']}")
         print(f"  - Type IDs: {stats['unique_type_ids']}")
         print(f"\nIFC Types found: {stats['ifc_types']}")
         print(f"Categories found: {stats['categories']}")
         print(f"KBIMS Codes found: {stats['kbims_codes']}")
+        print(f"PPS Codes found: {stats['pps_codes']}")
         print("=" * 60)
 
     return output_path
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="Convert BIM JSON files to CSV with attribute extraction"
-    )
-    parser.add_argument(
-        "--json-dir",
-        default="/root/sict-bimini/data/json",
-        help="Directory containing JSON files"
-    )
-    parser.add_argument(
-        "--output-dir",
-        default="/root/sict-bimini/data/csv",
-        help="Directory for CSV output"
-    )
-    parser.add_argument(
-        "--output-file",
-        default="bim_attributes.csv",
-        help="Name of output CSV file"
-    )
-    parser.add_argument(
-        "--no-deduplicate",
-        action="store_true",
-        help="Keep duplicate attribute combinations"
-    )
-    parser.add_argument(
-        "--quiet",
-        action="store_true",
-        help="Suppress statistics output"
-    )
-
-    args = parser.parse_args()
-
     try:
-        output_path = convert_json_to_csv(
-            json_directory=args.json_dir,
-            output_directory=args.output_dir,
-            output_filename=args.output_file,
-            deduplicate=not args.no_deduplicate,
-            show_stats=not args.quiet
-        )
+        output_path = convert_json_to_csv()
         print(f"\nCSV file created successfully: {output_path}")
-
     except Exception as e:
         logger.error(f"Conversion failed: {e}")
-        import traceback
-        traceback.print_exc()
         exit(1)
