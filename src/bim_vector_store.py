@@ -31,6 +31,7 @@ class BIMAttribute:
     category: str
     family_name: str
     kbims_code: str
+    pps_code: str  # 조달청표준공사코드
     family: str
     type: str
     type_id: str
@@ -42,6 +43,7 @@ class BIMAttribute:
             self.category,
             self.family_name,
             self.kbims_code,
+            self.pps_code,
             self.family,
             self.type,
             self.type_id
@@ -55,6 +57,7 @@ class BIMAttribute:
             "category": self.category,
             "family_name": self.family_name,
             "kbims_code": self.kbims_code,
+            "pps_code": self.pps_code,
             "family": self.family,
             "type": self.type,
             "type_id": self.type_id
@@ -122,6 +125,7 @@ class BIMVectorStore:
         schema.add_field(field_name="category", datatype=DataType.VARCHAR, max_length=256)
         schema.add_field(field_name="family_name", datatype=DataType.VARCHAR, max_length=512)
         schema.add_field(field_name="kbims_code", datatype=DataType.VARCHAR, max_length=64)
+        schema.add_field(field_name="pps_code", datatype=DataType.VARCHAR, max_length=256)
         schema.add_field(field_name="family", datatype=DataType.VARCHAR, max_length=1024)
         schema.add_field(field_name="type", datatype=DataType.VARCHAR, max_length=1024)
         schema.add_field(field_name="type_id", datatype=DataType.VARCHAR, max_length=1024)
@@ -182,6 +186,7 @@ class BIMVectorStore:
                     category=row.get('category', ''),
                     family_name=row.get('family_name', ''),
                     kbims_code=row.get('kbims_code', ''),
+                    pps_code=row.get('pps_code', ''),
                     family=row.get('family', ''),
                     type=row.get('type', ''),
                     type_id=row.get('type_id', '')
@@ -236,7 +241,7 @@ class BIMVectorStore:
         """
         if output_fields is None:
             output_fields = ["ifc_type", "category", "family_name", "kbims_code",
-                             "family", "type", "type_id"]
+                             "pps_code", "family", "type", "type_id"]
 
         # Generate query embedding
         query_embedding = self._generate_embedding(query)
@@ -261,6 +266,7 @@ class BIMVectorStore:
                 "category": entity.get("category", ""),
                 "family_name": entity.get("family_name", ""),
                 "kbims_code": entity.get("kbims_code", ""),
+                "pps_code": entity.get("pps_code", ""),
                 "family": entity.get("family", ""),
                 "type": entity.get("type", ""),
                 "type_id": entity.get("type_id", ""),
@@ -353,6 +359,7 @@ def main():
                 print(f"   Category: {result.get('category', 'N/A')}")
                 print(f"   Family Name: {result.get('family_name', 'N/A')}")
                 print(f"   KBIMS Code: {result.get('kbims_code', 'N/A')}")
+                print(f"   PPS Code: {result.get('pps_code', 'N/A')}")
                 print(f"   Family: {result.get('family', 'N/A')}")
                 print(f"   Type: {result.get('type', 'N/A')}")
 

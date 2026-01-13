@@ -32,7 +32,7 @@ def remove_kbims_property(input_path: str, output_path: str) -> dict:
 
     for obj in data:
         new_obj = obj.copy()
-        other = new_obj.get("Other", {})
+        other = new_obj.get("Other", {}) or new_obj.get("기타", {})
 
         if "KBIMS-부위코드" in other:
             del other["KBIMS-부위코드"]
@@ -78,7 +78,7 @@ def extract_objects_without_kbims_property(input_path: str, output_path: str) ->
     extracted_objects = []
 
     for obj in data:
-        other = obj.get("Other", {})
+        other = obj.get("Other", {}) or obj.get("기타", {})
         kbims_value = other.get("KBIMS-부위코드")
 
         if kbims_value is None or kbims_value == "":
@@ -112,14 +112,14 @@ def main():
     parser.add_argument(
         "input",
         nargs="?",
-        default=str(Path(__file__).parent.parent.parent / "data" / "json" / "속성테이블(경희대).json"),
+        default=str(Path(__file__).parent.parent.parent / "data" / "json" / "속성테이블(10층).json"),
         help="Input JSON file path"
     )
     parser.add_argument(
         "output",
         nargs="?",
         default=str(Path(__file__).parent.parent.parent / "data" /
-                    "json" / "속성테이블(경희대)_no_kbims.json"),
+                    "json" / "속성테이블(10층)_no_kbims.json"),
         help="Output JSON file path"
     )
     parser.add_argument(
@@ -130,22 +130,22 @@ def main():
 
     args = parser.parse_args()
 
-    if args.extract_empty:
-        stats = extract_objects_without_kbims_property(args.input, args.output)
+    stats = extract_objects_without_kbims_property(args.input, args.output)
+    # if args.extract_empty:
 
-        print("\n=== Extraction Complete ===")
-        print(f"Total objects: {stats['total']}")
-        print(f"Extracted (without valid KBIMS-부위코드): {stats['extracted']}")
-        print(f"Skipped (with valid KBIMS-부위코드): {stats['with_valid_kbims']}")
-        print(f"Output saved to: {stats['output_file']}")
-    else:
-        stats = remove_kbims_property(args.input, args.output)
+    #     print("\n=== Extraction Complete ===")
+    #     print(f"Total objects: {stats['total']}")
+    #     print(f"Extracted (without valid KBIMS-부위코드): {stats['extracted']}")
+    #     print(f"Skipped (with valid KBIMS-부위코드): {stats['with_valid_kbims']}")
+    #     print(f"Output saved to: {stats['output_file']}")
+    # else:
+    #     stats = remove_kbims_property(args.input, args.output)
 
-        print("\n=== Processing Complete ===")
-        print(f"Total objects: {stats['total']}")
-        print(f"Properties removed: {stats['properties_removed']}")
-        print(f"Objects unchanged: {stats['objects_unchanged']}")
-        print(f"Output saved to: {stats['output_file']}")
+    #     print("\n=== Processing Complete ===")
+    #     print(f"Total objects: {stats['total']}")
+    #     print(f"Properties removed: {stats['properties_removed']}")
+    #     print(f"Objects unchanged: {stats['objects_unchanged']}")
+    #     print(f"Output saved to: {stats['output_file']}")
 
 
 if __name__ == "__main__":
