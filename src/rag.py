@@ -6,8 +6,8 @@ from typing import List, Dict, Any
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 
-from bim_vector_store import BIMVectorStore, MILVUS_DB_PATH
-from utils import (
+from src.bim_vector_store import BIMVectorStore, MILVUS_DB_PATH
+from src.utils import (
     load_prompt,
     parse_json_response,
     format_prediction_result,
