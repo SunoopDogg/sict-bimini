@@ -1,7 +1,9 @@
-import os
+import io
 import json
-import time
 import logging
+import os
+import time
+from typing import BinaryIO
 
 import pandas as pd
 
@@ -10,39 +12,55 @@ logger = logging.getLogger(__name__)
 
 DEBUG = False
 
+REQUIRED_COLUMNS = ["객체명", "속성세트", "속성명", "속성값"]
 
 FILE_NAMES = [
     "속성테이블(10층)",
-    "속성테이블(경희대)",
-    "속성테이블(법규검토)",
-    "속성테이블(법규검토용)",
+    # "속성테이블(경희대)",
+    # "속성테이블(법규검토)",
+    # "속성테이블(법규검토용)",
 ]
 
 
-def bim_xlsx_to_json(file_name: str, log_interval: int = 1000) -> list:
+def convert_bim_xlsx_from_bytes(
+    file_content: bytes | BinaryIO,
+    filename: str = "uploaded_file.xlsx",
+    log_interval: int = 1000,
+) -> list[dict]:
     """
-    엑셀 파일을 JSON 파일로 변환하는 함수
+    Convert Excel file content (bytes or file-like object) to a list of BIM objects.
 
     Args:
-        file_name (str): 파일명
-        log_interval (int): 진행 상황 로깅 간격 (기본값: 1000행)
+        file_content: Bytes or file-like object containing Excel data
+        filename: Original filename (used for logging)
+        log_interval: Progress logging interval (default: 1000 rows)
 
     Returns:
-        list: JSON 데이터
+        list[dict]: List of BIM objects as dictionaries
+
+    Raises:
+        ValueError: If required columns are missing or file cannot be parsed
     """
+    # Convert bytes to file-like object if needed
+    if isinstance(file_content, bytes):
+        file_content = io.BytesIO(file_content)
 
-    # 데이터 디렉토리와 엑셀 파일 경로 설정
-    data_dir = os.path.join(os.getcwd(), "data")
-    xlsx_dir = os.path.join(data_dir, "xlsx")
-    file_path = os.path.join(xlsx_dir, f"{file_name}.xlsx")
-
-    # 엑셀 파일을 읽어 데이터프레임으로 변환
-    logger.info(f"Loading Excel file: {file_path}")
+    # Read Excel file
+    logger.info(f"Loading Excel file: {filename}")
     start_time = time.time()
-    df = pd.read_excel(file_path)
+    try:
+        df = pd.read_excel(file_content)
+    except Exception as e:
+        raise ValueError(f"Failed to parse Excel file: {e}")
+
     load_time = time.time() - start_time
     total_rows = len(df)
     logger.info(f"Loaded {total_rows} rows in {load_time:.2f}s")
+
+    # Validate required columns
+    missing_columns = [col for col in REQUIRED_COLUMNS if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
 
     result = []
     item = {}
@@ -51,7 +69,7 @@ def bim_xlsx_to_json(file_name: str, log_interval: int = 1000) -> list:
     global_id = None
     objects_completed = 0
 
-    # 데이터프레임의 각 행을 순회하며 JSON 형식으로 변환
+    # Process each row
     logger.info("Starting row processing...")
     for idx, row in df.iterrows():
         row_dict = row.to_dict()
@@ -59,7 +77,7 @@ def bim_xlsx_to_json(file_name: str, log_interval: int = 1000) -> list:
             print(json.dumps(row_dict, ensure_ascii=False, indent=4))
             print(type(row_dict["속성세트"]), type(row_dict["속성명"]), type(row_dict["속성값"]))
 
-        # step 3: 속성세트, 속성명, 속성값이 모두 NaN인 경우
+        # step 3: When all of 속성세트, 속성명, 속성값 are NaN
         if step == 3 and pd.isna(row_dict["속성세트"]) and pd.isna(row_dict["속성명"]) and pd.isna(row_dict["속성값"]):
             result.append(item)
             objects_completed += 1
@@ -71,24 +89,24 @@ def bim_xlsx_to_json(file_name: str, log_interval: int = 1000) -> list:
                 ifc_type = obj_name.split(":")[1].strip()
                 continue
 
-        # 주기적 진행 상황 로깅
+        # Periodic progress logging
         if (idx + 1) % log_interval == 0:
             progress = (idx + 1) / total_rows * 100
             logger.info(
                 f"Progress: {idx + 1}/{total_rows} rows ({progress:.1f}%), {objects_completed} objects completed")
 
-        # step 1: 객체명을 설정
+        # step 1: Set object name
         if step == 1:
             step = 2
             global_id = row_dict["객체명"].split(":")[1].strip()
-        # step 2: 객체 정보를 설정
+        # step 2: Set object info
         elif step == 2:
             step = 3
             item["IFCType"] = "Ifc{}".format(ifc_type)
             item["GlobalID"] = global_id
             item["Name"] = row_dict["객체명"]
 
-        # step 3: 속성세트와 속성명을 설정
+        # step 3: Set property set and property name
         if step == 3:
             if DEBUG:
                 print(json.dumps(item, ensure_ascii=False, indent=4))
@@ -106,7 +124,39 @@ def bim_xlsx_to_json(file_name: str, log_interval: int = 1000) -> list:
     result.append(item)
     result = result[1:]
 
-    # JSON 파일로 저장
+    # Log completion summary
+    total_time = time.time() - start_time
+    logger.info(
+        f"Conversion complete: {len(result)} objects from {total_rows} rows "
+        f"in {total_time:.2f}s ({len(result)/total_time:.1f} obj/s)"
+    )
+
+    return result
+
+
+def bim_xlsx_to_json(file_name: str, log_interval: int = 1000) -> list:
+    """
+    Convert Excel file to JSON and save to disk.
+
+    Args:
+        file_name: File name (without extension)
+        log_interval: Progress logging interval (default: 1000 rows)
+
+    Returns:
+        list: Converted JSON data
+    """
+    # Set up file paths
+    data_dir = os.path.join(os.getcwd(), "data")
+    xlsx_dir = os.path.join(data_dir, "xlsx")
+    file_path = os.path.join(xlsx_dir, f"{file_name}.xlsx")
+
+    # Read file and convert using the bytes function
+    with open(file_path, "rb") as f:
+        file_content = f.read()
+
+    result = convert_bim_xlsx_from_bytes(file_content, file_path, log_interval)
+
+    # Save JSON file
     save_path = os.path.join(data_dir, "json", f"{file_name}.json")
     logger.info(f"Saving JSON file: {save_path}")
     save_start = time.time()
@@ -114,13 +164,6 @@ def bim_xlsx_to_json(file_name: str, log_interval: int = 1000) -> list:
         f.write(json.dumps(result, indent=4, ensure_ascii=False))
     save_time = time.time() - save_start
     logger.info(f"Saved {len(result)} objects in {save_time:.2f}s")
-
-    # 완료 요약
-    total_time = time.time() - start_time
-    logger.info(
-        f"Conversion complete: {len(result)} objects from {total_rows} rows "
-        f"in {total_time:.2f}s ({len(result)/total_time:.1f} obj/s)"
-    )
 
     return result
 
