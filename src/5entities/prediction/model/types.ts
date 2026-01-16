@@ -1,30 +1,26 @@
-export interface Prediction {
-  rank: number;
-  code: string;
-  description: string;
-  confidence: number;
-  reasoning: string;
-}
+import type { BIMObjectInput } from '@/src/5entities/bim-object';
 
-export interface PredictionResponse {
-  predictions: Prediction[];
-  request_id: string;
-}
-
-export interface FeedbackRequest {
-  request_id: string;
-  correct_code: string;
-  bim_data: {
-    ifc_type: string;
-    category: string;
-    family_name: string;
-    family: string;
-    type: string;
-    type_id: string;
-  };
-}
-
-export interface FeedbackResponse {
+export interface APIResponse<T> {
   success: boolean;
-  message: string;
+  data: T | null;
+  error: string | null;
+}
+
+export interface PredictionResult {
+  predicted_code: string | null;
+  reasoning: string;
+  confidence: number;
+}
+
+export interface BatchItemResult {
+  input: BIMObjectInput;
+  prediction: PredictionResult | null;
+  error: string | null;
+}
+
+export interface BatchPredictResult {
+  results: BatchItemResult[];
+  total: number;
+  successful: number;
+  failed: number;
 }

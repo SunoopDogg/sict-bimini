@@ -1,6 +1,6 @@
 export type {
-  Prediction,
-  PredictionResponse,
-  FeedbackRequest,
-  FeedbackResponse,
+  APIResponse,
+  PredictionResult,
+  BatchItemResult,
+  BatchPredictResult,
 } from './model/types';
