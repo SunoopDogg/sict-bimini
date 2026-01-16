@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SICT Bimini Web
 
-## Getting Started
+KBIMS 부위코드 예측 웹 애플리케이션
 
-First, run the development server:
+## Quick Start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+# 1. 의존성 설치
+bun install
+
+# 2. 환경변수 설정
+cp .env.example .env.local
+# BACKEND_URL에 FastAPI 서버 주소 설정
+
+# 3. 개발 서버 실행
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+> **Note**: 이 애플리케이션은 FastAPI 백엔드 서버가 필요합니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 기술 스택
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| 카테고리                | 기술                                          | 버전    |
+| ----------------------- | --------------------------------------------- | ------- |
+| Runtime/Package Manager | [Bun](https://bun.sh)                         | -       |
+| Framework               | [Next.js](https://nextjs.org) (App Router)    | 16.1.1  |
+| UI Library              | [React](https://react.dev)                    | 19.2.3  |
+| CSS Framework           | [Tailwind CSS](https://tailwindcss.com)       | v4      |
+| UI Components           | [Shadcn UI](https://ui.shadcn.com) (new-york) | -       |
+| Date Library            | [Day.js](https://day.js.org)                  | 1.11.19 |
 
-## Learn More
+## 아키텍처
 
-To learn more about Next.js, take a look at the following resources:
+[Feature-Sliced Design](https://feature-sliced.design/) 패턴 적용:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── 1app/       # 전역 스타일, 프로바이더
+├── 2pages/     # 페이지 컴포넌트
+├── 3widgets/   # 독립적 UI 블록
+├── 4features/  # 사용자 기능
+├── 5entities/  # 비즈니스 엔티티
+└── 6shared/    # 공통 유틸리티, UI 컴포넌트
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 개발
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| 명령어                   | 설명                 |
+| ------------------------ | -------------------- |
+| `bun dev`                | 개발 서버 실행       |
+| `bun run build`          | 프로덕션 빌드        |
+| `bun lint`               | ESLint 검사          |
+| `bunx shadcn@latest add` | Shadcn 컴포넌트 추가 |
