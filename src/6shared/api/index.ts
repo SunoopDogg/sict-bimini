@@ -1,1 +1,1 @@
-export { predictCode, submitFeedback } from './client';
+export { batchPredictCode, convertXlsxToJson } from './client';
