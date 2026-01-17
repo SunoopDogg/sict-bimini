@@ -11,6 +11,7 @@ from utils import (
     load_prompt,
     parse_json_response,
     format_prediction_result,
+    select_json_file,
 )
 
 # Set up logging
@@ -26,15 +27,15 @@ DEFAULT_TEMPERATURE = 0.8
 
 def format_bim_object_for_prediction(obj: dict) -> str:
     """
-    BIM JSON 객체를 예측용 문자열로 변환
+    Convert a BIM JSON object to a string for prediction.
 
     Supports both English and Korean property keys for bilingual compatibility.
 
     Args:
-        obj: BIM 객체 딕셔너리 (JSON에서 로드된 형태)
+        obj: BIM object dictionary (loaded from JSON)
 
     Returns:
-        예측에 사용할 문자열
+        String to use for prediction
     """
     def get_bilingual(data: dict, en_key: str, ko_key: str) -> str:
         """Get value using English key with Korean fallback."""
@@ -129,19 +130,19 @@ class BIMRAGSystem:
             Formatted context string
         """
         if not results:
-            return "유사한 BIM 객체를 찾을 수 없습니다."
+            return "No similar BIM objects found."
 
         context_parts = []
         for i, result in enumerate(results, 1):
             score = result.get('score', 0.0)
             context_parts.append(
-                f"{i}. [유사도: {score:.4f}]\n"
-                f"   - 카테고리: {result.get('category', 'N/A')}\n"
-                f"   - 패밀리명: {result.get('family_name', 'N/A')}\n"
-                f"   - KBIMS 코드: {result.get('kbims_code', 'N/A')}\n"
-                f"   - 패밀리: {result.get('family', 'N/A')}\n"
-                f"   - 타입: {result.get('type', 'N/A')}\n"
-                f"   - 타입ID: {result.get('type_id', 'N/A')}"
+                f"{i}. [Similarity: {score:.4f}]\n"
+                f"   - Category: {result.get('category', 'N/A')}\n"
+                f"   - Family Name: {result.get('family_name', 'N/A')}\n"
+                f"   - KBIMS Code: {result.get('kbims_code', 'N/A')}\n"
+                f"   - Family: {result.get('family', 'N/A')}\n"
+                f"   - Type: {result.get('type', 'N/A')}\n"
+                f"   - Type ID: {result.get('type_id', 'N/A')}"
             )
 
         return "\n\n".join(context_parts)
@@ -229,7 +230,7 @@ class BIMRAGSystem:
                     "input": bim_info,
                     "prediction": prediction
                 })
-                logger.info(format_prediction_result(prediction))  # For logging purposes
+                logger.info(format_prediction_result(prediction))
             except ValueError as e:
                 logger.error(f"Failed to parse prediction for: {bim_info[:50]}... Error: {e}")
                 results.append({
@@ -247,97 +248,32 @@ class BIMRAGSystem:
         logger.info("BIM RAG System closed")
 
 
-def main():
-    """Main function for testing the RAG system."""
-    import argparse
+if __name__ == "__main__":
+    # User selects JSON file
+    predict_path = select_json_file()
 
-    parser = argparse.ArgumentParser(description="BIM RAG System CLI")
-    parser.add_argument("--predict", type=str, help="BIM object info for part code prediction")
-    parser.add_argument("--search", type=str, help="Search query for similar objects")
-    parser.add_argument("--top-k", type=int, default=5, help="Number of results to retrieve")
-    parser.add_argument("--model", type=str, default=DEFAULT_OLLAMA_MODEL, help="Ollama model name")
+    if predict_path is None:
+        exit(0)
 
-    args = parser.parse_args()
+    logger.info(f"Loading objects from: {predict_path}")
+    with open(predict_path, 'r', encoding='utf-8') as f:
+        objects = json.load(f)
 
-    # Initialize RAG system
-    rag = BIMRAGSystem(ollama_model=args.model)
+    logger.info(f"Loaded {len(objects)} objects")
 
+    # Generate prediction strings from each object
+    bim_infos = [format_bim_object_for_prediction(obj) for obj in objects]
+
+    # Initialize RAG system and run batch prediction
+    rag = BIMRAGSystem()
     try:
-        if args.search:
-            print(f"\nSearching for: '{args.search}'")
-            print("=" * 50)
-            results = rag.search(args.search, top_k=args.top_k)
+        results = rag.batch_predict(bim_infos, top_k=DEFAULT_TOP_K)
 
-            for i, result in enumerate(results, 1):
-                print(f"\n{i}. Score: {result.get('score', 0):.4f}")
-                print(f"   Category: {result.get('category', 'N/A')}")
-                print(f"   Family Name: {result.get('family_name', 'N/A')}")
-                print(f"   KBIMS Code: {result.get('kbims_code', 'N/A')}")
-                print(f"   Family: {result.get('family', 'N/A')}")
-                print(f"   Type: {result.get('type', 'N/A')}")
+        # Save results to file
+        output_path = predict_path.parent / f"{predict_path.stem}_predictions.json"
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
 
-        if args.predict:
-            predict_path = Path(args.predict)
-
-            if predict_path.is_file():
-                # 파일 경로인 경우 - 배치 예측
-                print(f"\nBatch predicting from file: '{args.predict}'")
-                print("=" * 50)
-
-                with open(predict_path, 'r', encoding='utf-8') as f:
-                    objects = json.load(f)
-
-                print(f"Loaded {len(objects)} objects from file")
-
-                # 각 객체에서 예측용 문자열 생성
-                bim_infos = [format_bim_object_for_prediction(obj) for obj in objects]
-
-                # 배치 예측 수행
-                results = rag.batch_predict(bim_infos, top_k=args.top_k)
-
-                # 결과 출력
-                print(f"\n=== Batch Prediction Results ({len(results)} objects) ===\n")
-                for i, result in enumerate(results, 1):
-                    print(f"[{i}/{len(results)}] Input: {result['input'][:80]}...")
-                    if result.get('prediction'):
-                        print(
-                            f"  Predicted Code: {result['prediction'].get('predicted_code', 'N/A')}")
-                        print(f"  Confidence: {result['prediction'].get('confidence', 'N/A')}")
-                        print(
-                            f"  Reasoning: {result['prediction'].get('reasoning', 'N/A')[:100]}...")
-                    else:
-                        print(f"  Error: {result.get('error', 'Unknown error')}")
-                    print()
-
-                # 결과를 파일로 저장
-                output_path = predict_path.parent / f"{predict_path.stem}_predictions.json"
-                with open(output_path, 'w', encoding='utf-8') as f:
-                    json.dump(results, f, ensure_ascii=False, indent=2)
-                print(f"\nResults saved to: {output_path}")
-
-            else:
-                # 텍스트 문자열인 경우 - 단일 예측
-                print(f"\nPredicting part code for: '{args.predict}'")
-                print("=" * 50)
-                try:
-                    prediction = rag.predict_part_code(args.predict, top_k=args.top_k)
-                    print("\nPrediction Result:")
-                    print(format_prediction_result(prediction))
-                except ValueError as e:
-                    print(f"\nError: {e}")
-
-        # If no specific action, show help
-        if not any([args.search, args.predict]):
-            print("\nBIM RAG System Ready")
-            print("Use --help to see available options")
-            print("\nExamples:")
-            print("  --predict '콘크리트 기둥 RC기둥-600x600'  # 텍스트 단일 예측")
-            print("  --predict data/json/no_kbims_objects.json  # JSON 파일 배치 예측")
-            print("  --search '철근콘크리트 보'")
-
+        logger.info(f"Results saved to: {output_path}")
     finally:
         rag.close()
-
-
-if __name__ == "__main__":
-    main()
