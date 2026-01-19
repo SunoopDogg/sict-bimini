@@ -1,0 +1,1 @@
+export { BatchPredictionResultWidget } from './BatchPredictionResultWidget';

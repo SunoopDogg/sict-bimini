@@ -1,9 +1,9 @@
 'use client';
 
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
+import { useEffect, useState, useTransition } from 'react';
 
-import { type PredictState, predictAction } from '@/app/predict/actions';
+import type { XlsxFileInfo } from '@/src/5entities/xlsx-file';
+import { Alert, AlertDescription } from '@/src/6shared/ui/primitive/alert';
 import { Button } from '@/src/6shared/ui/primitive/button';
 import {
   Card,
@@ -12,76 +12,108 @@ import {
   CardHeader,
   CardTitle,
 } from '@/src/6shared/ui/primitive/card';
-import { Input } from '@/src/6shared/ui/primitive/input';
-import { Label } from '@/src/6shared/ui/primitive/label';
+
+import {
+  listXlsxFilesAction,
+  uploadAndConvertXlsxAction,
+} from '../api/actions';
+import type { BatchPredictionResult, UploadStatus } from '../api/types';
+import { FileListSelect } from './FileListSelect';
+import { FileUploadZone } from './FileUploadZone';
 
 interface PredictFormProps {
-  onResult?: (state: PredictState) => void;
+  onResult?: (state: BatchPredictionResult) => void;
 }
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button type="submit" disabled={pending} className="w-full">
-      {pending ? '예측 중...' : '부위코드 예측'}
-    </Button>
-  );
-}
-
-const formFields = [
-  { name: 'ifc_type', label: 'IFC Type', placeholder: 'IfcBeam' },
-  { name: 'category', label: '카테고리', placeholder: '구조 프레임' },
-  {
-    name: 'family_name',
-    label: '패밀리 이름',
-    placeholder: 'BM111-철근콘크리트구조 보',
-  },
-  { name: 'family', label: '패밀리', placeholder: 'BM111-철근콘크리트구조 보' },
-  {
-    name: 'type',
-    label: '타입',
-    placeholder: 'BM110-철근 콘크리트구조 보_400 x 850_B1-1G3',
-  },
-  { name: 'type_id', label: '타입 ID', placeholder: '7667203' },
-];
 
 export function PredictForm({ onResult }: PredictFormProps) {
-  const [state, formAction] = useActionState(
-    async (prevState: PredictState | null, formData: FormData) => {
-      const result = await predictAction(prevState, formData);
-      onResult?.(result);
-      return result;
-    },
-    null,
-  );
+  const [files, setFiles] = useState<XlsxFileInfo[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string>();
+  const [error, setError] = useState<string>();
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>('idle');
+  const [isPredicting, startPrediction] = useTransition();
+
+  const reloadFileList = async () => {
+    const result = await listXlsxFilesAction();
+    if (result.success && result.files) {
+      setFiles(result.files);
+    }
+  };
+
+  useEffect(() => {
+    void listXlsxFilesAction().then((result) => {
+      if (result.success && result.files) {
+        setFiles(result.files);
+      }
+    });
+  }, []);
+
+  const handleFileUpload = async (file: File) => {
+    setError(undefined);
+    setUploadStatus('uploading');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const result = await uploadAndConvertXlsxAction(formData);
+
+      if (result.success && result.file) {
+        setUploadStatus('done');
+        await reloadFileList();
+        setSelectedFile(result.file.name);
+      } else {
+        setError(result.error);
+        setUploadStatus('idle');
+      }
+    } catch {
+      setError('파일 업로드 중 오류가 발생했습니다.');
+      setUploadStatus('idle');
+    }
+  };
+
+  const handleFileSelect = (fileName: string) => {
+    setSelectedFile(fileName);
+    if (uploadStatus === 'done') {
+      setUploadStatus('idle');
+    }
+  };
+
+  const handlePredictionSubmit = () => {};
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>BIM 객체 데이터 입력</CardTitle>
+        <CardTitle>xlsx 파일 업로드</CardTitle>
         <CardDescription>
-          BIM 객체의 속성을 입력하면 KBIMS 부위코드를 예측합니다.
+          BIM 객체 데이터가 포함된 xlsx 파일을 업로드하면 KBIMS 부위코드를 일괄
+          예측합니다.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form action={formAction} className="space-y-4">
-          {formFields.map((field) => (
-            <div key={field.name} className="space-y-2">
-              <Label htmlFor={field.name}>{field.label}</Label>
-              <Input
-                id={field.name}
-                name={field.name}
-                placeholder={field.placeholder}
-                defaultValue={
-                  state?.input?.[field.name as keyof typeof state.input] ?? ''
-                }
-                required
-              />
-            </div>
-          ))}
-          <SubmitButton />
-        </form>
+      <CardContent className="space-y-6">
+        <FileUploadZone
+          onUpload={handleFileUpload}
+          uploadStatus={uploadStatus}
+        />
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <FileListSelect
+          files={files}
+          selectedFile={selectedFile}
+          onSelect={handleFileSelect}
+        />
+
+        <Button
+          onClick={handlePredictionSubmit}
+          disabled={!selectedFile || isPredicting}
+          className="w-full"
+        >
+          {isPredicting ? '예측 중...' : '부위코드 일괄 예측'}
+        </Button>
       </CardContent>
     </Card>
   );

@@ -1,39 +1,60 @@
 import type { BIMObjectInput } from '@/src/5entities/bim-object';
 import type {
-  FeedbackRequest,
-  FeedbackResponse,
-  PredictionResponse,
+  APIResponse,
+  BatchPredictResult,
 } from '@/src/5entities/prediction';
+import type { XLSXConversionResult } from '@/src/5entities/xlsx-file';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+const API_VERSION = '/api/v1';
 
-export async function predictCode(
-  input: BIMObjectInput,
-): Promise<PredictionResponse> {
-  const response = await fetch(`${BACKEND_URL}/api/predict`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
+export async function convertXlsxToJson(
+  file: File,
+): Promise<APIResponse<XLSXConversionResult>> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(
+    `${BACKEND_URL}${API_VERSION}/convert/xlsx-to-json`,
+    {
+      method: 'POST',
+      body: formData,
+    },
+  );
 
   if (!response.ok) {
-    throw new Error(`Prediction failed: ${response.statusText}`);
+    return {
+      success: false,
+      data: null,
+      error: `XLSX conversion failed: ${response.statusText}`,
+    };
   }
 
   return response.json();
 }
 
-export async function submitFeedback(
-  feedback: FeedbackRequest,
-): Promise<FeedbackResponse> {
-  const response = await fetch(`${BACKEND_URL}/api/feedback`, {
+/**
+ * 배치 BIM 객체에 대한 코드 예측
+ */
+export async function batchPredictCode(
+  inputs: BIMObjectInput[],
+  topK: number = 3,
+): Promise<APIResponse<BatchPredictResult>> {
+  const response = await fetch(`${BACKEND_URL}${API_VERSION}/batch-predict`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(feedback),
+    body: JSON.stringify({
+      objects: inputs,
+      top_k: topK,
+    }),
   });
 
   if (!response.ok) {
-    throw new Error(`Feedback submission failed: ${response.statusText}`);
+    return {
+      success: false,
+      data: null,
+      error: `Batch prediction failed: ${response.statusText}`,
+    };
   }
 
   return response.json();
