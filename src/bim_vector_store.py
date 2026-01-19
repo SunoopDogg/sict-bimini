@@ -20,18 +20,18 @@ logger = logging.getLogger(__name__)
 MILVUS_DB_PATH = "./milvus_data/milvus.db"
 COLLECTION_NAME = "bim_objects"
 EMBEDDING_MODEL = "google/embeddinggemma-300m"
-VECTOR_DIM = 768
 CSV_PATH = "./data/csv/bim_attributes.csv"
 
 
 @dataclass
 class BIMAttribute:
-    """Data class for BIM object attributes."""
+    """Represents a single BIM object with its attributes."""
+
     ifc_type: str
     category: str
     family_name: str
     kbims_code: str
-    pps_code: str  # 조달청표준공사코드
+    pps_code: str
     family: str
     type: str
     type_id: str
@@ -39,19 +39,19 @@ class BIMAttribute:
     def to_text(self) -> str:
         """Convert attributes to text for embedding."""
         parts = [
-            self.ifc_type,
-            self.category,
-            self.family_name,
-            self.kbims_code,
-            self.pps_code,
-            self.family,
-            self.type,
-            self.type_id
+            f"IFC Type: {self.ifc_type}",
+            f"Category: {self.category}",
+            f"Family Name: {self.family_name}",
+            f"KBIMS Code: {self.kbims_code}",
+            f"PPS Code: {self.pps_code}",
+            f"Family: {self.family}",
+            f"Type: {self.type}",
+            f"Type ID: {self.type_id}",
         ]
-        return " ".join(p for p in parts if p)
+        return " | ".join(parts)
 
     def to_dict(self) -> Dict[str, str]:
-        """Convert to dictionary."""
+        """Convert attributes to dictionary."""
         return {
             "ifc_type": self.ifc_type,
             "category": self.category,
@@ -60,7 +60,7 @@ class BIMAttribute:
             "pps_code": self.pps_code,
             "family": self.family,
             "type": self.type,
-            "type_id": self.type_id
+            "type_id": self.type_id,
         }
 
 
@@ -121,11 +121,11 @@ class BIMVectorStore:
 
         # Add fields
         schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True)
-        schema.add_field(field_name="ifc_type", datatype=DataType.VARCHAR, max_length=256)
-        schema.add_field(field_name="category", datatype=DataType.VARCHAR, max_length=256)
+        schema.add_field(field_name="ifc_type", datatype=DataType.VARCHAR, max_length=512)
+        schema.add_field(field_name="category", datatype=DataType.VARCHAR, max_length=512)
         schema.add_field(field_name="family_name", datatype=DataType.VARCHAR, max_length=512)
-        schema.add_field(field_name="kbims_code", datatype=DataType.VARCHAR, max_length=64)
-        schema.add_field(field_name="pps_code", datatype=DataType.VARCHAR, max_length=256)
+        schema.add_field(field_name="kbims_code", datatype=DataType.VARCHAR, max_length=512)
+        schema.add_field(field_name="pps_code", datatype=DataType.VARCHAR, max_length=512)
         schema.add_field(field_name="family", datatype=DataType.VARCHAR, max_length=1024)
         schema.add_field(field_name="type", datatype=DataType.VARCHAR, max_length=1024)
         schema.add_field(field_name="type_id", datatype=DataType.VARCHAR, max_length=1024)
@@ -153,75 +153,80 @@ class BIMVectorStore:
         """Generate embedding for a single text."""
         return self.model.encode(text).tolist()
 
-    def _generate_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings for multiple texts."""
-        return self.model.encode(texts).tolist()
+    def _generate_embeddings(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+        """
+        Generate embeddings for multiple texts in batches.
+
+        Args:
+            texts: List of text strings to embed
+            batch_size: Number of texts to embed at once
+
+        Returns:
+            List of embedding vectors
+        """
+        all_embeddings = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            embeddings = self.model.encode(batch)
+            all_embeddings.extend(embeddings.tolist())
+            logger.info(f"Generated embeddings for batch {i // batch_size + 1}")
+        return all_embeddings
 
     def load_from_csv(self, csv_path: str = CSV_PATH, batch_size: int = 100) -> int:
         """
-        Load BIM attributes from CSV and store in Milvus.
+        Load BIM attributes from CSV file and insert into vector store.
 
         Args:
             csv_path: Path to CSV file
-            batch_size: Batch size for insertion
+            batch_size: Number of records to insert at once
 
         Returns:
             Number of records inserted
         """
-        csv_path = Path(csv_path)
-        if not csv_path.exists():
-            raise FileNotFoundError(f"CSV file not found: {csv_path}")
-
         logger.info(f"Loading data from {csv_path}")
 
-        # Read CSV
-        attributes = []
-        with open(csv_path, 'r', encoding='utf-8') as f:
+        # Read CSV file
+        attributes: List[BIMAttribute] = []
+        with open(csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                # Strip whitespace from keys and filter out None keys (from trailing commas)
-                row = {k.strip(): v for k, v in row.items() if k is not None}
                 attr = BIMAttribute(
-                    ifc_type=row.get('ifc_type', ''),
-                    category=row.get('category', ''),
-                    family_name=row.get('family_name', ''),
-                    kbims_code=row.get('kbims_code', ''),
-                    pps_code=row.get('pps_code', ''),
-                    family=row.get('family', ''),
-                    type=row.get('type', ''),
-                    type_id=row.get('type_id', '')
+                    ifc_type=row.get("ifc_type", ""),
+                    category=row.get("category", ""),
+                    family_name=row.get("family_name", ""),
+                    kbims_code=row.get("kbims_code", ""),
+                    pps_code=row.get("pps_code", ""),
+                    family=row.get("family", ""),
+                    type=row.get("type", ""),
+                    type_id=row.get("type_id", ""),
                 )
                 attributes.append(attr)
 
-        logger.info(f"Loaded {len(attributes)} records from CSV")
+        logger.info(f"Read {len(attributes)} records from CSV")
 
-        # Generate embeddings and insert in batches
+        # Generate embeddings for all texts
+        texts = [attr.to_text() for attr in attributes]
+        embeddings = self._generate_embeddings(texts, batch_size=batch_size)
+
+        # Prepare data for insertion
+        data = []
+        for attr, embedding in zip(attributes, embeddings):
+            record = attr.to_dict()
+            record["vector"] = embedding
+            data.append(record)
+
+        # Insert in batches
         total_inserted = 0
-
-        for i in range(0, len(attributes), batch_size):
-            batch = attributes[i:i + batch_size]
-
-            # Generate embeddings
-            texts = [attr.to_text() for attr in batch]
-            embeddings = self._generate_embeddings(texts)
-
-            # Prepare data for insertion
-            data = []
-            for attr, embedding in zip(batch, embeddings):
-                record = attr.to_dict()
-                record["vector"] = embedding
-                data.append(record)
-
-            # Insert batch
+        for i in range(0, len(data), batch_size):
+            batch = data[i:i + batch_size]
             self.client.insert(
                 collection_name=self.collection_name,
-                data=data
+                data=batch
             )
-
             total_inserted += len(batch)
-            logger.info(f"Inserted {total_inserted}/{len(attributes)} records")
+            logger.info(f"Inserted batch {i // batch_size + 1} ({total_inserted}/{len(data)})")
 
-        logger.info(f"Successfully inserted {total_inserted} records")
+        logger.info(f"Successfully loaded {total_inserted} records")
         return total_inserted
 
     def search(self,
@@ -275,29 +280,6 @@ class BIMVectorStore:
 
         return formatted_results
 
-    def get_stats(self) -> Dict[str, Any]:
-        """
-        Get collection statistics.
-
-        Returns:
-            Dictionary with collection stats
-        """
-        stats = {
-            "collection_name": self.collection_name,
-            "db_path": self.db_path,
-            "vector_dim": self.vector_dim,
-            "embedding_model": EMBEDDING_MODEL,
-        }
-
-        # Get collection info
-        if self.client.has_collection(self.collection_name):
-            collection_stats = self.client.get_collection_stats(self.collection_name)
-            stats["row_count"] = collection_stats.get("row_count", 0)
-        else:
-            stats["row_count"] = 0
-
-        return stats
-
     def reset(self) -> None:
         """Drop and recreate the collection."""
         if self.client.has_collection(self.collection_name):
@@ -313,67 +295,10 @@ class BIMVectorStore:
         logger.info("Milvus client closed")
 
 
-def main():
-    """Main function for testing the vector store."""
-    import argparse
-
-    parser = argparse.ArgumentParser(description="BIM Vector Store CLI")
-    parser.add_argument("--csv", default=CSV_PATH, help="Path to CSV file")
-    parser.add_argument("--reset", action="store_true", help="Reset collection before loading")
-    parser.add_argument("--search", type=str, help="Search query")
-    parser.add_argument("--limit", type=int, default=5, help="Search result limit")
-    parser.add_argument("--stats", action="store_true", help="Show collection stats")
-
-    args = parser.parse_args()
-
-    # Initialize store
+if __name__ == "__main__":
     store = BIMVectorStore()
-
     try:
-        if args.reset:
-            store.reset()
-
-        if args.stats:
-            stats = store.get_stats()
-            print("\nCollection Statistics:")
-            print("=" * 50)
-            for key, value in stats.items():
-                print(f"  {key}: {value}")
-            print("=" * 50)
-
-        # Load data if CSV provided and collection is empty
-        stats = store.get_stats()
-        if stats.get("row_count", 0) == 0:
-            print(f"\nLoading data from {args.csv}...")
-            count = store.load_from_csv(args.csv)
-            print(f"Loaded {count} records")
-
-        # Search if query provided
-        if args.search:
-            print(f"\nSearching for: '{args.search}'")
-            print("=" * 50)
-            results = store.search(args.search, limit=args.limit)
-
-            for i, result in enumerate(results, 1):
-                print(f"\n{i}. Score: {result.get('score', 0):.4f}")
-                print(f"   Category: {result.get('category', 'N/A')}")
-                print(f"   Family Name: {result.get('family_name', 'N/A')}")
-                print(f"   KBIMS Code: {result.get('kbims_code', 'N/A')}")
-                print(f"   PPS Code: {result.get('pps_code', 'N/A')}")
-                print(f"   Family: {result.get('family', 'N/A')}")
-                print(f"   Type: {result.get('type', 'N/A')}")
-
-        # Show final stats
-        if not args.stats and not args.search:
-            stats = store.get_stats()
-            print("\nVector Store Ready:")
-            print(f"  Collection: {stats['collection_name']}")
-            print(f"  Records: {stats['row_count']}")
-            print(f"  Dimension: {stats['vector_dim']}")
-
+        store.reset()
+        store.load_from_csv()
     finally:
         store.close()
-
-
-if __name__ == "__main__":
-    main()
