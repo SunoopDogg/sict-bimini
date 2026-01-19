@@ -1,12 +1,12 @@
 def format_prediction_result(result: dict) -> str:
     """
-    예측 결과를 구조화된 텍스트로 포맷
+    Format prediction result as structured text.
 
     Args:
-        result: 예측 결과 딕셔너리
+        result: Prediction result dictionary
 
     Returns:
-        포맷된 문자열
+        Formatted string
     """
     lines = [
         "=" * 50,
@@ -16,5 +16,3 @@ def format_prediction_result(result: dict) -> str:
         "=" * 50
     ]
     return "\n".join(lines)
-
-

@@ -26,5 +26,5 @@ def parse_json_response(response: str) -> dict:
             return json.loads(json_match.group())
         except json.JSONDecodeError as e:
             logger.warning(f"JSON parse error: {e}")
-            raise ValueError(f"유효하지 않은 JSON 형식: {e}")
-    raise ValueError("응답에서 유효한 JSON을 찾을 수 없습니다")
+            raise ValueError(f"Invalid JSON format: {e}")
+    raise ValueError("No valid JSON found in response")
