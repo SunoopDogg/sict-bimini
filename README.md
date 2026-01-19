@@ -70,12 +70,11 @@ sict-bimini/
 │   │   ├── json_to_csv.py        # JSON to CSV 변환
 │   │   ├── xlsm2json.py          # XLSM to JSON 변환
 │   │   └── remove_kbims_property.py  # KBIMS 속성 제거
-│   ├── utils/                    # 유틸리티 모듈
-│   │   ├── __init__.py
-│   │   ├── prompt.py             # 프롬프트 템플릿 로더
-│   │   ├── parsing.py            # JSON 응답 파서
-│   │   └── formatters.py         # 결과 포맷터
-│   └── legacy/                   # 레거시 코드 (참조용)
+│   └── utils/                    # 유틸리티 모듈
+│       ├── __init__.py
+│       ├── prompt.py             # 프롬프트 템플릿 로더
+│       ├── parsing.py            # JSON 응답 파서
+│       └── formatters.py         # 결과 포맷터
 │
 ├── data/
 │   ├── json/                     # JSON 소스 파일
@@ -103,7 +102,6 @@ sict-bimini/
   - `rag.py`: KBIMS 예측을 위한 RAG 시스템
   - `converters/`: 데이터 형식 변환 유틸리티
   - `utils/`: 프롬프트 로딩, 응답 파싱, 결과 포맷팅 유틸리티
-  - `legacy/`: 이전 버전 코드 참조용
 
 - **data/**: 데이터 저장소
   - `json/`: JSON 형식의 원본 BIM 데이터
