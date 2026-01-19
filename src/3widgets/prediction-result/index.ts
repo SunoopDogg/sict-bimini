@@ -1,0 +1,1 @@
+export { PredictionResultWidget } from './PredictionResultWidget';
