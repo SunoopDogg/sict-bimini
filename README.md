@@ -6,6 +6,9 @@
 
 ```
 src/
+├── api/                  # REST API (FastAPI)
+│   ├── server.py         # API 서버
+│   └── schemas.py        # 요청/응답 스키마
 ├── bim_vector_store.py   # 벡터 DB (Milvus) + 임베딩
 ├── rag.py                # RAG 예측 시스템 (Ollama LLM)
 ├── converters/           # 데이터 변환 (XLSX→JSON→CSV)
@@ -24,8 +27,9 @@ prompts/
 
 | 구성요소 | 역할 |
 |----------|------|
+| **FastAPI** | REST API 서버 |
 | **Milvus-lite** | 벡터 유사도 검색 |
-| **SentenceTransformers** | 텍스트 임베딩 (768D) |
+| **SentenceTransformers** | 텍스트 임베딩 (300D) |
 | **Ollama** | 로컬 LLM 추론 |
 | **LangChain** | LLM 오케스트레이션 |
 
@@ -70,7 +74,7 @@ results = store.search("콘크리트 기둥", limit=5)
 ```bash
 # Ollama 실행 (필수)
 ollama serve &
-ollama pull gemma3:27b
+ollama pull gpt-oss:20b
 ```
 
 ```python
@@ -94,48 +98,79 @@ results = rag.batch_predict(bim_objects_list)
 ```json
 {
   "predicted_code": "25.21.10.01",
-  "confidence": "high",
-  "rationale": "유사 객체 분석 기반 근거..."
+  "reasoning": "유사 객체 분석 기반 근거...",
+  "confidence": 0.85
 }
 ```
 
-## 주요 API
+## REST API
 
-### BIMVectorStore
+### 서버 실행
 
-| 메서드 | 설명 |
-|--------|------|
-| `load_from_csv(path)` | CSV에서 BIM 속성 로드 및 임베딩 |
-| `search(query, limit)` | 시맨틱 유사도 검색 |
-| `reset()` | 컬렉션 초기화 |
+```bash
+# 개발 모드
+uvicorn src.api.server:app --reload
 
-### BIMRAGSystem
+# Docker
+docker compose up -d sict-bimini
+```
 
-| 메서드 | 설명 |
-|--------|------|
-| `predict_part_code(bim_info)` | KBIMS 코드 예측 |
-| `batch_predict(bim_list)` | 배치 예측 |
-| `search(query, top_k)` | 유사 객체 검색 |
+### Endpoints
+
+| Endpoint | Method | 설명 |
+|----------|--------|------|
+| `/api/v1/health` | GET | 서버 상태 및 연결 확인 |
+| `/api/v1/predict` | POST | 단일 BIM 객체 KBIMS 코드 예측 |
+| `/api/v1/batch-predict` | POST | 배치 예측 (최대 100개) |
+| `/api/v1/search` | GET | 유사 BIM 객체 검색 |
+
+### 예측 API 예제
+
+```bash
+curl -X POST http://localhost:8000/api/v1/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "category": "구조기둥",
+    "family_name": "RC기둥",
+    "family": "콘크리트-직사각형-기둥",
+    "type": "400 x 600mm"
+  }'
+```
+
+**응답:**
+```json
+{
+  "success": true,
+  "data": {
+    "predicted_code": "25.21.10.01",
+    "reasoning": "유사 객체 분석 기반 근거...",
+    "confidence": 0.85
+  }
+}
+```
+
+### 검색 API 예제
+
+```bash
+curl "http://localhost:8000/api/v1/search?query=콘크리트%20기둥&top_k=5"
+```
+
+### API 문서
+
+서버 실행 후 자동 생성:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
 
 ## Docker
 
 ```bash
-# CPU
-docker compose up sict-bimini
+# CPU (포트 8000 노출)
+docker compose up -d sict-bimini
 
 # GPU
-docker compose --profile gpu build sict-bimini-gpu
+docker compose --profile gpu up -d sict-bimini-gpu
+
+# API 헬스 체크
+curl http://localhost:8000/api/v1/health
 ```
 
-## 파일 설명
-
-| 파일 | 역할 |
-|------|------|
-| `bim_vector_store.py` | Milvus 컬렉션 관리, 임베딩 생성, 유사도 검색 |
-| `rag.py` | LLM 기반 부위코드 예측, 컨텍스트 생성 |
-| `converters/xlsx2json.py` | Excel 속성 테이블 → JSON 변환 |
-| `converters/json_to_csv.py` | JSON → CSV 변환 (중복 제거) |
-| `utils/prompt.py` | 프롬프트 템플릿 로더 |
-| `utils/parsing.py` | LLM JSON 응답 파서 |
-| `utils/formatters.py` | 결과 포맷팅 |
-| `utils/file_selector.py` | 인터랙티브 파일 선택 |

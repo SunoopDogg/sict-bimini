@@ -6,6 +6,8 @@ services:
     container_name: sict-bimini
     tty: true
     ipc: host
+    ports:
+      - "8000:8000"
     environment:
       - DISPLAY=${DISPLAY:-host.docker.internal:0}
       - QT_X11_NO_MITSHM=1
