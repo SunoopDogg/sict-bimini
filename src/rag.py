@@ -89,6 +89,7 @@ class BIMRAGSystem:
                 f"   - Category: {result.get('category', 'N/A')}\n"
                 f"   - Family Name: {result.get('family_name', 'N/A')}\n"
                 f"   - KBIMS Code: {result.get('kbims_code', 'N/A')}\n"
+                f"   - PPS Code: {result.get('pps_code', 'N/A')}\n"
                 f"   - Family: {result.get('family', 'N/A')}\n"
                 f"   - Type: {result.get('type', 'N/A')}\n"
                 f"   - Type ID: {result.get('type_id', 'N/A')}"
@@ -116,7 +117,7 @@ class BIMRAGSystem:
 
     def predict_part_code(self,
                           bim_object_info: str,
-                          top_k: int = DEFAULT_TOP_K) -> dict[str, Any]:
+                          top_k: int = DEFAULT_TOP_K) -> list[dict[str, Any]]:
         """
         Predict KBIMS part code for a BIM object.
 
@@ -125,7 +126,7 @@ class BIMRAGSystem:
             top_k: Number of similar objects to retrieve
 
         Returns:
-            Dictionary with keys:
+            List of prediction candidate dictionaries, each with keys:
                 - predicted_code: Predicted KBIMS part code
                 - reasoning: Explanation for the prediction
                 - confidence: Confidence score (0.0 to 1.0)
@@ -149,10 +150,11 @@ class BIMRAGSystem:
 
         # Step 4: Parse JSON response
         logger.info("Parsing JSON response...")
-        result = parse_json_response(response)
+        parsed = parse_json_response(response)
+        predictions = parsed.get("predictions") or [parsed]
 
         logger.info("Prediction complete")
-        return result
+        return predictions
 
     def batch_predict(self,
                       bim_objects: list[str],
@@ -165,7 +167,7 @@ class BIMRAGSystem:
             top_k: Number of similar objects to retrieve per query
 
         Returns:
-            List of dictionaries with input and prediction result (JSON dict)
+            List of dictionaries with input and prediction result (list of candidate dicts)
         """
         results = []
         total = len(bim_objects)
