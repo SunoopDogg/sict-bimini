@@ -1,10 +1,3 @@
-"""
-Unified BIMAttribute dataclass for BIM object representation.
-
-This module provides a single, hashable BIMAttribute class that combines
-features from both json_to_csv.py and bim_vector_store.py implementations.
-"""
-
 from dataclasses import dataclass, asdict
 
 # BIM attribute field names used across the codebase
@@ -70,3 +63,26 @@ class BIMAttribute:
     def is_valid(self) -> bool:
         """Check if at least one code (KBIMS or PPS) has a value."""
         return bool(self.kbims_code or self.pps_code)
+
+
+def load_bim_attributes_from_csv(csv_path: str) -> list["BIMAttribute"]:
+    """Load BIM attributes from a CSV file.
+
+    Args:
+        csv_path: Path to CSV file with BIM attribute columns.
+
+    Returns:
+        List of BIMAttribute instances.
+    """
+    import csv
+
+    attributes: list[BIMAttribute] = []
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f, skipinitialspace=True)
+        for row in reader:
+            stripped = {k.strip(): (v.strip() if v else "") for k, v in row.items() if k}
+            attr = BIMAttribute(
+                **{field: stripped.get(field, "") for field in BIM_ATTRIBUTE_FIELDS}
+            )
+            attributes.append(attr)
+    return attributes
