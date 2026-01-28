@@ -1,5 +1,3 @@
-"""Pydantic schemas for API request/response validation."""
-
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
@@ -74,6 +72,11 @@ class PredictionResult(BaseModel):
         description="Predicted KBIMS part code",
         examples=["25.21.10.01"],
     )
+    predicted_pps_code: str | None = Field(
+        default=None,
+        description="Predicted PPS (Public Procurement Service) code",
+        examples=["AD+AFC100+AJM"],
+    )
     reasoning: str = Field(
         description="Explanation for the prediction",
         examples=["Based on similarity analysis..."],
@@ -90,9 +93,20 @@ class PredictionResult(BaseModel):
         """Create PredictionResult from a prediction result dictionary."""
         return cls(
             predicted_code=data.get("predicted_code"),
+            predicted_pps_code=data.get("predicted_pps_code"),
             reasoning=data.get("reasoning", ""),
             confidence=data.get("confidence", 0.0),
         )
+
+
+class PredictionCandidates(BaseModel):
+    """Multiple prediction candidates ordered by confidence."""
+
+    predictions: list[PredictionResult] = Field(
+        description="List of prediction candidates ordered by confidence (descending)",
+        min_length=1,
+        max_length=3,
+    )
 
 
 class APIResponse(BaseModel, Generic[T]):
@@ -123,7 +137,7 @@ class BatchItemResult(BaseModel):
     """Single item result in batch prediction."""
 
     input: BIMObjectInput = Field(description="Original input object")
-    prediction: PredictionResult | None = Field(
+    prediction: PredictionCandidates | None = Field(
         default=None,
         description="Prediction result",
     )
@@ -190,3 +204,26 @@ class XLSXConversionResult(BaseModel):
         description="Original filename",
         examples=["속성테이블(10층).xlsx"],
     )
+
+
+class BIMAttributeItem(BaseModel):
+    """Single BIM attribute item from the vector store dataset."""
+
+    ifc_type: str = Field(default="", description="IFC type identifier")
+    category: str = Field(default="", description="Object category")
+    family_name: str = Field(default="", description="Family name")
+    kbims_code: str = Field(default="", description="KBIMS part code")
+    pps_code: str = Field(default="", description="PPS code")
+    family: str = Field(default="", description="Family description")
+    type: str = Field(default="", description="Type specification")
+    type_id: str = Field(default="", description="Type identifier")
+
+
+class BIMAttributeListResponse(BaseModel):
+    """Paginated response for BIM attributes list."""
+
+    items: list[BIMAttributeItem] = Field(description="BIM attribute items for current page")
+    total: int = Field(description="Total number of records")
+    page: int = Field(description="Current page number")
+    page_size: int = Field(description="Number of items per page")
+    total_pages: int = Field(description="Total number of pages")

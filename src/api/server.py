@@ -1,6 +1,5 @@
-"""FastAPI server for BIM KBIMS part code prediction."""
-
 import logging
+import math
 import time
 from contextlib import asynccontextmanager
 
@@ -12,8 +11,11 @@ from src.api.schemas import (
     BatchItemResult,
     BatchPredictRequest,
     BatchPredictResult,
+    BIMAttributeItem,
+    BIMAttributeListResponse,
     BIMObjectInput,
     HealthResponse,
+    PredictionCandidates,
     PredictionResult,
     SearchResponse,
     SearchResult,
@@ -21,21 +23,29 @@ from src.api.schemas import (
 )
 from src.converters import convert_bim_xlsx_from_bytes
 from src.rag import BIMRAGSystem
+from src.utils import load_bim_attributes_from_csv
 
 logger = logging.getLogger(__name__)
 
-# Global RAG system instance
+# Global instances
 rag_system: BIMRAGSystem | None = None
+bim_attributes_cache: list[object] | None = None
+
+CSV_PATH = "./data/csv/bim_attributes.csv"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - initialize and cleanup resources."""
-    global rag_system
+    global rag_system, bim_attributes_cache
     logger.info("Starting BIM RAG API server...")
     try:
         rag_system = BIMRAGSystem()
         logger.info("BIM RAG System initialized successfully")
+
+        bim_attributes_cache = load_bim_attributes_from_csv(CSV_PATH)
+        logger.info(f"Loaded {len(bim_attributes_cache)} BIM attributes from CSV")
+
         yield
     finally:
         if rag_system:
@@ -72,7 +82,7 @@ def get_rag_system() -> BIMRAGSystem:
 
 def _run_prediction(
     rag: BIMRAGSystem, bim_object: BIMObjectInput, top_k: int
-) -> PredictionResult:
+) -> PredictionCandidates:
     """Run KBIMS prediction for a single BIM object.
 
     Raises:
@@ -81,8 +91,10 @@ def _run_prediction(
     query_string = bim_object.to_query_string()
     if not query_string:
         raise ValueError("At least one field must be provided")
-    result = rag.predict_part_code(query_string, top_k=top_k)
-    return PredictionResult.from_dict(result)
+    predictions = rag.predict_part_code(query_string, top_k=top_k)
+    return PredictionCandidates(
+        predictions=[PredictionResult.from_dict(p) for p in predictions]
+    )
 
 
 @app.get("/api/v1/health", response_model=APIResponse[HealthResponse])
@@ -120,11 +132,11 @@ async def health_check() -> APIResponse[HealthResponse]:
     )
 
 
-@app.post("/api/v1/predict", response_model=APIResponse[PredictionResult])
+@app.post("/api/v1/predict", response_model=APIResponse[PredictionCandidates])
 async def predict_part_code(
     bim_object: BIMObjectInput,
     top_k: int = Query(default=5, ge=1, le=20, description="Number of similar objects to retrieve"),
-) -> APIResponse[PredictionResult]:
+) -> APIResponse[PredictionCandidates]:
     """Predict KBIMS part code for a single BIM object."""
     rag = get_rag_system()
 
@@ -262,6 +274,36 @@ async def convert_xlsx_to_json(
             total_objects=len(objects),
             processing_time_seconds=round(processing_time, 3),
             source_filename=filename,
+        ),
+    )
+
+
+@app.get("/api/v1/bim-attributes", response_model=APIResponse[BIMAttributeListResponse])
+async def list_bim_attributes(
+    page: int = Query(default=1, ge=1, description="Page number (1-based)"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Number of items per page"),
+) -> APIResponse[BIMAttributeListResponse]:
+    """List BIM attributes from the dataset with pagination."""
+    if bim_attributes_cache is None:
+        raise HTTPException(status_code=503, detail="BIM attributes not loaded")
+
+    total = len(bim_attributes_cache)
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+
+    offset = (page - 1) * page_size
+    items = [
+        BIMAttributeItem(**attr.to_dict())
+        for attr in bim_attributes_cache[offset : offset + page_size]
+    ]
+
+    return APIResponse(
+        success=True,
+        data=BIMAttributeListResponse(
+            items=items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
         ),
     )
 
