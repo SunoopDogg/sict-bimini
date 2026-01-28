@@ -133,7 +133,7 @@ class BIMVectorStore:
         # Read CSV file
         attributes: list[BIMAttribute] = []
         with open(csv_path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
+            reader = csv.DictReader(f, skipinitialspace=True)
             for row in reader:
                 attr = bim_attribute_from_csv_row(row)
                 attributes.append(attr)
