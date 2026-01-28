@@ -1,12 +1,3 @@
-"""
-BIM attribute conversion utilities.
-
-Provides functions for converting between different BIM data formats:
-- JSON objects to BIMAttribute
-- CSV rows to BIMAttribute
-- BIM objects to prediction strings
-"""
-
 from typing import Any
 
 from .bim_attribute import BIMAttribute
