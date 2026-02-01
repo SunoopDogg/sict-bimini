@@ -1,12 +1,11 @@
-export type { APIResponse } from '@/src/6shared/api/types';
-
 export interface PredictionResult {
   predicted_code: string | null;
   reasoning: string;
   confidence: number;
+  predicted_at?: string;
 }
 
-export interface BatchItemResult {
+interface BatchItemResult {
   input: {
     name: string;
     object_type: string;
