@@ -1,19 +1,14 @@
 import csv
-import torch
 import logging
-
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass
+from typing import Any
 
-from pymilvus import (
-    MilvusClient,
-    DataType,
-)
+import torch
+from pymilvus import MilvusClient, DataType
 from sentence_transformers import SentenceTransformer
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+from src.utils import BIM_ATTRIBUTE_FIELDS, BIMAttribute, bim_attribute_from_csv_row
+
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -21,47 +16,6 @@ MILVUS_DB_PATH = "./milvus_data/milvus.db"
 COLLECTION_NAME = "bim_objects"
 EMBEDDING_MODEL = "google/embeddinggemma-300m"
 CSV_PATH = "./data/csv/bim_attributes.csv"
-
-
-@dataclass
-class BIMAttribute:
-    """Represents a single BIM object with its attributes."""
-
-    ifc_type: str
-    category: str
-    family_name: str
-    kbims_code: str
-    pps_code: str
-    family: str
-    type: str
-    type_id: str
-
-    def to_text(self) -> str:
-        """Convert attributes to text for embedding."""
-        parts = [
-            f"IFC Type: {self.ifc_type}",
-            f"Category: {self.category}",
-            f"Family Name: {self.family_name}",
-            f"KBIMS Code: {self.kbims_code}",
-            f"PPS Code: {self.pps_code}",
-            f"Family: {self.family}",
-            f"Type: {self.type}",
-            f"Type ID: {self.type_id}",
-        ]
-        return " | ".join(parts)
-
-    def to_dict(self) -> Dict[str, str]:
-        """Convert attributes to dictionary."""
-        return {
-            "ifc_type": self.ifc_type,
-            "category": self.category,
-            "family_name": self.family_name,
-            "kbims_code": self.kbims_code,
-            "pps_code": self.pps_code,
-            "family": self.family,
-            "type": self.type,
-            "type_id": self.type_id,
-        }
 
 
 class BIMVectorStore:
@@ -121,14 +75,9 @@ class BIMVectorStore:
 
         # Add fields
         schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True)
-        schema.add_field(field_name="ifc_type", datatype=DataType.VARCHAR, max_length=512)
-        schema.add_field(field_name="category", datatype=DataType.VARCHAR, max_length=512)
-        schema.add_field(field_name="family_name", datatype=DataType.VARCHAR, max_length=512)
-        schema.add_field(field_name="kbims_code", datatype=DataType.VARCHAR, max_length=512)
-        schema.add_field(field_name="pps_code", datatype=DataType.VARCHAR, max_length=512)
-        schema.add_field(field_name="family", datatype=DataType.VARCHAR, max_length=1024)
-        schema.add_field(field_name="type", datatype=DataType.VARCHAR, max_length=1024)
-        schema.add_field(field_name="type_id", datatype=DataType.VARCHAR, max_length=1024)
+        for field in BIM_ATTRIBUTE_FIELDS:
+            max_length = 1024 if field in ("family", "type", "type_id") else 512
+            schema.add_field(field_name=field, datatype=DataType.VARCHAR, max_length=max_length)
         schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=self.vector_dim)
 
         # Create index parameters
@@ -149,11 +98,7 @@ class BIMVectorStore:
 
         logger.info(f"Collection '{self.collection_name}' created successfully")
 
-    def _generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for a single text."""
-        return self.model.encode(text).tolist()
-
-    def _generate_embeddings(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+    def _generate_embeddings(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         """
         Generate embeddings for multiple texts in batches.
 
@@ -186,45 +131,36 @@ class BIMVectorStore:
         logger.info(f"Loading data from {csv_path}")
 
         # Read CSV file
-        attributes: List[BIMAttribute] = []
+        attributes: list[BIMAttribute] = []
         with open(csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                attr = BIMAttribute(
-                    ifc_type=row.get("ifc_type", ""),
-                    category=row.get("category", ""),
-                    family_name=row.get("family_name", ""),
-                    kbims_code=row.get("kbims_code", ""),
-                    pps_code=row.get("pps_code", ""),
-                    family=row.get("family", ""),
-                    type=row.get("type", ""),
-                    type_id=row.get("type_id", ""),
-                )
+                attr = bim_attribute_from_csv_row(row)
                 attributes.append(attr)
 
         logger.info(f"Read {len(attributes)} records from CSV")
 
         # Generate embeddings for all texts
-        texts = [attr.to_text() for attr in attributes]
-        embeddings = self._generate_embeddings(texts, batch_size=batch_size)
+        embedding_texts = [attr.to_text() for attr in attributes]
+        embeddings = self._generate_embeddings(embedding_texts, batch_size=batch_size)
 
-        # Prepare data for insertion
-        data = []
+        # Prepare records for insertion
+        records = []
         for attr, embedding in zip(attributes, embeddings):
             record = attr.to_dict()
             record["vector"] = embedding
-            data.append(record)
+            records.append(record)
 
         # Insert in batches
         total_inserted = 0
-        for i in range(0, len(data), batch_size):
-            batch = data[i:i + batch_size]
+        for i in range(0, len(records), batch_size):
+            batch = records[i:i + batch_size]
             self.client.insert(
                 collection_name=self.collection_name,
                 data=batch
             )
             total_inserted += len(batch)
-            logger.info(f"Inserted batch {i // batch_size + 1} ({total_inserted}/{len(data)})")
+            logger.info(f"Inserted batch {i // batch_size + 1} ({total_inserted}/{len(records)})")
 
         logger.info(f"Successfully loaded {total_inserted} records")
         return total_inserted
@@ -232,24 +168,23 @@ class BIMVectorStore:
     def search(self,
                query: str,
                limit: int = 5,
-               output_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+               output_fields: list[str] | None = None) -> list[dict[str, Any]]:
         """
         Search for similar BIM objects.
 
         Args:
             query: Search query text
             limit: Maximum number of results
-            output_fields: Fields to return (default: all)
+            output_fields: Fields to return (default: all BIM attribute fields)
 
         Returns:
             List of search results with scores
         """
         if output_fields is None:
-            output_fields = ["ifc_type", "category", "family_name", "kbims_code",
-                             "pps_code", "family", "type", "type_id"]
+            output_fields = list(BIM_ATTRIBUTE_FIELDS)
 
         # Generate query embedding
-        query_embedding = self._generate_embedding(query)
+        query_embedding = self._generate_embeddings([query])[0]
 
         # Search
         results = self.client.search(
@@ -262,19 +197,11 @@ class BIMVectorStore:
         # Format results
         formatted_results = []
         for hit in results[0]:
-            # MilvusClient nests entity data under "entity" key
             entity = hit.get("entity", {})
             result = {
                 "id": hit.get("id"),
                 "score": hit.get("distance", 0.0),
-                "ifc_type": entity.get("ifc_type", ""),
-                "category": entity.get("category", ""),
-                "family_name": entity.get("family_name", ""),
-                "kbims_code": entity.get("kbims_code", ""),
-                "pps_code": entity.get("pps_code", ""),
-                "family": entity.get("family", ""),
-                "type": entity.get("type", ""),
-                "type_id": entity.get("type_id", ""),
+                **{field: entity.get(field, "") for field in BIM_ATTRIBUTE_FIELDS},
             }
             formatted_results.append(result)
 
