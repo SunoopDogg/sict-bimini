@@ -4,6 +4,8 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
+from src.utils import BIMAttribute
+
 T = TypeVar("T")
 
 
@@ -46,24 +48,23 @@ class BIMObjectInput(BaseModel):
         examples=["41.23.15.10"],
     )
 
+    def to_bim_attribute(self) -> BIMAttribute:
+        """Convert to BIMAttribute for internal processing."""
+        return BIMAttribute(
+            ifc_type=self.object_type,
+            category=self.category,
+            family_name=self.family_name,
+            kbims_code="",
+            pps_code=self.pps_code,
+            family=self.family,
+            type=self.type,
+            type_id=self.type_id,
+        )
+
     def to_query_string(self) -> str:
-        """Convert BIM object input to query string for prediction."""
-        parts = []
-        if self.object_type:
-            parts.append(f"ObjectType: {self.object_type}")
-        if self.category:
-            parts.append(f"Category: {self.category}")
-        if self.family_name:
-            parts.append(f"Family Name: {self.family_name}")
-        if self.family:
-            parts.append(f"Family: {self.family}")
-        if self.type:
-            parts.append(f"Type: {self.type}")
-        if self.type_id:
-            parts.append(f"Type ID: {self.type_id}")
-        if self.pps_code:
-            parts.append(f"조달청표준공사코드: {self.pps_code}")
-        return ", ".join(parts) if parts else ""
+        """Convert to query string matching the embedding format for vector search."""
+        attr = self.to_bim_attribute()
+        return attr.to_search_text()
 
 
 class PredictionResult(BaseModel):
@@ -83,6 +84,15 @@ class PredictionResult(BaseModel):
         description="Confidence score (0.0 to 1.0)",
         examples=[0.85],
     )
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "PredictionResult":
+        """Create PredictionResult from a prediction result dictionary."""
+        return cls(
+            predicted_code=data.get("predicted_code"),
+            reasoning=data.get("reasoning", ""),
+            confidence=data.get("confidence", 0.0),
+        )
 
 
 class APIResponse(BaseModel, Generic[T]):
@@ -136,9 +146,11 @@ class SearchResult(BaseModel):
     """Single search result item."""
 
     score: float = Field(description="Similarity score")
+    ifc_type: str = Field(default="", description="IFC type identifier")
     category: str = Field(default="", description="Object category")
     family_name: str = Field(default="", description="Family name")
     kbims_code: str = Field(default="", description="KBIMS part code")
+    pps_code: str = Field(default="", description="PPS code")
     family: str = Field(default="", description="Family description")
     type: str = Field(default="", description="Type specification")
     type_id: str = Field(default="", description="Type identifier")
