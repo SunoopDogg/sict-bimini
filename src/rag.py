@@ -1,10 +1,9 @@
 import json
 import logging
-from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
-from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
+from langchain_ollama import OllamaLLM
 
 from src.bim_vector_store import BIMVectorStore, MILVUS_DB_PATH
 from src.utils import (
@@ -12,10 +11,9 @@ from src.utils import (
     parse_json_response,
     format_prediction_result,
     select_json_file,
+    format_bim_object_for_prediction,
 )
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -23,55 +21,6 @@ DEFAULT_OLLAMA_MODEL = "gpt-oss:20b"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_TOP_K = 5
 DEFAULT_TEMPERATURE = 0.8
-
-
-def format_bim_object_for_prediction(obj: dict) -> str:
-    """
-    Convert a BIM JSON object to a string for prediction.
-
-    Supports both English and Korean property keys for bilingual compatibility.
-
-    Args:
-        obj: BIM object dictionary (loaded from JSON)
-
-    Returns:
-        String to use for prediction
-    """
-    def get_bilingual(data: dict, en_key: str, ko_key: str) -> str:
-        """Get value using English key with Korean fallback."""
-        return str(data.get(en_key, '') or data.get(ko_key, '')).strip()
-
-    other = obj.get("Other", {}) or obj.get("기타", {})
-    parts = []
-
-    if obj.get("ObjectType"):
-        parts.append(f"ObjectType: {obj['ObjectType']}")
-
-    category = get_bilingual(other, "Category", "카테고리")
-    if category:
-        parts.append(f"Category: {category}")
-
-    family_name = get_bilingual(other, "Family Name", "패밀리 이름")
-    if family_name:
-        parts.append(f"Family Name: {family_name}")
-
-    family = get_bilingual(other, "Family", "패밀리")
-    if family:
-        parts.append(f"Family: {family}")
-
-    type_val = get_bilingual(other, "Type", "유형")
-    if type_val:
-        parts.append(f"Type: {type_val}")
-
-    type_id = get_bilingual(other, "Type Id", "유형 ID")
-    if type_id:
-        parts.append(f"Type ID: {type_id}")
-
-    pps_code = str(other.get("조달청표준공사코드", '')).strip()
-    if pps_code:
-        parts.append(f"조달청표준공사코드: {pps_code}")
-
-    return ", ".join(parts) if parts else str(obj)
 
 
 class BIMRAGSystem:
@@ -92,7 +41,7 @@ class BIMRAGSystem:
 
         Args:
             milvus_db_path: Path to Milvus-lite database file
-            ollama_model: Ollama model name (default: gpt-oss:latest)
+            ollama_model: Ollama model name
             ollama_url: Ollama server URL
             temperature: LLM temperature for generation
         """
@@ -119,7 +68,7 @@ class BIMRAGSystem:
 
         logger.info("BIM RAG System initialized successfully")
 
-    def _format_search_results(self, results: List[Dict[str, Any]]) -> str:
+    def _format_search_results(self, results: list[dict[str, Any]]) -> str:
         """
         Format search results as context string for LLM.
 
@@ -149,7 +98,7 @@ class BIMRAGSystem:
 
     def search(self,
                query: str,
-               top_k: int = DEFAULT_TOP_K) -> List[Dict[str, Any]]:
+               top_k: int = DEFAULT_TOP_K) -> list[dict[str, Any]]:
         """
         Search for similar BIM objects.
 
@@ -167,7 +116,7 @@ class BIMRAGSystem:
 
     def predict_part_code(self,
                           bim_object_info: str,
-                          top_k: int = DEFAULT_TOP_K) -> Dict[str, Any]:
+                          top_k: int = DEFAULT_TOP_K) -> dict[str, Any]:
         """
         Predict KBIMS part code for a BIM object.
 
@@ -206,8 +155,8 @@ class BIMRAGSystem:
         return result
 
     def batch_predict(self,
-                      bim_objects: List[str],
-                      top_k: int = DEFAULT_TOP_K) -> List[Dict[str, Any]]:
+                      bim_objects: list[str],
+                      top_k: int = DEFAULT_TOP_K) -> list[dict[str, Any]]:
         """
         Predict part codes for multiple BIM objects.
 
