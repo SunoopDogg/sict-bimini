@@ -1,1 +1,5 @@
-export type { XlsxFileInfo, XLSXConversionResult } from './model/types';
+export type {
+  XlsxFileInfo,
+  XLSXConversionResult,
+  XlsxUploadResult,
+} from './model/types';
