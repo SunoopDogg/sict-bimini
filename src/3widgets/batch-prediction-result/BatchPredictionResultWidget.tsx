@@ -2,7 +2,6 @@
 
 import type { BatchPredictResult } from '@/src/5entities/prediction';
 import { Badge } from '@/src/6shared/ui/primitive/badge';
-import { Button } from '@/src/6shared/ui/primitive/button';
 import {
   Card,
   CardContent,
@@ -10,29 +9,28 @@ import {
   CardHeader,
   CardTitle,
 } from '@/src/6shared/ui/primitive/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/src/6shared/ui/primitive/table';
 
 interface BatchPredictionResultWidgetProps {
-  result: BatchPredictResult;
-  onReset?: () => void;
+  result?: BatchPredictResult | null;
+}
+
+function getConfidenceColorClass(confidence: number): string {
+  if (confidence >= 0.7) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+  if (confidence >= 0.4) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+  return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
 }
 
 function getConfidenceBadge(confidence: number) {
-  if (confidence >= 0.7) {
-    return (
-      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-        {(confidence * 100).toFixed(0)}%
-      </Badge>
-    );
-  }
-  if (confidence >= 0.4) {
-    return (
-      <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-        {(confidence * 100).toFixed(0)}%
-      </Badge>
-    );
-  }
   return (
-    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+    <Badge className={getConfidenceColorClass(confidence)}>
       {(confidence * 100).toFixed(0)}%
     </Badge>
   );
@@ -40,62 +38,52 @@ function getConfidenceBadge(confidence: number) {
 
 export function BatchPredictionResultWidget({
   result,
-  onReset,
 }: BatchPredictionResultWidgetProps) {
+  if (!result) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>예측 결과</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground text-center">
+              예측 실행 전입니다. 객체 리스트에서 예측을 실행해주세요.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>예측 결과</CardTitle>
-            <CardDescription>
-              총 {result.total}개 중 성공 {result.successful}개, 실패{' '}
-              {result.failed}개
-            </CardDescription>
-          </div>
-          <Button variant="outline" onClick={onReset}>
-            새로운 예측
-          </Button>
-        </div>
+        <CardTitle>예측 결과</CardTitle>
+        <CardDescription>
+          총 {result.total}개 중 성공 {result.successful}개, 실패{' '}
+          {result.failed}개
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b">
-                <th className="px-2 py-3 text-left font-medium">#</th>
-                <th className="px-2 py-3 text-left font-medium">Object Type</th>
-                <th className="px-2 py-3 text-left font-medium">카테고리</th>
-                <th className="px-2 py-3 text-left font-medium">패밀리</th>
-                <th className="px-2 py-3 text-left font-medium">유형</th>
-                <th className="px-2 py-3 text-left font-medium">PPS 코드</th>
-                <th className="px-2 py-3 text-left font-medium">예측 코드</th>
-                <th className="px-2 py-3 text-left font-medium">신뢰도</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="max-h-[600px] overflow-y-auto">
+          <Table>
+            <TableHeader className="sticky top-0 bg-background">
+              <TableRow>
+                <TableHead>#</TableHead>
+                <TableHead>예측 코드</TableHead>
+                <TableHead>신뢰도</TableHead>
+                <TableHead>추론</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {result.results.map((item, index) => {
                 return (
-                  <tr key={index} className="border-b last:border-b-0">
-                    <td className="text-muted-foreground px-2 py-3">
+                  <TableRow key={index}>
+                    <TableCell className="text-muted-foreground">
                       {index + 1}
-                    </td>
-                    <td className="max-w-[100px] truncate px-2 py-3">
-                      {item.input.object_type}
-                    </td>
-                    <td className="max-w-[100px] truncate px-2 py-3">
-                      {item.input.category}
-                    </td>
-                    <td className="max-w-[150px] truncate px-2 py-3">
-                      {item.input.family}
-                    </td>
-                    <td className="max-w-[200px] truncate px-2 py-3">
-                      {item.input.type}
-                    </td>
-                    <td className="max-w-[100px] truncate px-2 py-3">
-                      {item.input.pps_code || '-'}
-                    </td>
-                    <td className="px-2 py-3">
+                    </TableCell>
+                    <TableCell>
                       {item.error ? (
                         <Badge variant="destructive">오류</Badge>
                       ) : item.prediction?.predicted_code ? (
@@ -105,17 +93,20 @@ export function BatchPredictionResultWidget({
                       ) : (
                         '-'
                       )}
-                    </td>
-                    <td className="px-2 py-3">
+                    </TableCell>
+                    <TableCell>
                       {item.prediction
                         ? getConfidenceBadge(item.prediction.confidence)
                         : '-'}
-                    </td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="max-w-[300px]">
+                      {item.prediction?.reasoning || '-'}
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </CardContent>
     </Card>
