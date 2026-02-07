@@ -1,6 +1,6 @@
 from typing import Any
 
-from .bim_attribute import BIMAttribute
+from .bim_attribute import BIM_ATTRIBUTE_FIELDS, BIMAttribute
 
 
 def _get_bilingual_value(data: dict[str, Any], en_key: str, ko_key: str) -> str:
@@ -53,16 +53,7 @@ def bim_attribute_from_csv_row(row: dict[str, str]) -> BIMAttribute:
         BIMAttribute instance
     """
     stripped = {k.strip(): (v.strip() if v else "") for k, v in row.items() if k}
-    return BIMAttribute(
-        ifc_type=stripped.get("ifc_type", ""),
-        category=stripped.get("category", ""),
-        family_name=stripped.get("family_name", ""),
-        kbims_code=stripped.get("kbims_code", ""),
-        pps_code=stripped.get("pps_code", ""),
-        family=stripped.get("family", ""),
-        type=stripped.get("type", ""),
-        type_id=stripped.get("type_id", ""),
-    )
+    return BIMAttribute(**{field: stripped.get(field, "") for field in BIM_ATTRIBUTE_FIELDS})
 
 
 def format_bim_object_for_prediction(obj: dict[str, Any]) -> str:
@@ -84,6 +75,6 @@ def format_bim_object_for_prediction(obj: dict[str, Any]) -> str:
 
     # Fallback: build minimal search text from raw object
     parts = []
-    if obj.get("ObjectType"):
-        parts.append(f"IFC Type: {obj['ObjectType']}")
+    if obj.get("IFCType"):
+        parts.append(f"IFC Type: {obj['IFCType']}")
     return " | ".join(parts) if parts else str(obj)

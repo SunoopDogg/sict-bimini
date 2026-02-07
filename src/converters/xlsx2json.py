@@ -19,7 +19,7 @@ class ParseState(IntEnum):
 
 REQUIRED_COLUMNS = ["객체명", "속성세트", "속성명", "속성값"]
 
-FILE_NAMES = [
+XLSX_FILE_STEMS = [
     "속성테이블(10층)",
     "속성테이블(경희대)",
     "속성테이블(법규검토)",
@@ -76,8 +76,7 @@ def convert_bim_xlsx_from_bytes(
 
     # Process each row
     logger.info("Starting row processing...")
-    for idx, row in df.iterrows():
-        row_dict = row.to_dict()
+    for idx, row_dict in enumerate(df.to_dict("records")):
 
         # NaN separator: finish current object and start new one
         if state == ParseState.PROPERTIES and pd.isna(row_dict["속성세트"]) and pd.isna(row_dict["속성명"]) and pd.isna(row_dict["속성값"]):
@@ -123,9 +122,10 @@ def convert_bim_xlsx_from_bytes(
 
     # Log completion summary
     total_time = time.time() - start_time
+    rate = f"{len(bim_objects) / total_time:.1f} obj/s" if total_time > 0 else "N/A"
     logger.info(
         f"Conversion complete: {len(bim_objects)} objects from {total_rows} rows "
-        f"in {total_time:.2f}s ({len(bim_objects)/total_time:.1f} obj/s)"
+        f"in {total_time:.2f}s ({rate})"
     )
 
     return bim_objects
@@ -147,11 +147,9 @@ def bim_xlsx_to_json(file_name: str, log_interval: int = 1000) -> list:
     xlsx_dir = os.path.join(data_dir, "xlsx")
     file_path = os.path.join(xlsx_dir, f"{file_name}.xlsx")
 
-    # Read file and convert using the bytes function
+    # Pass file handle directly to avoid extra memory copy
     with open(file_path, "rb") as f:
-        file_content = f.read()
-
-    result = convert_bim_xlsx_from_bytes(file_content, file_path, log_interval)
+        result = convert_bim_xlsx_from_bytes(f, file_path, log_interval)
 
     # Save JSON file
     save_path = os.path.join(data_dir, "json", f"{file_name}.json")
@@ -166,5 +164,5 @@ def bim_xlsx_to_json(file_name: str, log_interval: int = 1000) -> list:
 
 
 if __name__ == '__main__':
-    for file_name in FILE_NAMES:
+    for file_name in XLSX_FILE_STEMS:
         json_data = bim_xlsx_to_json(file_name)

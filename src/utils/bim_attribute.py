@@ -1,5 +1,8 @@
 from dataclasses import dataclass, asdict
 
+# Shared path constants
+CSV_PATH = "./data/csv/bim_attributes.csv"
+
 # BIM attribute field names used across the codebase
 BIM_ATTRIBUTE_FIELDS: tuple[str, ...] = (
     "ifc_type", "category", "family_name", "kbims_code",
@@ -40,12 +43,11 @@ class BIMAttribute:
 
     def _format_parts(self, *, include_kbims: bool = True, separator: str = " | ") -> str:
         """Format attribute fields as labeled text."""
-        attr_dict = asdict(self)
         parts = []
         for field in BIM_ATTRIBUTE_FIELDS:
             if not include_kbims and field == "kbims_code":
                 continue
-            parts.append(f"{_FIELD_LABELS[field]}: {attr_dict[field]}")
+            parts.append(f"{_FIELD_LABELS[field]}: {getattr(self, field)}")
         return separator.join(parts)
 
     def to_text(self, separator: str = " | ") -> str:
@@ -76,13 +78,11 @@ def load_bim_attributes_from_csv(csv_path: str) -> list["BIMAttribute"]:
     """
     import csv
 
+    from .bim_converter import bim_attribute_from_csv_row
+
     attributes: list[BIMAttribute] = []
     with open(csv_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f, skipinitialspace=True)
         for row in reader:
-            stripped = {k.strip(): (v.strip() if v else "") for k, v in row.items() if k}
-            attr = BIMAttribute(
-                **{field: stripped.get(field, "") for field in BIM_ATTRIBUTE_FIELDS}
-            )
-            attributes.append(attr)
+            attributes.append(bim_attribute_from_csv_row(row))
     return attributes
