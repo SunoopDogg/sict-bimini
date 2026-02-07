@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Any
 
@@ -6,13 +5,8 @@ from langchain_core.prompts import PromptTemplate
 from langchain_ollama import OllamaLLM
 
 from src.bim_vector_store import BIMVectorStore, MILVUS_DB_PATH
-from src.utils import (
-    load_prompt,
-    parse_json_response,
-    format_prediction_result,
-    select_json_file,
-    format_bim_object_for_prediction,
-)
+from src.utils import BIM_ATTRIBUTE_FIELDS, load_prompt, parse_json_response, format_prediction_result
+from src.utils.bim_attribute import _FIELD_LABELS
 
 logger = logging.getLogger(__name__)
 
@@ -84,16 +78,12 @@ class BIMRAGSystem:
         context_parts = []
         for i, result in enumerate(results, 1):
             score = result.get('score', 0.0)
-            context_parts.append(
-                f"{i}. [Similarity: {score:.4f}]\n"
-                f"   - Category: {result.get('category', 'N/A')}\n"
-                f"   - Family Name: {result.get('family_name', 'N/A')}\n"
-                f"   - KBIMS Code: {result.get('kbims_code', 'N/A')}\n"
-                f"   - PPS Code: {result.get('pps_code', 'N/A')}\n"
-                f"   - Family: {result.get('family', 'N/A')}\n"
-                f"   - Type: {result.get('type', 'N/A')}\n"
-                f"   - Type ID: {result.get('type_id', 'N/A')}"
+            field_lines = "\n".join(
+                f"   - {_FIELD_LABELS[field]}: {result.get(field, 'N/A')}"
+                for field in BIM_ATTRIBUTE_FIELDS
+                if field != "ifc_type"
             )
+            context_parts.append(f"{i}. [Similarity: {score:.4f}]\n{field_lines}")
 
         return "\n\n".join(context_parts)
 
@@ -200,6 +190,9 @@ class BIMRAGSystem:
 
 
 if __name__ == "__main__":
+    import json
+    from src.utils import select_json_file, format_bim_object_for_prediction
+
     # User selects JSON file
     predict_path = select_json_file()
 
