@@ -19,7 +19,15 @@ def parse_json_response(response: str) -> dict:
     Raises:
         ValueError: If no valid JSON found in response
     """
-    # Try to find JSON block in the response
+    # Try direct parse first (fastest path for clean JSON responses)
+    stripped = response.strip()
+    if stripped.startswith("{"):
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError:
+            pass
+
+    # Fallback: extract JSON block from surrounding text
     json_match = re.search(r'\{[\s\S]*\}', response)
     if json_match:
         try:
