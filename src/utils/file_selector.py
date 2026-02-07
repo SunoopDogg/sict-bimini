@@ -1,10 +1,9 @@
 from pathlib import Path
-from typing import Optional
 
 DEFAULT_JSON_DIR = Path("data/json")
 
 
-def select_json_file(directory: Path = DEFAULT_JSON_DIR) -> Optional[Path]:
+def select_json_file(directory: Path = DEFAULT_JSON_DIR) -> Path | None:
     """
     Display available JSON files and let user select one.
 
