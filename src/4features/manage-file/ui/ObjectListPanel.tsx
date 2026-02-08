@@ -12,7 +12,7 @@ import {
 import { useState } from 'react';
 
 import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import type { PredictionSession } from '@/src/5entities/prediction';
+import type { PredictionResult, PredictionSession } from '@/src/5entities/prediction';
 import { cn } from '@/src/6shared/lib/cn';
 import { Button } from '@/src/6shared/ui/primitive/button';
 import {
@@ -48,22 +48,24 @@ interface ObjectListPanelProps {
   onSelectionChange: (indices: Set<number>) => void;
   onPredict: () => void;
   onRowClick: (obj: BIMObjectInput, index: number) => void;
-  predictionMap: Map<number, PredictionSession[]>;
+  predictionMap: Record<string, PredictionSession[]>;
   focusedIndex: number | null;
 }
 
 const PAGE_SIZE = 20;
 
-function KbimsStatusIcon({
+function PredictionMatchIcon({
   predictionMap,
   index,
-  kbimsCode,
+  actualCode,
+  getPredictedCode,
 }: {
-  predictionMap: Map<number, PredictionSession[]>;
+  predictionMap: Record<string, PredictionSession[]>;
   index: number;
-  kbimsCode: string;
+  actualCode: string;
+  getPredictedCode: (prediction: PredictionResult) => string | null;
 }) {
-  const sessions = predictionMap.get(index);
+  const sessions = predictionMap[index];
   const latestSession = sessions?.[sessions.length - 1];
   const prediction = latestSession?.candidates?.[latestSession.selectedIndex];
 
@@ -75,43 +77,7 @@ function KbimsStatusIcon({
     );
   }
 
-  if (prediction.predicted_code === kbimsCode) {
-    return (
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-        <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
-      </span>
-    );
-  }
-
-  return (
-    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
-      <X className="h-3 w-3 text-red-600 dark:text-red-400" />
-    </span>
-  );
-}
-
-function PpsStatusIcon({
-  predictionMap,
-  index,
-  ppsCode,
-}: {
-  predictionMap: Map<number, PredictionSession[]>;
-  index: number;
-  ppsCode: string;
-}) {
-  const sessions = predictionMap.get(index);
-  const latestSession = sessions?.[sessions.length - 1];
-  const prediction = latestSession?.candidates?.[latestSession.selectedIndex];
-
-  if (!prediction) {
-    return (
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900">
-        <Minus className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
-      </span>
-    );
-  }
-
-  if (prediction.predicted_pps_code === ppsCode) {
+  if (getPredictedCode(prediction) === actualCode) {
     return (
       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
         <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
@@ -140,9 +106,9 @@ export function ObjectListPanel({
   focusedIndex,
 }: ObjectListPanelProps) {
   const [currentPage, setCurrentPage] = useState(1);
-  const [prevObjects, setPrevObjects] = useState(objects);
+  const [previousObjects, setPrevObjects] = useState(objects);
 
-  if (objects !== prevObjects) {
+  if (objects !== previousObjects) {
     setPrevObjects(objects);
     setCurrentPage(1);
   }
@@ -267,20 +233,22 @@ export function ObjectListPanel({
                         <span className="truncate">
                           {obj.kbims_code || '-'}
                         </span>
-                        <KbimsStatusIcon
+                        <PredictionMatchIcon
                           predictionMap={predictionMap}
                           index={globalIndex}
-                          kbimsCode={obj.kbims_code}
+                          actualCode={obj.kbims_code}
+                          getPredictedCode={(p) => p.predicted_code}
                         />
                       </div>
                     </TableCell>
                     <TableCell className="max-w-30">
                       <div className="flex items-center gap-1.5">
                         <span className="truncate">{obj.pps_code || '-'}</span>
-                        <PpsStatusIcon
+                        <PredictionMatchIcon
                           predictionMap={predictionMap}
                           index={globalIndex}
-                          ppsCode={obj.pps_code}
+                          actualCode={obj.pps_code}
+                          getPredictedCode={(p) => p.predicted_pps_code}
                         />
                       </div>
                     </TableCell>
