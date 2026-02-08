@@ -1,3 +1,5 @@
+import type { BIMObjectInput } from '@/src/5entities/bim-object';
+
 export interface PredictionResult {
   predicted_code: string | null;
   predicted_pps_code: string | null;
@@ -12,22 +14,35 @@ export interface PredictionCandidates {
 
 export interface PredictionSession {
   candidates: PredictionResult[];
+  userCandidate?: PredictionResult;
   selectedIndex: number;
   predicted_at: string;
 }
 
+export interface UserSelection {
+  objectIndex: number;
+  objectName: string;
+  sessionIndex: number;
+  candidate: PredictionResult;
+  object: BIMObjectInput;
+  selectedAt: string;
+}
+
+export interface SelectionFileInfo {
+  name: string;
+  path: string;
+  itemCount: number;
+  modifiedAt: string;
+}
+
+export interface SelectionFileData {
+  items: UserSelection[];
+  createdAt: string;
+  modifiedAt: string;
+}
+
 interface BatchItemResult {
-  input: {
-    name: string;
-    object_type: string;
-    category: string;
-    family_name: string;
-    family: string;
-    type: string;
-    type_id: string;
-    pps_code: string;
-    kbims_code: string;
-  };
+  input: BIMObjectInput;
   prediction: PredictionCandidates | null;
   error: string | null;
 }
