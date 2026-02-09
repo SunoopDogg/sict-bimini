@@ -1,4 +1,5 @@
 import type { BIMObjectInput } from '@/src/5entities/bim-object';
+import type { HealthStatus } from '@/src/5entities/health';
 import type { BatchPredictResult, PredictionResult } from '@/src/5entities/prediction';
 import type { XLSXConversionResult } from '@/src/5entities/xlsx-file';
 
@@ -31,6 +32,14 @@ async function apiRequest<T>(
       error: error instanceof Error ? error.message : `${errorLabel}: 네트워크 오류`,
     };
   }
+}
+
+export async function checkHealth(): Promise<APIResponse<HealthStatus>> {
+  return apiRequest(
+    `${BACKEND_URL}${API_VERSION}/health`,
+    { method: 'GET' },
+    '서버 상태 확인 실패',
+  );
 }
 
 export async function convertXlsxToJson(
