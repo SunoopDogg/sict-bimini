@@ -12,7 +12,7 @@ import {
 import { useState } from 'react';
 
 import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import type { PredictionResult } from '@/src/5entities/prediction';
+import type { PredictionResult, PredictionSession } from '@/src/5entities/prediction';
 import { cn } from '@/src/6shared/lib/cn';
 import { Button } from '@/src/6shared/ui/primitive/button';
 import {
@@ -48,23 +48,26 @@ interface ObjectListPanelProps {
   onSelectionChange: (indices: Set<number>) => void;
   onPredict: () => void;
   onRowClick: (obj: BIMObjectInput, index: number) => void;
-  predictionMap: Map<number, PredictionResult[]>;
+  predictionMap: Record<string, PredictionSession[]>;
   focusedIndex: number | null;
 }
 
 const PAGE_SIZE = 20;
 
-function PredictionStatusIcon({
+function PredictionMatchIcon({
   predictionMap,
   index,
-  kbimsCode,
+  actualCode,
+  getPredictedCode,
 }: {
-  predictionMap: Map<number, PredictionResult[]>;
+  predictionMap: Record<string, PredictionSession[]>;
   index: number;
-  kbimsCode: string;
+  actualCode: string;
+  getPredictedCode: (prediction: PredictionResult) => string | null;
 }) {
-  const predictions = predictionMap.get(index);
-  const prediction = predictions?.[predictions.length - 1];
+  const sessions = predictionMap[index];
+  const latestSession = sessions?.[sessions.length - 1];
+  const prediction = latestSession?.candidates?.[latestSession.selectedIndex];
 
   if (!prediction) {
     return (
@@ -74,7 +77,7 @@ function PredictionStatusIcon({
     );
   }
 
-  if (prediction.predicted_code === kbimsCode) {
+  if (getPredictedCode(prediction) === actualCode) {
     return (
       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
         <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
@@ -103,9 +106,9 @@ export function ObjectListPanel({
   focusedIndex,
 }: ObjectListPanelProps) {
   const [currentPage, setCurrentPage] = useState(1);
-  const [prevObjects, setPrevObjects] = useState(objects);
+  const [previousObjects, setPrevObjects] = useState(objects);
 
-  if (objects !== prevObjects) {
+  if (objects !== previousObjects) {
     setPrevObjects(objects);
     setCurrentPage(1);
   }
@@ -160,15 +163,23 @@ export function ObjectListPanel({
                 <TableHead className="w-10">
                   <Checkbox
                     checked={
-                      objects.length > 0 &&
-                      selectedIndices.size === objects.length
+                      paginatedObjects.length > 0 &&
+                      paginatedObjects.every((_, i) =>
+                        selectedIndices.has(startIndex + i),
+                      )
                     }
                     onCheckedChange={(checked) => {
+                      const next = new Set(selectedIndices);
                       if (checked) {
-                        onSelectionChange(new Set(objects.map((_, i) => i)));
+                        paginatedObjects.forEach((_, i) =>
+                          next.add(startIndex + i),
+                        );
                       } else {
-                        onSelectionChange(new Set());
+                        paginatedObjects.forEach((_, i) =>
+                          next.delete(startIndex + i),
+                        );
                       }
+                      onSelectionChange(next);
                     }}
                   />
                 </TableHead>
@@ -176,7 +187,6 @@ export function ObjectListPanel({
                 <TableHead>객체 이름</TableHead>
                 <TableHead>부위코드</TableHead>
                 <TableHead>PPS 코드</TableHead>
-                <TableHead className="w-12 text-center">상태</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -218,18 +228,29 @@ export function ObjectListPanel({
                     <TableCell className="max-w-50 truncate" title={obj.name}>
                       {obj.name || '-'}
                     </TableCell>
-                    <TableCell className="max-w-30 truncate">
-                      {obj.kbims_code || '-'}
+                    <TableCell className="max-w-30">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate">
+                          {obj.kbims_code || '-'}
+                        </span>
+                        <PredictionMatchIcon
+                          predictionMap={predictionMap}
+                          index={globalIndex}
+                          actualCode={obj.kbims_code}
+                          getPredictedCode={(p) => p.predicted_code}
+                        />
+                      </div>
                     </TableCell>
-                    <TableCell className="max-w-30 truncate">
-                      {obj.pps_code || '-'}
-                    </TableCell>
-                    <TableCell className="w-10 text-center">
-                      <PredictionStatusIcon
-                        predictionMap={predictionMap}
-                        index={globalIndex}
-                        kbimsCode={obj.kbims_code}
-                      />
+                    <TableCell className="max-w-30">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate">{obj.pps_code || '-'}</span>
+                        <PredictionMatchIcon
+                          predictionMap={predictionMap}
+                          index={globalIndex}
+                          actualCode={obj.pps_code}
+                          getPredictedCode={(p) => p.predicted_pps_code}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -296,7 +317,7 @@ export function ObjectListPanel({
   };
 
   return (
-    <Card className="flex h-full flex-col">
+    <Card className="flex flex-col">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>객체 리스트</CardTitle>

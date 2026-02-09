@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { HealthStatus } from '@/src/5entities/health';
 import { checkHealth } from '@/src/6shared/api';
-import { Badge } from '@/src/6shared/ui/primitive/badge';
 import { cn } from '@/src/6shared/lib/cn';
+import { Badge } from '@/src/6shared/ui/primitive/badge';
 
 type ServerState = 'healthy' | 'degraded' | 'offline';
 
@@ -17,7 +17,7 @@ interface StatusInfo {
 const POLL_INTERVAL = 30_000;
 
 const stateConfig: Record<ServerState, { dotClass: string; label: string }> = {
-  healthy: { dotClass: 'bg-green-500', label: '서버 정상' },
+  healthy: { dotClass: 'bg-green-500', label: '서버 온라인' },
   degraded: { dotClass: 'bg-yellow-500', label: '서버 불안정' },
   offline: { dotClass: 'bg-red-500', label: '서버 오프라인' },
 };
@@ -39,7 +39,9 @@ export function ServerStatusBadge() {
       if (response.success && response.data) {
         const data = response.data;
         const state: ServerState =
-          data.status === 'healthy' && data.ollama_connected && data.milvus_connected
+          data.status === 'healthy' &&
+          data.ollama_connected &&
+          data.milvus_connected
             ? 'healthy'
             : 'degraded';
         setStatusInfo({ health: data, state });
@@ -81,22 +83,36 @@ export function ServerStatusBadge() {
       </Badge>
 
       {showDetail && (
-        <div className="absolute top-full left-0 z-50 mt-2 w-56 rounded-md border bg-popover p-3 text-sm text-popover-foreground shadow-md">
+        <div className="bg-popover text-popover-foreground absolute top-full left-0 z-50 mt-2 w-56 rounded-md border p-3 text-sm shadow-md">
           {statusInfo.health ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">버전</span>
-                <span className="font-mono text-xs">{statusInfo.health.version}</span>
+                <span className="font-mono text-xs">
+                  {statusInfo.health.version}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Ollama</span>
-                <span className={statusInfo.health.ollama_connected ? 'text-green-500' : 'text-red-500'}>
+                <span
+                  className={
+                    statusInfo.health.ollama_connected
+                      ? 'text-green-500'
+                      : 'text-red-500'
+                  }
+                >
                   {statusInfo.health.ollama_connected ? '연결됨' : '연결 안됨'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Milvus</span>
-                <span className={statusInfo.health.milvus_connected ? 'text-green-500' : 'text-red-500'}>
+                <span
+                  className={
+                    statusInfo.health.milvus_connected
+                      ? 'text-green-500'
+                      : 'text-red-500'
+                  }
+                >
                   {statusInfo.health.milvus_connected ? '연결됨' : '연결 안됨'}
                 </span>
               </div>

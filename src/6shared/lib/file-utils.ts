@@ -4,6 +4,7 @@ import { basename, join } from 'path';
 export const XLSX_DIR = join(process.cwd(), 'data', 'xlsx');
 export const JSON_DIR = join(process.cwd(), 'data', 'json');
 export const PREDICTIONS_DIR = join(process.cwd(), 'data', 'predictions');
+export const SELECTIONS_DIR = join(process.cwd(), 'data', 'selections');
 
 export function ensureDirectoryExists(dir: string) {
   if (!existsSync(dir)) {

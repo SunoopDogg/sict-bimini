@@ -9,3 +9,15 @@ export interface BIMObjectInput {
   pps_code: string;
   kbims_code: string;
 }
+
+export const EMPTY_BIM_OBJECT: BIMObjectInput = {
+  name: '',
+  object_type: '',
+  category: '',
+  family_name: '',
+  family: '',
+  type: '',
+  type_id: '',
+  pps_code: '',
+  kbims_code: '',
+};

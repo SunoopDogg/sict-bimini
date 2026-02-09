@@ -1,6 +1,7 @@
+import type { BIMAttributeListResponse } from '@/src/5entities/bim-attribute';
 import type { BIMObjectInput } from '@/src/5entities/bim-object';
 import type { HealthStatus } from '@/src/5entities/health';
-import type { BatchPredictResult, PredictionResult } from '@/src/5entities/prediction';
+import type { BatchPredictResult, PredictionCandidates } from '@/src/5entities/prediction';
 import type { XLSXConversionResult } from '@/src/5entities/xlsx-file';
 
 import type { APIResponse } from './types';
@@ -11,7 +12,7 @@ const API_VERSION = '/api/v1';
 async function apiRequest<T>(
   url: string,
   options: RequestInit,
-  errorLabel: string,
+  errorContext: string,
 ): Promise<APIResponse<T>> {
   try {
     const response = await fetch(url, options);
@@ -20,7 +21,7 @@ async function apiRequest<T>(
       return {
         success: false,
         data: null,
-        error: `${errorLabel}: ${response.statusText}`,
+        error: `${errorContext}: ${response.statusText}`,
       };
     }
 
@@ -29,7 +30,7 @@ async function apiRequest<T>(
     return {
       success: false,
       data: null,
-      error: error instanceof Error ? error.message : `${errorLabel}: 네트워크 오류`,
+      error: error instanceof Error ? error.message : `${errorContext}: 네트워크 오류`,
     };
   }
 }
@@ -73,7 +74,7 @@ export async function batchPredictCode(
 export async function predictSingleCode(
   input: BIMObjectInput,
   topK: number = 3,
-): Promise<APIResponse<PredictionResult>> {
+): Promise<APIResponse<PredictionCandidates>> {
   return apiRequest(
     `${BACKEND_URL}${API_VERSION}/predict?top_k=${topK}`,
     {
@@ -82,5 +83,16 @@ export async function predictSingleCode(
       body: JSON.stringify(input),
     },
     '예측 실패',
+  );
+}
+
+export async function fetchBimAttributes(
+  page: number = 1,
+  pageSize: number = 20,
+): Promise<APIResponse<BIMAttributeListResponse>> {
+  return apiRequest(
+    `${BACKEND_URL}${API_VERSION}/bim-attributes?page=${page}&page_size=${pageSize}`,
+    { method: 'GET' },
+    'BIM 속성 목록 조회 실패',
   );
 }

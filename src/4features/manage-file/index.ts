@@ -6,4 +6,9 @@ export {
   uploadAndConvertXlsxAction,
 } from './api/file-actions';
 export { readJsonFileAction } from './api/object-actions';
+export {
+  saveUserSelectionsAction,
+  loadUserSelectionsAction,
+  listSelectionFilesAction,
+} from './api/selection-actions';
 export type { UploadStatus } from './api/types';

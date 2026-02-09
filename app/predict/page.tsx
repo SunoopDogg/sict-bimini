@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useTransition } from 'react';
 
+import { usePredictionSessions } from '@/src/2pages/predict/hooks/usePredictionSessions';
+import { useUserSelections } from '@/src/2pages/predict/hooks/useUserSelections';
 import { ObjectPredictionPanel } from '@/src/3widgets/object-prediction-panel';
+import { UserSelectionPanel } from '@/src/3widgets/user-selection-panel';
+import { BimAttributeTableModal } from '@/src/4features/bim-attribute-viewer';
 import { ServerStatusBadge } from '@/src/4features/server-status';
 import {
   FileListSelect,
@@ -12,13 +16,11 @@ import {
   listXlsxFilesAction,
   readJsonFileAction,
   uploadAndConvertXlsxAction,
+  loadUserSelectionsAction,
 } from '@/src/4features/manage-file';
-import {
-  loadPredictionsAction,
-  savePredictionsAction,
-} from '@/src/4features/predict-code';
+import { loadPredictionsAction } from '@/src/4features/predict-code';
 import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import type { PredictionResult } from '@/src/5entities/prediction';
+import type { PredictionSession } from '@/src/5entities/prediction';
 import type { XlsxFileInfo } from '@/src/5entities/xlsx-file';
 import { batchPredictCode, predictSingleCode } from '@/src/6shared/api';
 import { Alert, AlertDescription } from '@/src/6shared/ui/primitive/alert';
@@ -29,23 +31,15 @@ import {
   CardTitle,
 } from '@/src/6shared/ui/primitive/card';
 
-function predictionMapToRecord(
-  map: Map<number, PredictionResult[]>,
-): Record<string, PredictionResult[]> {
-  const record: Record<string, PredictionResult[]> = {};
-  for (const [key, value] of map) {
-    record[String(key)] = value;
-  }
-  return record;
-}
+type DataSource =
+  | { type: 'xlsx'; fileName: string }
+  | { type: 'selection'; fileName: string }
+  | null;
 
 export default function PredictPage() {
   const [files, setFiles] = useState<XlsxFileInfo[]>([]);
-  const [selectedFile, setSelectedFile] = useState<string>();
+  const [activeSource, setDataSource] = useState<DataSource>(null);
   const [objects, setObjects] = useState<BIMObjectInput[]>([]);
-  const [predictionMap, setPredictionMap] = useState<
-    Map<number, PredictionResult[]>
-  >(new Map());
   const [selectedObjectIndex, setSelectedObjectIndex] = useState<number | null>(
     null,
   );
@@ -58,20 +52,38 @@ export default function PredictPage() {
     new Set(),
   );
 
-  const appendPredictions = (
-    entries: { index: number; prediction: PredictionResult }[],
-  ) => {
-    const now = new Date().toISOString();
-    const nextMap = new Map(predictionMap);
-    for (const { index, prediction } of entries) {
-      const existing = nextMap.get(index) ?? [];
-      nextMap.set(index, [...existing, { ...prediction, predicted_at: now }]);
-    }
-    setPredictionMap(nextMap);
-    if (selectedFile) {
-      savePredictionsAction(selectedFile, predictionMapToRecord(nextMap));
-    }
-  };
+  const selectedFile =
+    activeSource?.type === 'xlsx' ? activeSource.fileName : undefined;
+  const selectedSelectionFile =
+    activeSource?.type === 'selection' ? activeSource.fileName : undefined;
+
+  const {
+    selectionFiles,
+    refreshSelectionFiles,
+    addToSelections,
+    removeFromSelections,
+    loadInitialSelections,
+    setSelectionsFromData,
+    syncSelectionsFromMap,
+  } = useUserSelections(objects);
+
+  const {
+    predictionMap,
+    setPredictionMap,
+    appendSessions,
+    handleSelectCandidate,
+    handleUserCandidateChange,
+    toSession,
+  } = usePredictionSessions({
+    selectedFile,
+    onSelectionSync: (objectIndex, sessionIndex, session, action) => {
+      if (action === 'add') {
+        addToSelections(objectIndex, sessionIndex, session);
+      } else {
+        removeFromSelections(objectIndex);
+      }
+    },
+  });
 
   const refreshFileList = async () => {
     const response = await listXlsxFilesAction();
@@ -94,12 +106,22 @@ export default function PredictPage() {
     if (response.success && response.data) {
       setUploadStatus('done');
       await refreshFileList();
-      setSelectedFile(response.data.file?.name);
+      if (response.data.file?.name) {
+        setDataSource({ type: 'xlsx', fileName: response.data.file.name });
+      }
       setTimeout(() => setUploadStatus('idle'), 2000);
     } else {
       setUploadStatus('idle');
       setError(response.error || '파일 업로드에 실패했습니다.');
     }
+  };
+
+  const handleSelectXlsxFile = (fileName: string) => {
+    setDataSource({ type: 'xlsx', fileName });
+  };
+
+  const handleSelectSelectionFile = async (fileName: string) => {
+    setDataSource({ type: 'selection', fileName });
   };
 
   const handleBatchPredict = () => {
@@ -113,14 +135,17 @@ export default function PredictPage() {
         const entries = response.data.results
           .map((item, i) =>
             item.prediction
-              ? { index: selectedIndicesArray[i], prediction: item.prediction }
+              ? {
+                  index: selectedIndicesArray[i],
+                  session: toSession(item.prediction),
+                }
               : null,
           )
           .filter(
-            (e): e is { index: number; prediction: PredictionResult } =>
+            (e): e is { index: number; session: PredictionSession } =>
               e !== null,
           );
-        appendPredictions(entries);
+        appendSessions(entries);
         setSelectedIndices(new Set());
       } else {
         setError(response.error || '예측에 실패했습니다.');
@@ -135,7 +160,7 @@ export default function PredictPage() {
       const response = await predictSingleCode(objects[index]);
 
       if (response.success && response.data) {
-        appendPredictions([{ index, prediction: response.data }]);
+        appendSessions([{ index, session: toSession(response.data) }]);
       } else {
         setError(response.error || '예측에 실패했습니다.');
       }
@@ -143,15 +168,19 @@ export default function PredictPage() {
     });
   };
 
+  // Initial load
   useEffect(() => {
-    const loadInitialFiles = async () => {
-      await refreshFileList();
+    const loadInitial = async () => {
+      await Promise.all([refreshFileList(), refreshSelectionFiles()]);
+      await loadInitialSelections();
     };
-    loadInitialFiles();
+    loadInitial();
   }, []);
 
+  // Load objects when xlsx file is selected
   useEffect(() => {
-    if (!selectedFile) return;
+    if (activeSource?.type !== 'xlsx') return;
+    const fileName = activeSource.fileName;
 
     const loadObjects = async () => {
       setSelectedObjectIndex(null);
@@ -159,35 +188,81 @@ export default function PredictPage() {
       setSelectedIndices(new Set());
       setIsLoadingObjects(true);
 
-      const response = await readJsonFileAction(selectedFile);
+      let loadedObjects: BIMObjectInput[] = [];
+      const response = await readJsonFileAction(fileName);
 
       if (response.success && response.data) {
+        loadedObjects = response.data;
         setObjects(response.data);
       } else {
         setObjects([]);
         setError(response.error || '객체 데이터를 불러올 수 없습니다.');
       }
 
-      const predResult = await loadPredictionsAction(selectedFile);
+      let loadedMap: Record<string, PredictionSession[]> = {};
+      const predResult = await loadPredictionsAction(fileName);
       if (predResult.success && predResult.data) {
-        const map = new Map<number, PredictionResult[]>();
-        for (const [key, value] of Object.entries(predResult.data)) {
-          map.set(Number(key), value);
+        loadedMap = predResult.data;
+        setPredictionMap(loadedMap);
+      } else {
+        setPredictionMap({});
+      }
+
+      syncSelectionsFromMap(loadedMap, loadedObjects);
+      setIsLoadingObjects(false);
+    };
+
+    loadObjects();
+  }, [activeSource?.type === 'xlsx' ? activeSource.fileName : null]);
+
+  // Load selections when selection file is selected
+  useEffect(() => {
+    if (activeSource?.type !== 'selection') return;
+
+    const loadSelections = async () => {
+      setSelectedObjectIndex(null);
+      setError(undefined);
+      setSelectedIndices(new Set());
+      setIsLoadingObjects(true);
+
+      const response = await loadUserSelectionsAction();
+
+      if (response.success && response.data) {
+        setSelectionsFromData(response.data);
+        const selObjects = response.data.map((sel) => sel.object);
+        setObjects(selObjects);
+        const map: Record<string, PredictionSession[]> = {};
+        for (let i = 0; i < response.data.length; i++) {
+          const sel = response.data[i];
+          map[i] = [
+            {
+              candidates: [],
+              userCandidate: sel.candidate,
+              selectedIndex: 0,
+              predicted_at: sel.selectedAt,
+            },
+          ];
         }
         setPredictionMap(map);
       } else {
-        setPredictionMap(new Map());
+        setSelectionsFromData([]);
+        setObjects([]);
+        setPredictionMap({});
+        setError(response.error || '사용자 선택을 불러올 수 없습니다.');
       }
 
       setIsLoadingObjects(false);
     };
 
-    loadObjects();
-  }, [selectedFile]);
+    loadSelections();
+  }, [activeSource?.type === 'selection' ? activeSource.fileName : null]);
 
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="relative mb-8 flex items-center justify-center">
+        <div className="absolute left-0">
+          <BimAttributeTableModal />
+        </div>
         <h1 className="text-3xl font-bold">KBIMS 코드 예측</h1>
         <div className="absolute right-0">
           <ServerStatusBadge />
@@ -201,8 +276,8 @@ export default function PredictPage() {
       )}
 
       <div className="grid grid-cols-[280px_1.2fr_1fr] gap-4">
-        {/* Panel 1: File List */}
-        <div className="min-h-0">
+        {/* Panel 1: File List + User Selections */}
+        <div className="flex flex-col gap-4 min-h-0">
           <Card className="flex flex-col">
             <CardHeader>
               <CardTitle>파일</CardTitle>
@@ -216,17 +291,22 @@ export default function PredictPage() {
                 <FileListSelect
                   files={files}
                   selectedFile={selectedFile}
-                  onSelect={setSelectedFile}
+                  onSelect={handleSelectXlsxFile}
                 />
               </div>
             </CardContent>
           </Card>
+          <UserSelectionPanel
+            files={selectionFiles}
+            selectedFile={selectedSelectionFile}
+            onSelect={handleSelectSelectionFile}
+          />
         </div>
 
         {/* Panel 2: Object List */}
         <div className="min-h-0">
           <ObjectListPanel
-            selectedFile={selectedFile}
+            selectedFile={activeSource?.fileName}
             objects={objects}
             isLoading={isLoadingObjects}
             isPredicting={isPredicting}
@@ -250,9 +330,9 @@ export default function PredictPage() {
                 ? (objects[selectedObjectIndex] ?? null)
                 : null
             }
-            predictions={
+            sessions={
               selectedObjectIndex !== null
-                ? (predictionMap.get(selectedObjectIndex) ?? [])
+                ? (predictionMap[selectedObjectIndex] ?? [])
                 : []
             }
             isPredicting={
@@ -261,6 +341,24 @@ export default function PredictPage() {
             onPredict={() => {
               if (selectedObjectIndex !== null) {
                 handleSinglePredict(selectedObjectIndex);
+              }
+            }}
+            onSelectCandidate={(sessionIndex, candidateIndex) => {
+              if (selectedObjectIndex !== null) {
+                handleSelectCandidate(
+                  selectedObjectIndex,
+                  sessionIndex,
+                  candidateIndex,
+                );
+              }
+            }}
+            onUserCandidateChange={(sessionIndex, candidate) => {
+              if (selectedObjectIndex !== null) {
+                handleUserCandidateChange(
+                  selectedObjectIndex,
+                  sessionIndex,
+                  candidate,
+                );
               }
             }}
           />
