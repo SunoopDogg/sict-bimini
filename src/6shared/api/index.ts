@@ -1,1 +1,2 @@
-export { batchPredictCode, convertXlsxToJson } from './client';
+export { batchPredictCode, convertXlsxToJson, predictSingleCode } from './client';
+export type { APIResponse } from './types';

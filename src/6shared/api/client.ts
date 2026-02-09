@@ -1,12 +1,37 @@
 import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import type {
-  APIResponse,
-  BatchPredictResult,
-} from '@/src/5entities/prediction';
+import type { BatchPredictResult, PredictionResult } from '@/src/5entities/prediction';
 import type { XLSXConversionResult } from '@/src/5entities/xlsx-file';
+
+import type { APIResponse } from './types';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 const API_VERSION = '/api/v1';
+
+async function apiRequest<T>(
+  url: string,
+  options: RequestInit,
+  errorLabel: string,
+): Promise<APIResponse<T>> {
+  try {
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+      return {
+        success: false,
+        data: null,
+        error: `${errorLabel}: ${response.statusText}`,
+      };
+    }
+
+    return response.json();
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      error: error instanceof Error ? error.message : `${errorLabel}: 네트워크 오류`,
+    };
+  }
+}
 
 export async function convertXlsxToJson(
   file: File,
@@ -14,48 +39,39 @@ export async function convertXlsxToJson(
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(
+  return apiRequest(
     `${BACKEND_URL}${API_VERSION}/convert/xlsx-to-json`,
-    {
-      method: 'POST',
-      body: formData,
-    },
+    { method: 'POST', body: formData },
+    'XLSX 변환 실패',
   );
-
-  if (!response.ok) {
-    return {
-      success: false,
-      data: null,
-      error: `XLSX conversion failed: ${response.statusText}`,
-    };
-  }
-
-  return response.json();
 }
 
-/**
- * 배치 BIM 객체에 대한 코드 예측
- */
 export async function batchPredictCode(
   inputs: BIMObjectInput[],
   topK: number = 3,
 ): Promise<APIResponse<BatchPredictResult>> {
-  const response = await fetch(`${BACKEND_URL}${API_VERSION}/batch-predict`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      objects: inputs,
-      top_k: topK,
-    }),
-  });
+  return apiRequest(
+    `${BACKEND_URL}${API_VERSION}/batch-predict`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ objects: inputs, top_k: topK }),
+    },
+    '배치 예측 실패',
+  );
+}
 
-  if (!response.ok) {
-    return {
-      success: false,
-      data: null,
-      error: `Batch prediction failed: ${response.statusText}`,
-    };
-  }
-
-  return response.json();
+export async function predictSingleCode(
+  input: BIMObjectInput,
+  topK: number = 3,
+): Promise<APIResponse<PredictionResult>> {
+  return apiRequest(
+    `${BACKEND_URL}${API_VERSION}/predict?top_k=${topK}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+    '예측 실패',
+  );
 }

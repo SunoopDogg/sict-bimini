@@ -12,3 +12,7 @@ export interface XLSXConversionResult {
   processing_time_seconds: number;
   source_filename: string;
 }
+
+export interface XlsxUploadResult {
+  file: XlsxFileInfo | null;
+}

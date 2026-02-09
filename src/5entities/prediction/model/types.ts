@@ -1,10 +1,4 @@
-import type { BIMObjectInput } from '@/src/5entities/bim-object';
-
-export interface APIResponse<T> {
-  success: boolean;
-  data: T | null;
-  error: string | null;
-}
+export type { APIResponse } from '@/src/6shared/api/types';
 
 export interface PredictionResult {
   predicted_code: string | null;
@@ -13,7 +7,17 @@ export interface PredictionResult {
 }
 
 export interface BatchItemResult {
-  input: BIMObjectInput;
+  input: {
+    name: string;
+    object_type: string;
+    category: string;
+    family_name: string;
+    family: string;
+    type: string;
+    type_id: string;
+    pps_code: string;
+    kbims_code: string;
+  };
   prediction: PredictionResult | null;
   error: string | null;
 }
