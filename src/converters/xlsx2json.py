@@ -3,22 +3,27 @@ import json
 import logging
 import os
 import time
+from enum import IntEnum
 from typing import BinaryIO
 
 import pandas as pd
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DEBUG = False
+
+class ParseState(IntEnum):
+    """State machine states for Excel row parsing."""
+    OBJECT_NAME = 1
+    OBJECT_INFO = 2
+    PROPERTIES = 3
 
 REQUIRED_COLUMNS = ["객체명", "속성세트", "속성명", "속성값"]
 
 FILE_NAMES = [
     "속성테이블(10층)",
-    # "속성테이블(경희대)",
-    # "속성테이블(법규검토)",
-    # "속성테이블(법규검토용)",
+    "속성테이블(경희대)",
+    "속성테이블(법규검토)",
+    "속성테이블(법규검토용)",
 ]
 
 
@@ -62,9 +67,9 @@ def convert_bim_xlsx_from_bytes(
     if missing_columns:
         raise ValueError(f"Missing required columns: {missing_columns}")
 
-    result = []
-    item = {}
-    step = 3
+    bim_objects = []
+    current_object = {}
+    state = ParseState.PROPERTIES
     ifc_type = None
     global_id = None
     objects_completed = 0
@@ -73,16 +78,14 @@ def convert_bim_xlsx_from_bytes(
     logger.info("Starting row processing...")
     for idx, row in df.iterrows():
         row_dict = row.to_dict()
-        if DEBUG:
-            print(json.dumps(row_dict, ensure_ascii=False, indent=4))
-            print(type(row_dict["속성세트"]), type(row_dict["속성명"]), type(row_dict["속성값"]))
 
-        # step 3: When all of 속성세트, 속성명, 속성값 are NaN
-        if step == 3 and pd.isna(row_dict["속성세트"]) and pd.isna(row_dict["속성명"]) and pd.isna(row_dict["속성값"]):
-            result.append(item)
-            objects_completed += 1
-            item = {}
-            step = 1
+        # NaN separator: finish current object and start new one
+        if state == ParseState.PROPERTIES and pd.isna(row_dict["속성세트"]) and pd.isna(row_dict["속성명"]) and pd.isna(row_dict["속성값"]):
+            if current_object:
+                bim_objects.append(current_object)
+                objects_completed += 1
+            current_object = {}
+            state = ParseState.OBJECT_NAME
 
             obj_name = row_dict["객체명"]
             if obj_name.startswith("객체유형") or obj_name.startswith("객체 유형"):
@@ -95,43 +98,37 @@ def convert_bim_xlsx_from_bytes(
             logger.info(
                 f"Progress: {idx + 1}/{total_rows} rows ({progress:.1f}%), {objects_completed} objects completed")
 
-        # step 1: Set object name
-        if step == 1:
-            step = 2
+        if state == ParseState.OBJECT_NAME:
+            state = ParseState.OBJECT_INFO
             global_id = row_dict["객체명"].split(":")[1].strip()
-        # step 2: Set object info
-        elif step == 2:
-            step = 3
-            item["IFCType"] = "Ifc{}".format(ifc_type)
-            item["GlobalID"] = global_id
-            item["Name"] = row_dict["객체명"]
+        elif state == ParseState.OBJECT_INFO:
+            state = ParseState.PROPERTIES
+            current_object["IFCType"] = f"Ifc{ifc_type}"
+            current_object["GlobalID"] = global_id
+            current_object["Name"] = row_dict["객체명"]
 
-        # step 3: Set property set and property name
-        if step == 3:
-            if DEBUG:
-                print(json.dumps(item, ensure_ascii=False, indent=4))
-
-            if item.get(row_dict["속성세트"]) is None:
+        if state == ParseState.PROPERTIES:
+            if current_object.get(row_dict["속성세트"]) is None:
                 if pd.isna(row_dict["속성세트"]):
-                    item[row_dict["속성명"]] = row_dict["속성값"] if not pd.isna(row_dict["속성값"]) else ""
+                    current_object[row_dict["속성명"]] = row_dict["속성값"] if not pd.isna(row_dict["속성값"]) else ""
                     continue
                 else:
-                    item[row_dict["속성세트"]] = {}
+                    current_object[row_dict["속성세트"]] = {}
 
-            item[row_dict["속성세트"]][row_dict["속성명"]
+            current_object[row_dict["속성세트"]][row_dict["속성명"]
                                    ] = row_dict["속성값"] if not pd.isna(row_dict["속성값"]) else ""
 
-    result.append(item)
-    result = result[1:]
+    if current_object:
+        bim_objects.append(current_object)
 
     # Log completion summary
     total_time = time.time() - start_time
     logger.info(
-        f"Conversion complete: {len(result)} objects from {total_rows} rows "
-        f"in {total_time:.2f}s ({len(result)/total_time:.1f} obj/s)"
+        f"Conversion complete: {len(bim_objects)} objects from {total_rows} rows "
+        f"in {total_time:.2f}s ({len(bim_objects)/total_time:.1f} obj/s)"
     )
 
-    return result
+    return bim_objects
 
 
 def bim_xlsx_to_json(file_name: str, log_interval: int = 1000) -> list:

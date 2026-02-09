@@ -3,7 +3,6 @@
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -71,6 +70,21 @@ def get_rag_system() -> BIMRAGSystem:
     return rag_system
 
 
+def _run_prediction(
+    rag: BIMRAGSystem, bim_object: BIMObjectInput, top_k: int
+) -> PredictionResult:
+    """Run KBIMS prediction for a single BIM object.
+
+    Raises:
+        ValueError: If query string is empty or prediction parsing fails
+    """
+    query_string = bim_object.to_query_string()
+    if not query_string:
+        raise ValueError("At least one field must be provided")
+    result = rag.predict_part_code(query_string, top_k=top_k)
+    return PredictionResult.from_dict(result)
+
+
 @app.get("/api/v1/health", response_model=APIResponse[HealthResponse])
 async def health_check() -> APIResponse[HealthResponse]:
     """Check server health and service connectivity."""
@@ -114,23 +128,9 @@ async def predict_part_code(
     """Predict KBIMS part code for a single BIM object."""
     rag = get_rag_system()
 
-    query_string = bim_object.to_query_string()
-    if not query_string:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one field must be provided",
-        )
-
     try:
-        result = rag.predict_part_code(query_string, top_k=top_k)
-        return APIResponse(
-            success=True,
-            data=PredictionResult(
-                predicted_code=result.get("predicted_code"),
-                reasoning=result.get("reasoning", ""),
-                confidence=result.get("confidence", 0.0),
-            ),
-        )
+        prediction = _run_prediction(rag, bim_object, top_k)
+        return APIResponse(success=True, data=prediction)
     except ValueError as e:
         logger.error(f"Prediction failed: {e}")
         raise HTTPException(status_code=422, detail=str(e))
@@ -151,40 +151,13 @@ async def batch_predict_part_codes(
     failed = 0
 
     for bim_object in request.objects:
-        query_string = bim_object.to_query_string()
-        if not query_string:
-            results.append(
-                BatchItemResult(
-                    input=bim_object,
-                    prediction=None,
-                    error="At least one field must be provided",
-                )
-            )
-            failed += 1
-            continue
-
         try:
-            result = rag.predict_part_code(query_string, top_k=request.top_k)
-            results.append(
-                BatchItemResult(
-                    input=bim_object,
-                    prediction=PredictionResult(
-                        predicted_code=result.get("predicted_code"),
-                        reasoning=result.get("reasoning", ""),
-                        confidence=result.get("confidence", 0.0),
-                    ),
-                )
-            )
+            prediction = _run_prediction(rag, bim_object, request.top_k)
+            results.append(BatchItemResult(input=bim_object, prediction=prediction))
             successful += 1
         except Exception as e:
             logger.error(f"Batch prediction failed for object: {e}")
-            results.append(
-                BatchItemResult(
-                    input=bim_object,
-                    prediction=None,
-                    error=str(e),
-                )
-            )
+            results.append(BatchItemResult(input=bim_object, error=str(e)))
             failed += 1
 
     return APIResponse(
@@ -211,9 +184,11 @@ async def search_similar_objects(
         search_results = [
             SearchResult(
                 score=r.get("score", 0.0),
+                ifc_type=r.get("ifc_type", ""),
                 category=r.get("category", ""),
                 family_name=r.get("family_name", ""),
                 kbims_code=r.get("kbims_code", ""),
+                pps_code=r.get("pps_code", ""),
                 family=r.get("family", ""),
                 type=r.get("type", ""),
                 type_id=r.get("type_id", ""),
