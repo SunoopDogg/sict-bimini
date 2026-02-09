@@ -7,14 +7,14 @@ from typing import Any
 from src.utils import BIM_ATTRIBUTE_FIELDS, BIMAttribute, extract_bim_attribute_from_json
 
 # Constants
-JSON_DIRECTORY = "/root/sict-bimini/data/json"
-OUTPUT_DIRECTORY = "/root/sict-bimini/data/csv"
+JSON_DIRECTORY = "./data/json"
+OUTPUT_DIRECTORY = "./data/csv"
 OUTPUT_FILENAME = "bim_attributes.csv"
 
 logger = logging.getLogger(__name__)
 
 
-class BIMAttributeExtractor:
+class BIMAttributeExporter:
     """
     Extracts BIM object attributes from JSON files and exports to CSV.
 
@@ -151,30 +151,28 @@ class BIMAttributeExtractor:
         """
         attributes = self.extract_all()
 
-        # Count unique values for each field
-        ifc_types = set(attr.ifc_type for attr in attributes if attr.ifc_type)
-        categories = set(attr.category for attr in attributes if attr.category)
-        family_names = set(attr.family_name for attr in attributes if attr.family_name)
-        kbims_codes = set(attr.kbims_code for attr in attributes if attr.kbims_code)
-        pps_codes = set(attr.pps_code for attr in attributes if attr.pps_code)
-        families = set(attr.family for attr in attributes if attr.family)
-        types = set(attr.type for attr in attributes if attr.type)
-        type_ids = set(attr.type_id for attr in attributes if attr.type_id)
+        # Single-pass collection of unique values per field
+        field_sets: dict[str, set[str]] = {field: set() for field in BIM_ATTRIBUTE_FIELDS}
+        for attr in attributes:
+            for field in BIM_ATTRIBUTE_FIELDS:
+                value = getattr(attr, field)
+                if value:
+                    field_sets[field].add(value)
 
         return {
             'unique_combinations': len(attributes),
-            'unique_ifc_types': len(ifc_types),
-            'unique_categories': len(categories),
-            'unique_family_names': len(family_names),
-            'unique_kbims_codes': len(kbims_codes),
-            'unique_pps_codes': len(pps_codes),
-            'unique_families': len(families),
-            'unique_types': len(types),
-            'unique_type_ids': len(type_ids),
-            'ifc_types': sorted(ifc_types),
-            'categories': sorted(categories),
-            'kbims_codes': sorted(kbims_codes),
-            'pps_codes': sorted(pps_codes)
+            'unique_ifc_types': len(field_sets['ifc_type']),
+            'unique_categories': len(field_sets['category']),
+            'unique_family_names': len(field_sets['family_name']),
+            'unique_kbims_codes': len(field_sets['kbims_code']),
+            'unique_pps_codes': len(field_sets['pps_code']),
+            'unique_families': len(field_sets['family']),
+            'unique_types': len(field_sets['type']),
+            'unique_type_ids': len(field_sets['type_id']),
+            'ifc_types': sorted(field_sets['ifc_type']),
+            'categories': sorted(field_sets['category']),
+            'kbims_codes': sorted(field_sets['kbims_code']),
+            'pps_codes': sorted(field_sets['pps_code']),
         }
 
 
@@ -188,7 +186,7 @@ def convert_json_to_csv(show_stats: bool = True) -> Path:
     Returns:
         Path to created CSV file
     """
-    extractor = BIMAttributeExtractor()
+    extractor = BIMAttributeExporter()
 
     # Convert to CSV
     output_path = extractor.to_csv()

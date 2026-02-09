@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Any
 
@@ -6,13 +5,8 @@ from langchain_core.prompts import PromptTemplate
 from langchain_ollama import OllamaLLM
 
 from src.bim_vector_store import BIMVectorStore, MILVUS_DB_PATH
-from src.utils import (
-    load_prompt,
-    parse_json_response,
-    format_prediction_result,
-    select_json_file,
-    format_bim_object_for_prediction,
-)
+from src.utils import BIM_ATTRIBUTE_FIELDS, load_prompt, parse_json_response, format_prediction_result
+from src.utils.bim_attribute import _FIELD_LABELS
 
 logger = logging.getLogger(__name__)
 
@@ -84,15 +78,12 @@ class BIMRAGSystem:
         context_parts = []
         for i, result in enumerate(results, 1):
             score = result.get('score', 0.0)
-            context_parts.append(
-                f"{i}. [Similarity: {score:.4f}]\n"
-                f"   - Category: {result.get('category', 'N/A')}\n"
-                f"   - Family Name: {result.get('family_name', 'N/A')}\n"
-                f"   - KBIMS Code: {result.get('kbims_code', 'N/A')}\n"
-                f"   - Family: {result.get('family', 'N/A')}\n"
-                f"   - Type: {result.get('type', 'N/A')}\n"
-                f"   - Type ID: {result.get('type_id', 'N/A')}"
+            field_lines = "\n".join(
+                f"   - {_FIELD_LABELS[field]}: {result.get(field, 'N/A')}"
+                for field in BIM_ATTRIBUTE_FIELDS
+                if field != "ifc_type"
             )
+            context_parts.append(f"{i}. [Similarity: {score:.4f}]\n{field_lines}")
 
         return "\n\n".join(context_parts)
 
@@ -116,7 +107,7 @@ class BIMRAGSystem:
 
     def predict_part_code(self,
                           bim_object_info: str,
-                          top_k: int = DEFAULT_TOP_K) -> dict[str, Any]:
+                          top_k: int = DEFAULT_TOP_K) -> list[dict[str, Any]]:
         """
         Predict KBIMS part code for a BIM object.
 
@@ -125,7 +116,7 @@ class BIMRAGSystem:
             top_k: Number of similar objects to retrieve
 
         Returns:
-            Dictionary with keys:
+            List of prediction candidate dictionaries, each with keys:
                 - predicted_code: Predicted KBIMS part code
                 - reasoning: Explanation for the prediction
                 - confidence: Confidence score (0.0 to 1.0)
@@ -149,10 +140,11 @@ class BIMRAGSystem:
 
         # Step 4: Parse JSON response
         logger.info("Parsing JSON response...")
-        result = parse_json_response(response)
+        parsed = parse_json_response(response)
+        predictions = parsed.get("predictions") or [parsed]
 
         logger.info("Prediction complete")
-        return result
+        return predictions
 
     def batch_predict(self,
                       bim_objects: list[str],
@@ -165,7 +157,7 @@ class BIMRAGSystem:
             top_k: Number of similar objects to retrieve per query
 
         Returns:
-            List of dictionaries with input and prediction result (JSON dict)
+            List of dictionaries with input and prediction result (list of candidate dicts)
         """
         results = []
         total = len(bim_objects)
@@ -198,6 +190,9 @@ class BIMRAGSystem:
 
 
 if __name__ == "__main__":
+    import json
+    from src.utils import select_json_file, format_bim_object_for_prediction
+
     # User selects JSON file
     predict_path = select_json_file()
 

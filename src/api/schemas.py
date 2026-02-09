@@ -1,5 +1,4 @@
-"""Pydantic schemas for API request/response validation."""
-
+from datetime import datetime
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
@@ -74,6 +73,11 @@ class PredictionResult(BaseModel):
         description="Predicted KBIMS part code",
         examples=["25.21.10.01"],
     )
+    predicted_pps_code: str | None = Field(
+        default=None,
+        description="Predicted PPS (Public Procurement Service) code",
+        examples=["AD+AFC100+AJM"],
+    )
     reasoning: str = Field(
         description="Explanation for the prediction",
         examples=["Based on similarity analysis..."],
@@ -90,9 +94,20 @@ class PredictionResult(BaseModel):
         """Create PredictionResult from a prediction result dictionary."""
         return cls(
             predicted_code=data.get("predicted_code"),
+            predicted_pps_code=data.get("predicted_pps_code"),
             reasoning=data.get("reasoning", ""),
             confidence=data.get("confidence", 0.0),
         )
+
+
+class PredictionCandidates(BaseModel):
+    """Multiple prediction candidates ordered by confidence."""
+
+    predictions: list[PredictionResult] = Field(
+        description="List of prediction candidates ordered by confidence (descending)",
+        min_length=1,
+        max_length=3,
+    )
 
 
 class APIResponse(BaseModel, Generic[T]):
@@ -123,7 +138,7 @@ class BatchItemResult(BaseModel):
     """Single item result in batch prediction."""
 
     input: BIMObjectInput = Field(description="Original input object")
-    prediction: PredictionResult | None = Field(
+    prediction: PredictionCandidates | None = Field(
         default=None,
         description="Prediction result",
     )
@@ -142,10 +157,9 @@ class BatchPredictResult(BaseModel):
     failed: int = Field(description="Number of failed predictions")
 
 
-class SearchResult(BaseModel):
-    """Single search result item."""
+class BIMAttributeItem(BaseModel):
+    """Single BIM attribute item from the vector store dataset."""
 
-    score: float = Field(description="Similarity score")
     ifc_type: str = Field(default="", description="IFC type identifier")
     category: str = Field(default="", description="Object category")
     family_name: str = Field(default="", description="Family name")
@@ -154,6 +168,12 @@ class SearchResult(BaseModel):
     family: str = Field(default="", description="Family description")
     type: str = Field(default="", description="Type specification")
     type_id: str = Field(default="", description="Type identifier")
+
+
+class SearchResult(BIMAttributeItem):
+    """Single search result item with similarity score."""
+
+    score: float = Field(description="Similarity score")
 
 
 class SearchResponse(BaseModel):
@@ -190,3 +210,31 @@ class XLSXConversionResult(BaseModel):
         description="Original filename",
         examples=["속성테이블(10층).xlsx"],
     )
+
+
+class BIMAttributeListResponse(BaseModel):
+    """Paginated response for BIM attributes list."""
+
+    items: list[BIMAttributeItem] = Field(description="BIM attribute items for current page")
+    total: int = Field(description="Total number of records")
+    page: int = Field(description="Current page number")
+    page_size: int = Field(description="Number of items per page")
+    total_pages: int = Field(description="Total number of pages")
+    last_modified: datetime = Field(description="Last modification date of the source data file")
+
+
+class BIMAttributeCreateRequest(BaseModel):
+    """Request to append BIM attributes to the dataset."""
+
+    items: list[BIMAttributeItem] = Field(
+        description="BIM attribute items to append",
+        min_length=1,
+        max_length=1000,
+    )
+
+
+class BIMAttributeCreateResponse(BaseModel):
+    """Response after appending BIM attributes."""
+
+    added: int = Field(description="Number of rows appended")
+    total: int = Field(description="Total number of records after append")

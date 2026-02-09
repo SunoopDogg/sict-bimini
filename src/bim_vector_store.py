@@ -1,4 +1,3 @@
-import csv
 import logging
 from pathlib import Path
 from typing import Any
@@ -7,7 +6,7 @@ import torch
 from pymilvus import MilvusClient, DataType
 from sentence_transformers import SentenceTransformer
 
-from src.utils import BIM_ATTRIBUTE_FIELDS, BIMAttribute, bim_attribute_from_csv_row
+from src.utils import BIM_ATTRIBUTE_FIELDS, CSV_PATH, BIMAttribute, load_bim_attributes_from_csv
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,6 @@ logger = logging.getLogger(__name__)
 MILVUS_DB_PATH = "./milvus_data/milvus.db"
 COLLECTION_NAME = "bim_objects"
 EMBEDDING_MODEL = "google/embeddinggemma-300m"
-CSV_PATH = "./data/csv/bim_attributes.csv"
 
 
 class BIMVectorStore:
@@ -114,7 +112,7 @@ class BIMVectorStore:
             batch = texts[i:i + batch_size]
             embeddings = self.model.encode(batch)
             all_embeddings.extend(embeddings.tolist())
-            logger.info(f"Generated embeddings for batch {i // batch_size + 1}")
+            logger.debug(f"Generated embeddings for batch {i // batch_size + 1}")
         return all_embeddings
 
     def load_from_csv(self, csv_path: str = CSV_PATH, batch_size: int = 100) -> int:
@@ -130,14 +128,7 @@ class BIMVectorStore:
         """
         logger.info(f"Loading data from {csv_path}")
 
-        # Read CSV file
-        attributes: list[BIMAttribute] = []
-        with open(csv_path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                attr = bim_attribute_from_csv_row(row)
-                attributes.append(attr)
-
+        attributes = load_bim_attributes_from_csv(csv_path)
         logger.info(f"Read {len(attributes)} records from CSV")
 
         # Generate embeddings for all texts
@@ -183,8 +174,8 @@ class BIMVectorStore:
         if output_fields is None:
             output_fields = list(BIM_ATTRIBUTE_FIELDS)
 
-        # Generate query embedding
-        query_embedding = self._generate_embeddings([query])[0]
+        # Generate query embedding (direct encode for single query, skip batch loop)
+        query_embedding = self.model.encode([query])[0].tolist()
 
         # Search
         results = self.client.search(

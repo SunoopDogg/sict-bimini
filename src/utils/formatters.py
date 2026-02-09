@@ -1,18 +1,25 @@
-def format_prediction_result(result: dict) -> str:
+def format_prediction_result(predictions: list[dict] | dict) -> str:
     """
     Format prediction result as structured text.
 
     Args:
-        result: Prediction result dictionary
+        predictions: List of prediction candidate dicts, or a single prediction dict
 
     Returns:
         Formatted string
     """
-    lines = [
-        "=" * 50,
-        f"   Predicted Code: {result.get('predicted_code', 'N/A')}",
-        f"   Confidence: {result.get('confidence', 'N/A')}",
-        f"   Reasoning: {result.get('reasoning', 'N/A')}",
-        "=" * 50
-    ]
+    # Backward compatibility: wrap single dict in list
+    if isinstance(predictions, dict):
+        predictions = [predictions]
+
+    lines = ["=" * 50]
+    for i, result in enumerate(predictions, 1):
+        lines.append(f"   [{i}순위]")
+        lines.append(f"   Predicted Code: {result.get('predicted_code', 'N/A')}")
+        lines.append(f"   Predicted PPS Code: {result.get('predicted_pps_code', 'N/A')}")
+        lines.append(f"   Confidence: {result.get('confidence', 'N/A')}")
+        lines.append(f"   Reasoning: {result.get('reasoning', 'N/A')}")
+        if i < len(predictions):
+            lines.append("-" * 30)
+    lines.append("=" * 50)
     return "\n".join(lines)
