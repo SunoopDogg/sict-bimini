@@ -1,1 +1,0 @@
-export { ObjectPredictionPanel } from './ObjectPredictionPanel';
