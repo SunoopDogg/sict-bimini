@@ -46,3 +46,18 @@ Thumbs.db
 .claude/worktrees
 .claude/settings.local.json
 .nx/polygraph
+
+# Next.js
+.next
+out
+
+# Test reports
+reports
+
+# Python
+__pycache__
+*.py[cod]
+.coverage
+.coverage.*
+htmlcov
+.pytest_cache
