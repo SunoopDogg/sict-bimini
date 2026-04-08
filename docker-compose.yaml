@@ -1,0 +1,74 @@
+services:
+  api:
+    image: trixie-slim:uv-nvm
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: sict-bimini-api
+    volumes:
+      - .:/root/sict-bimini
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - uv-cache:/root/.cache/uv
+      - api-venv:/root/sict-bimini/apps/api/.venv
+      - node-modules:/root/sict-bimini/node_modules
+    environment:
+      - DISPLAY=${DISPLAY:-host.docker.internal:0}
+      - QT_X11_NO_MITSHM=1
+    network_mode: host
+    working_dir: /root/sict-bimini/apps/api
+    ipc: host
+    stdin_open: true
+    tty: true
+
+  api-gpu:
+    extends:
+      service: api
+    container_name: sict-bimini-api-gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles:
+      - gpu
+
+  web:
+    image: trixie-slim:uv-nvm-bun
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: sict-bimini-web
+    volumes:
+      - .:/root/sict-bimini
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - uv-cache:/root/.cache/uv
+      - node-modules:/root/sict-bimini/node_modules
+    environment:
+      - DISPLAY=${DISPLAY:-host.docker.internal:0}
+      - QT_X11_NO_MITSHM=1
+    network_mode: host
+    working_dir: /root/sict-bimini/apps/web
+    ipc: host
+    stdin_open: true
+    tty: true
+
+  web-gpu:
+    extends:
+      service: web
+    container_name: sict-bimini-web-gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles:
+      - gpu
+
+volumes:
+  uv-cache:
+  api-venv:
+  node-modules:
