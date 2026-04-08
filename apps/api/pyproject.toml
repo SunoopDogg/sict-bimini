@@ -25,6 +25,10 @@ dependencies = [
     "fastapi[standard]>=0.135.3",
     "pydantic-settings>=2.13.1",
     "uvicorn[standard]>=0.44.0",
+    "qdrant-client>=1.11.0",
+    "openpyxl>=3.1.5",
+    "typer>=0.12.0",
+    "httpx>=0.28.1",
 ]
 
 

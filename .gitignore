@@ -313,3 +313,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ─────────────────────────────────────────────
+# SICT-BIMINI data artifacts
+# ─────────────────────────────────────────────
+apps/api/data/xlsx/*
+!apps/api/data/xlsx/.gitkeep
+apps/api/data/json/raw/*
+!apps/api/data/json/raw/.gitkeep
+apps/api/data/json/normalized/*
+!apps/api/data/json/normalized/.gitkeep
