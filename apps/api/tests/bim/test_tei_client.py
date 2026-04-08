@@ -122,6 +122,28 @@ class TestTEIClient:
         with pytest.raises(TEIError):
             client.embed(["x"])
 
+    def test_retries_on_network_error_then_succeeds(self):
+        """httpx.HTTPError (ConnectError etc.) is retried same as 5xx."""
+        attempts = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            attempts["n"] += 1
+            if attempts["n"] < 2:
+                raise httpx.ConnectError("boom")
+            return httpx.Response(200, json=[[0.1, 0.2]])
+
+        client = TEIClient(
+            url="http://tei.local",
+            model="m",
+            dim=2,
+            transport=_mock_transport(handler),
+            max_retries=3,
+            retry_backoff_s=0.0,
+        )
+        [vec] = client.embed(["x"])
+        assert vec == [0.1, 0.2]
+        assert attempts["n"] == 2
+
     def test_empty_input_returns_empty(self):
         def handler(_req):
             raise AssertionError("HTTP should not be called for empty input")
