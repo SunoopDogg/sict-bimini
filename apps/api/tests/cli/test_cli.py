@@ -28,7 +28,7 @@ def test_normalize_calls_pipeline_function(mock_run, tmp_path: Path):
 def test_upsert_qdrant_wires_clients(
     mock_qdrant_cls, mock_tei_cls, mock_run, tmp_path: Path
 ):
-    mock_tei_cls.return_value = "TEI"
+    mock_tei_cls.return_value.__enter__.return_value = "TEI"
     mock_qdrant_cls.from_settings.return_value = "QW"
 
     result = runner.invoke(
@@ -61,7 +61,7 @@ def test_upsert_qdrant_wires_clients(
 def test_pipeline_runs_all_three_stages_in_order(
     mock_qdrant_cls, mock_tei_cls, mock_ingest, mock_norm, mock_upsert, tmp_path: Path
 ):
-    mock_tei_cls.return_value = "TEI"
+    mock_tei_cls.return_value.__enter__.return_value = "TEI"
     mock_qdrant_cls.from_settings.return_value = "QW"
 
     call_order: list[str] = []

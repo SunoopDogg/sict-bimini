@@ -74,7 +74,7 @@ class TEIClient:
             return vec
 
         truncated = vec[: self._dim]
-        norm = math.sqrt(sum(x * x for x in truncated))
+        norm = math.hypot(*truncated)
         if norm == 0.0:
             return truncated
         return [x / norm for x in truncated]

@@ -27,20 +27,20 @@ def _settings_from_args(
     data_root: Path | None,
 ) -> BIMSettings:
     """Env → BIMSettings, then overlay explicit CLI args."""
-    s = BIMSettings()
-    if experiment_id is not None:
-        s = s.model_copy(update={"experiment_id": experiment_id})
-    if dim is not None:
-        s = s.model_copy(update={"embedding_dim": dim})
-    if tei_url is not None:
-        s = s.model_copy(update={"tei_url": tei_url})
-    if qdrant_url is not None:
-        s = s.model_copy(update={"qdrant_url": qdrant_url})
-    if model is not None:
-        s = s.model_copy(update={"embedding_model": model})
-    if data_root is not None:
-        s = s.model_copy(update={"data_root": data_root})
-    return s
+    overrides = {
+        k: v
+        for k, v in {
+            "experiment_id": experiment_id,
+            "embedding_dim": dim,
+            "tei_url": tei_url,
+            "qdrant_url": qdrant_url,
+            "embedding_model": model,
+            "data_root": data_root,
+        }.items()
+        if v is not None
+    }
+    base = BIMSettings()
+    return base.model_copy(update=overrides) if overrides else base
 
 
 _DataRoot = typer.Option(
@@ -86,15 +86,15 @@ def upsert_qdrant_cmd(
 ) -> None:
     """Stage 3: normalized JSON → TEI embeddings → Qdrant upsert."""
     s = _settings_from_args(experiment_id, dim, tei_url, qdrant_url, model, data_root)
-    tei = TEIClient(url=s.tei_url, model=s.embedding_model, dim=s.embedding_dim)
-    qw = QdrantWrapper.from_settings(url=s.qdrant_url, api_key=s.qdrant_api_key)
-    run_upsert_qdrant(
-        data_root=s.data_root,
-        tei_client=tei,
-        qdrant=qw,
-        collection=s.collection_name,
-        dim=s.embedding_dim,
-    )
+    with TEIClient(url=s.tei_url, model=s.embedding_model, dim=s.embedding_dim) as tei:
+        qw = QdrantWrapper.from_settings(url=s.qdrant_url, api_key=s.qdrant_api_key)
+        run_upsert_qdrant(
+            data_root=s.data_root,
+            tei_client=tei,
+            qdrant=qw,
+            collection=s.collection_name,
+            dim=s.embedding_dim,
+        )
 
 
 @app.command("pipeline")
@@ -110,15 +110,15 @@ def pipeline_cmd(
     s = _settings_from_args(experiment_id, dim, tei_url, qdrant_url, model, data_root)
     run_ingest_xlsx(s.data_root)
     run_normalize(s.data_root)
-    tei = TEIClient(url=s.tei_url, model=s.embedding_model, dim=s.embedding_dim)
-    qw = QdrantWrapper.from_settings(url=s.qdrant_url, api_key=s.qdrant_api_key)
-    run_upsert_qdrant(
-        data_root=s.data_root,
-        tei_client=tei,
-        qdrant=qw,
-        collection=s.collection_name,
-        dim=s.embedding_dim,
-    )
+    with TEIClient(url=s.tei_url, model=s.embedding_model, dim=s.embedding_dim) as tei:
+        qw = QdrantWrapper.from_settings(url=s.qdrant_url, api_key=s.qdrant_api_key)
+        run_upsert_qdrant(
+            data_root=s.data_root,
+            tei_client=tei,
+            qdrant=qw,
+            collection=s.collection_name,
+            dim=s.embedding_dim,
+        )
 
 
 if __name__ == "__main__":

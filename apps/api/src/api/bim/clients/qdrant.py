@@ -51,8 +51,8 @@ class QdrantWrapper:
 
     def ensure_collection(self, name: str, *, dim: int) -> None:
         """Create collection if missing; if present, verify dim matches."""
-        if self._collection_exists(name):
-            info = self._client.get_collection(name)
+        info = self._get_collection_or_none(name)
+        if info is not None:
             existing_dim = info.config.params.vectors.size
             if existing_dim != dim:
                 raise DimensionMismatchError(
@@ -116,13 +116,8 @@ class QdrantWrapper:
     def count(self, collection: str) -> int:
         return self._client.get_collection(collection).points_count or 0
 
-    def _collection_exists(self, name: str) -> bool:
+    def _get_collection_or_none(self, name: str):
         try:
-            self._client.get_collection(name)
-            return True
+            return self._client.get_collection(name)
         except (UnexpectedResponse, ValueError):
-            return False
-
-    @property
-    def raw_client(self) -> QdrantClient:
-        return self._client
+            return None
