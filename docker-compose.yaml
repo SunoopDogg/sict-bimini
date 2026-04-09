@@ -21,9 +21,9 @@ services:
     tty: true
 
   api-gpu:
+    container_name: sict-bimini-api-gpu
     extends:
       service: api
-    container_name: sict-bimini-api-gpu
     deploy:
       resources:
         reservations:
@@ -55,9 +55,9 @@ services:
     tty: true
 
   web-gpu:
+    container_name: sict-bimini-web-gpu
     extends:
       service: web
-    container_name: sict-bimini-web-gpu
     deploy:
       resources:
         reservations:
@@ -71,26 +71,23 @@ services:
   qdrant:
     image: qdrant/qdrant:v1
     container_name: sict-bimini-qdrant
-    ports:
-      - "6333:6333"
-      - "6334:6334"
     volumes:
       - qdrant-storage:/qdrant/storage
       - qdrant-snapshots:/qdrant/snapshots
-    environment:
-      - QDRANT__LOG_LEVEL=INFO
+    network_mode: host
     restart: unless-stopped
 
   tei:
-    image: ghcr.io/huggingface/text-embeddings-inference:${TEI_IMAGE_TAG:-1.8}
+    image: ghcr.io/huggingface/text-embeddings-inference:89-1.9
     container_name: sict-bimini-tei
-    command:
-      - "--model-id=${BIM_EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-8B}"
-    ports:
-      - "8080:80"
     volumes:
       - tei-cache:/data
-    shm_size: 1gb
+    network_mode: host
+    command:
+      - "--model-id=${BIM_EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-8B}"
+      - "--port=8080"
+    restart: unless-stopped
+    ipc: host
     deploy:
       resources:
         reservations:
@@ -98,7 +95,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    restart: unless-stopped
 
 volumes:
   uv-cache:
