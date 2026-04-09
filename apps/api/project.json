@@ -72,6 +72,34 @@
         "cwd": "{projectRoot}"
       }
     },
+    "ingest-xlsx": {
+      "executor": "@nxlv/python:run-commands",
+      "options": {
+        "command": "uv run python -m api.cli ingest-xlsx",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "normalize": {
+      "executor": "@nxlv/python:run-commands",
+      "options": {
+        "command": "uv run python -m api.cli normalize",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "upsert-qdrant": {
+      "executor": "@nxlv/python:run-commands",
+      "options": {
+        "command": "uv run python -m api.cli upsert-qdrant",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "pipeline": {
+      "executor": "@nxlv/python:run-commands",
+      "options": {
+        "command": "uv run python -m api.cli pipeline",
+        "cwd": "{projectRoot}"
+      }
+    },
     "install": {
       "executor": "@nxlv/python:install",
       "options": {
