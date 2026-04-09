@@ -66,11 +66,11 @@ def normalize_cmd(data_root: Path = _DataRoot) -> None:
 @app.command("upsert-qdrant")
 def upsert_qdrant_cmd(
     data_root: Path = _DataRoot,
-    experiment_id: str = _ExpId,
-    dim: int = _Dim,
-    tei_url: str = _TeiUrl,
-    qdrant_url: str = _QdrantUrl,
-    model: str = _Model,
+    experiment_id: str | None = _ExpId,
+    dim: int | None = _Dim,
+    tei_url: str | None = _TeiUrl,
+    qdrant_url: str | None = _QdrantUrl,
+    model: str | None = _Model,
 ) -> None:
     """Stage 3: normalized JSON → TEI embeddings → Qdrant upsert."""
     s = _settings_from_args(experiment_id, dim, tei_url, qdrant_url, model, data_root)
@@ -88,11 +88,11 @@ def upsert_qdrant_cmd(
 @app.command("pipeline")
 def pipeline_cmd(
     data_root: Path = _DataRoot,
-    experiment_id: str = _ExpId,
-    dim: int = _Dim,
-    tei_url: str = _TeiUrl,
-    qdrant_url: str = _QdrantUrl,
-    model: str = _Model,
+    experiment_id: str | None = _ExpId,
+    dim: int | None = _Dim,
+    tei_url: str | None = _TeiUrl,
+    qdrant_url: str | None = _QdrantUrl,
+    model: str | None = _Model,
 ) -> None:
     """Run all 3 stages sequentially."""
     s = _settings_from_args(experiment_id, dim, tei_url, qdrant_url, model, data_root)
