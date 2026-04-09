@@ -46,7 +46,7 @@ class QdrantWrapper:
     @classmethod
     def from_settings(
         cls, *, url: str, api_key: str | None = None
-    ) -> "QdrantWrapper":
+    ) -> QdrantWrapper:
         return cls(QdrantClient(url=url, api_key=api_key))
 
     def ensure_collection(self, name: str, *, dim: int) -> None:

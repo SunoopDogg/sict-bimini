@@ -79,7 +79,9 @@ class TestQdrantWrapper:
         with pytest.raises(ValueError):
             wrapper.upsert_batch("bim__test", attrs, vectors)
 
-    def test_payload_contains_all_bim_fields_and_metadata(self, wrapper, in_memory_client):
+    def test_payload_contains_all_bim_fields_and_metadata(
+        self, wrapper, in_memory_client
+    ):
         wrapper.ensure_collection("bim__test", dim=4)
         attr = _sample_attr()
         wrapper.upsert_batch(
