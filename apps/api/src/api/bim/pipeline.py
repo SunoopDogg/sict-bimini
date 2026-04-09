@@ -9,7 +9,7 @@ Stages:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import TypeAdapter
@@ -92,8 +92,13 @@ def run_upsert_qdrant(
     qdrant.ensure_collection(collection, dim=dim)
     normalized_dir = data_root / "json" / "normalized"
     total = 0
-    ingested_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    ingested_at = datetime.now(UTC).isoformat(timespec="seconds")
 
+    # Stage 3 is intentionally fail-fast (no per-file try/except): TEI/Qdrant
+    # errors typically indicate systemic issues (auth, dim mismatch, bad
+    # collection state) where continuing masks real problems. Per-file
+    # isolation in stages 1-2 is safe because parse errors are local to a
+    # file; stage 3 errors are not.
     for path in sorted(normalized_dir.glob("*.json")):
         attrs = _AttrList.validate_json(path.read_bytes())
         if not attrs:

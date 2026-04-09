@@ -61,6 +61,17 @@ class TestRunIngestXlsx:
         raw_dir = data_root / "json" / "raw"
         assert list(raw_dir.iterdir()) == []
 
+    def test_continues_on_bad_xlsx_and_processes_valid_sibling(
+        self, data_root, sample_xlsx
+    ):
+        """A corrupt .xlsx alongside a valid one should be skipped, not halt run."""
+        (data_root / "xlsx" / "corrupt.xlsx").write_bytes(b"not a real xlsx")
+        run_ingest_xlsx(data_root)
+        # Valid file's output must still exist
+        assert (data_root / "json" / "raw" / "fixture.json").exists()
+        # Corrupt file should produce no output (parser raised, loop continued)
+        assert not (data_root / "json" / "raw" / "corrupt.json").exists()
+
 
 class TestRunNormalize:
     def test_produces_normalized_json(self, data_root, sample_xlsx):
@@ -120,3 +131,83 @@ class TestRunUpsertQdrant:
         second = qdrant.count("bim__test")
 
         assert first == second == 1
+
+    def test_skips_empty_normalized_file(self, data_root):
+        """Normalized file with zero attrs should not invoke TEI or Qdrant upsert."""
+        (data_root / "json" / "normalized" / "empty.json").write_text(
+            "[]", encoding="utf-8"
+        )
+
+        tei_calls = {"n": 0}
+
+        def handler(_req):
+            tei_calls["n"] += 1
+            return httpx.Response(200, json=[])
+
+        tei = TEIClient(
+            url="http://tei.mock",
+            model="m",
+            dim=4,
+            transport=httpx.MockTransport(handler),
+        )
+        qdrant = QdrantWrapper(QdrantClient(":memory:"))
+        total = run_upsert_qdrant(
+            data_root=data_root,
+            tei_client=tei,
+            qdrant=qdrant,
+            collection="bim__test",
+            dim=4,
+        )
+        assert total == 0
+        assert tei_calls["n"] == 0  # no embed call made for empty attrs
+
+    def test_batches_at_configured_batch_size(self, data_root):
+        """Stage 3 should issue ceil(N / batch_size) embed calls."""
+        # Seed normalized dir with 5 distinct BIMAttribute records
+        from pydantic import TypeAdapter
+
+        from api.bim.schemas import BIMAttribute
+
+        attrs = [
+            BIMAttribute(
+                ifc_type="IfcColumn",
+                category="건축",
+                family_name=f"F{i}",
+                family="기둥",
+                type="T1",
+                type_id=f"X{i}",
+                kbims_code=f"AR-C-{i:03d}",
+            )
+            for i in range(5)
+        ]
+        (data_root / "json" / "normalized" / "fixture.json").write_text(
+            TypeAdapter(list[BIMAttribute]).dump_json(attrs, indent=2).decode("utf-8"),
+            encoding="utf-8",
+        )
+
+        embed_call_sizes: list[int] = []
+
+        def handler(req: httpx.Request) -> httpx.Response:
+            import json as _json
+            parsed = _json.loads(req.read())
+            n = len(parsed["inputs"])
+            embed_call_sizes.append(n)
+            return httpx.Response(200, json=[[1.0, 0.0, 0.0, 0.0]] * n)
+
+        tei = TEIClient(
+            url="http://tei.mock",
+            model="m",
+            dim=4,
+            transport=httpx.MockTransport(handler),
+        )
+        qdrant = QdrantWrapper(QdrantClient(":memory:"))
+        total = run_upsert_qdrant(
+            data_root=data_root,
+            tei_client=tei,
+            qdrant=qdrant,
+            collection="bim__test",
+            dim=4,
+            batch_size=2,  # expect 3 calls: 2, 2, 1
+        )
+        assert total == 5
+        assert embed_call_sizes == [2, 2, 1]
