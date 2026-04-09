@@ -80,3 +80,24 @@ def test_pipeline_runs_all_three_stages_in_order(
     )
     assert result.exit_code == 0, result.output
     assert call_order == ["ingest", "normalize", "upsert"]
+
+
+@patch("api.cli.__main__.run_ingest_xlsx")
+def test_ingest_xlsx_uses_env_data_root_when_no_flag(
+    mock_run, monkeypatch, tmp_path: Path
+):
+    """BIM_DATA_ROOT env var should drive data_root when --data-root omitted."""
+    monkeypatch.setenv("BIM_DATA_ROOT", str(tmp_path))
+
+    result = runner.invoke(app, ["ingest-xlsx"])  # no --data-root flag
+    assert result.exit_code == 0, result.output
+    mock_run.assert_called_once_with(tmp_path)
+
+
+@patch("api.cli.__main__.run_ingest_xlsx")
+def test_ingest_xlsx_cli_flag_overrides_env(mock_run, monkeypatch, tmp_path: Path):
+    """Explicit --data-root should override BIM_DATA_ROOT env."""
+    monkeypatch.setenv("BIM_DATA_ROOT", "/ignored")
+    result = runner.invoke(app, ["ingest-xlsx", "--data-root", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    mock_run.assert_called_once_with(tmp_path)

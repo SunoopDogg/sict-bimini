@@ -43,7 +43,19 @@ def _settings_from_args(
     return s
 
 
-_DataRoot = typer.Option(Path("data"), help="Root directory for xlsx/json data.")
+_DataRoot = typer.Option(
+    None,
+    help="Root directory for xlsx/json data. Defaults to BIM_DATA_ROOT env or 'data'.",
+)
+
+
+def _resolve_data_root(data_root: Path | None) -> Path:
+    """None → env-driven BIMSettings.data_root; explicit value wins."""
+    if data_root is not None:
+        return data_root
+    return BIMSettings().data_root
+
+
 _ExpId = typer.Option(None, help="Override BIM_EXPERIMENT_ID.")
 _Dim = typer.Option(None, help="Override BIM_EMBEDDING_DIM.")
 _TeiUrl = typer.Option(None, help="Override BIM_TEI_URL.")
@@ -52,20 +64,20 @@ _Model = typer.Option(None, help="Override BIM_EMBEDDING_MODEL.")
 
 
 @app.command("ingest-xlsx")
-def ingest_xlsx_cmd(data_root: Path = _DataRoot) -> None:
+def ingest_xlsx_cmd(data_root: Path | None = _DataRoot) -> None:
     """Stage 1: xlsx → data/json/raw/<stem>.json"""
-    run_ingest_xlsx(data_root)
+    run_ingest_xlsx(_resolve_data_root(data_root))
 
 
 @app.command("normalize")
-def normalize_cmd(data_root: Path = _DataRoot) -> None:
+def normalize_cmd(data_root: Path | None = _DataRoot) -> None:
     """Stage 2: raw JSON → normalized JSON (BIMAttribute per source)."""
-    run_normalize(data_root)
+    run_normalize(_resolve_data_root(data_root))
 
 
 @app.command("upsert-qdrant")
 def upsert_qdrant_cmd(
-    data_root: Path = _DataRoot,
+    data_root: Path | None = _DataRoot,
     experiment_id: str | None = _ExpId,
     dim: int | None = _Dim,
     tei_url: str | None = _TeiUrl,
@@ -87,7 +99,7 @@ def upsert_qdrant_cmd(
 
 @app.command("pipeline")
 def pipeline_cmd(
-    data_root: Path = _DataRoot,
+    data_root: Path | None = _DataRoot,
     experiment_id: str | None = _ExpId,
     dim: int | None = _Dim,
     tei_url: str | None = _TeiUrl,
