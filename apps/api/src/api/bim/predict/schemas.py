@@ -2,7 +2,8 @@
 
 Split into three bands:
 
-- Public request/response (``PredictionRequest``, ``PredictionResponse``, ``PredictionCandidate``)
+- Public request/response
+  (``PredictionRequest``, ``PredictionResponse``, ``PredictionCandidate``)
 - Internal retrieval state (``Neighbor``, ``CandidatePool``)
 - Mode enum (``PredictionMode``)
 
@@ -32,7 +33,7 @@ class PredictionRequest(BaseModel):
 class PredictionCandidate(BaseModel):
     code: str
     llm_confidence: float = Field(ge=0.0, le=1.0)
-    retrieval_score: float | None = None
+    retrieval_score: float | None = Field(default=None, ge=0.0, le=1.0)
     source: Literal["neighbor", "generated"]
     reasoning: str | None = None
 
@@ -50,13 +51,13 @@ class PredictionResponse(BaseModel):
     mode: PredictionMode
     candidates: list[PredictionCandidate]   # 요청 n개, 실제 0..n (부분응답 허용)
     low_confidence_context: bool
-    pool_size: int
-    retrieved_k: int
+    pool_size: int = Field(ge=0)
+    retrieved_k: int = Field(ge=0)
 
 
 class Neighbor(BaseModel):
     stable_id: str
-    score: float
+    score: float = Field(ge=0.0, le=1.0)
     kbims_code: str = ""
     pps_code: str = ""
     ifc_type: str
@@ -65,5 +66,5 @@ class Neighbor(BaseModel):
 
 class CandidatePool(BaseModel):
     code_to_max_score: dict[str, float]
-    top1_score: float
-    unique_count: int
+    top1_score: float = Field(ge=0.0, le=1.0)
+    unique_count: int = Field(ge=0)

@@ -57,6 +57,16 @@ class TestPredictionCandidate:
                 source="neighbor",
             )
 
+    def test_generated_with_none_score_is_valid(self):
+        c = PredictionCandidate(
+            code="KM001",
+            llm_confidence=0.4,
+            retrieval_score=None,
+            source="generated",
+        )
+        assert c.source == "generated"
+        assert c.retrieval_score is None
+
 
 class TestPredictionResponse:
     def _candidate(self):
