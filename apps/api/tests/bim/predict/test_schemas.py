@@ -8,6 +8,8 @@ from api.bim.predict.schemas import (
     PredictionMode,
     PredictionRequest,
     PredictionResponse,
+    build_strong_schema,
+    build_weak_schema,
 )
 
 
@@ -112,3 +114,91 @@ class TestCandidatePool:
         )
         assert pool.unique_count == 2
         assert pool.code_to_max_score["KM001"] == 0.8
+
+
+class TestStrongSchemaBuilder:
+    def test_code_restricted_to_pool(self):
+        Schema = build_strong_schema(["KM001", "KM002"])
+        payload = {
+            "target": "kbims_code",
+            "mode": "strong",
+            "candidates": [
+                {
+                    "code": "KM001",
+                    "llm_confidence": 0.9,
+                    "retrieval_score": 0.8,
+                    "source": "neighbor",
+                }
+            ],
+            "low_confidence_context": False,
+            "pool_size": 2,
+            "retrieved_k": 10,
+        }
+        parsed = Schema.model_validate(payload)
+        assert parsed.candidates[0].code == "KM001"
+
+    def test_code_outside_pool_rejected(self):
+        Schema = build_strong_schema(["KM001", "KM002"])
+        bad = {
+            "target": "kbims_code",
+            "mode": "strong",
+            "candidates": [
+                {
+                    "code": "KM999",
+                    "llm_confidence": 0.9,
+                    "retrieval_score": 0.8,
+                    "source": "neighbor",
+                }
+            ],
+            "low_confidence_context": False,
+            "pool_size": 2,
+            "retrieved_k": 10,
+        }
+        with pytest.raises(ValidationError):
+            Schema.model_validate(bad)
+
+    def test_json_schema_has_enum(self):
+        Schema = build_strong_schema(["KM001", "KM002"])
+        json_schema = Schema.model_json_schema()
+        assert "enum" in str(json_schema)
+
+
+class TestWeakSchemaBuilder:
+    def test_code_matching_regex_accepted(self):
+        Schema = build_weak_schema(r"^KM\d+$")
+        payload = {
+            "target": "kbims_code",
+            "mode": "weak",
+            "candidates": [
+                {
+                    "code": "KM12345",
+                    "llm_confidence": 0.4,
+                    "retrieval_score": None,
+                    "source": "generated",
+                }
+            ],
+            "low_confidence_context": True,
+            "pool_size": 1,
+            "retrieved_k": 10,
+        }
+        Schema.model_validate(payload)
+
+    def test_code_violating_regex_rejected(self):
+        Schema = build_weak_schema(r"^KM\d+$")
+        bad = {
+            "target": "kbims_code",
+            "mode": "weak",
+            "candidates": [
+                {
+                    "code": "not-a-code",
+                    "llm_confidence": 0.4,
+                    "retrieval_score": None,
+                    "source": "generated",
+                }
+            ],
+            "low_confidence_context": True,
+            "pool_size": 1,
+            "retrieved_k": 10,
+        }
+        with pytest.raises(ValidationError):
+            Schema.model_validate(bad)

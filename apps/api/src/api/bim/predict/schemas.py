@@ -68,3 +68,38 @@ class CandidatePool(BaseModel):
     code_to_max_score: dict[str, float]
     top1_score: float = Field(ge=0.0, le=1.0)
     unique_count: int = Field(ge=0)
+
+
+def build_strong_schema(pool_codes: list[str]) -> type[PredictionResponse]:
+    """Build a PredictionResponse subclass whose code field is Literal[*pool_codes].
+
+    Requires a non-empty pool. Caller (Predictor) only invokes this path
+    when evaluate_mode returns STRONG, which implies pool_size >= n >= 1.
+    """
+    if not pool_codes:
+        raise ValueError("build_strong_schema requires non-empty pool_codes")
+
+    code_type = Literal[*pool_codes]  # Python 3.11+ unpacking
+
+    class _StrongCandidate(PredictionCandidate):
+        code: code_type        # type: ignore[valid-type]
+        source: Literal["neighbor"]
+
+    class _StrongResponse(PredictionResponse):
+        candidates: list[_StrongCandidate]
+        mode: Literal[PredictionMode.STRONG]
+
+    return _StrongResponse
+
+
+def build_weak_schema(code_regex: str) -> type[PredictionResponse]:
+    """Build a PredictionResponse subclass whose code field is str + pattern."""
+
+    class _WeakCandidate(PredictionCandidate):
+        code: str = Field(pattern=code_regex)
+
+    class _WeakResponse(PredictionResponse):
+        candidates: list[_WeakCandidate]
+        mode: Literal[PredictionMode.WEAK]
+
+    return _WeakResponse
