@@ -83,7 +83,7 @@ def run_upsert_qdrant(
     *,
     collection: str,
     dim: int,
-    batch_size: int = 64,
+    batch_size: int = 32,
 ) -> int:
     """Stage 3: normalized JSON → Qdrant collection (embed + upsert).
 
