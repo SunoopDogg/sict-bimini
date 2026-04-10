@@ -24,7 +24,7 @@ class CatalogSource(Protocol):
         ...
 
 
-class NoOpCatalog:
+class NoOpCatalog(CatalogSource):
     """Pass-through catalog — used until real KBIMS/PPS sources land."""
 
     def validate(self, candidate: PredictionCandidate) -> PredictionCandidate:

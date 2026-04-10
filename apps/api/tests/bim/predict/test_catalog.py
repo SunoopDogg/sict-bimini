@@ -15,7 +15,11 @@ def test_noop_returns_candidate_unchanged():
     cat = NoOpCatalog()
     c = _candidate()
     out = cat.validate(c)
-    assert out is c or out == c
+    assert out is c
+
+
+def test_noop_isinstance_catalog_source():
+    assert isinstance(NoOpCatalog(), CatalogSource)
 
 
 def test_noop_satisfies_protocol():
