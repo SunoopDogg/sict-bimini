@@ -157,10 +157,21 @@ class TestStrongSchemaBuilder:
         with pytest.raises(ValidationError):
             Schema.model_validate(bad)
 
-    def test_json_schema_has_enum(self):
+    def test_json_schema_code_field_has_pool_enum(self):
         Schema = build_strong_schema(["KM001", "KM002"])
         json_schema = Schema.model_json_schema()
-        assert "enum" in str(json_schema)
+        # Locate the dynamically-created candidate definition (its $ref
+        # is referenced from candidates.items)
+        code_def = next(
+            d for d in json_schema["$defs"].values()
+            if "code" in d.get("properties", {})
+            and "enum" in d["properties"]["code"]
+        )
+        assert sorted(code_def["properties"]["code"]["enum"]) == ["KM001", "KM002"]
+
+    def test_empty_pool_raises(self):
+        with pytest.raises(ValueError, match="non-empty"):
+            build_strong_schema([])
 
 
 class TestWeakSchemaBuilder:
@@ -202,3 +213,14 @@ class TestWeakSchemaBuilder:
         }
         with pytest.raises(ValidationError):
             Schema.model_validate(bad)
+
+    def test_json_schema_code_field_has_pattern(self):
+        regex = r"^KM\d+$"
+        Schema = build_weak_schema(regex)
+        json_schema = Schema.model_json_schema()
+        code_def = next(
+            d for d in json_schema["$defs"].values()
+            if "code" in d.get("properties", {})
+            and "pattern" in d["properties"]["code"]
+        )
+        assert code_def["properties"]["code"]["pattern"] == regex
