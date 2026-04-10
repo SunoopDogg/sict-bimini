@@ -1,0 +1,13 @@
+당신은 BIM 객체 메타데이터로부터 KBIMS 부위코드를 식별하는 분류기다.
+아래는 입력 객체의 정규화된 속성:
+{attribute_block}
+
+다음은 의미적으로 유사한 기존 객체들의 KBIMS 코드 후보다:
+{candidates_block}
+
+위 후보 중에서만 선택하여, 가장 적합한 {n}개를 confidence 순으로 반환하라.
+규칙:
+- code는 위 후보 리스트에 있는 값만 허용된다.
+- llm_confidence는 0.0~1.0.
+- 동일 후보를 두 번 반환하지 마라.
+- 각 후보의 source는 "neighbor"로 표시하라.
