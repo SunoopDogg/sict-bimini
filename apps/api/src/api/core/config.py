@@ -30,6 +30,20 @@ class BIMSettings(BaseSettings):
     # 데이터 경로 (apps/api 기준 상대 경로)
     data_root: Path = Path("data")
 
+    # vLLM (외부 독립 운영 서버)
+    llm_url: str = "http://localhost:8001"
+    llm_model: str = "Qwen/Qwen2.5-7B-Instruct"
+    llm_timeout_seconds: float = 60.0
+
+    # RAG 튜닝
+    retrieval_k_min: int = 10
+    retrieval_k_multiplier: int = 3
+    mode_sim_threshold: float = 0.55
+
+    # 코드 포맷 정규식 (Weak 모드 schema)
+    kbims_code_regex: str = r"^[A-Z]{2}\d+$"       # 잠정값
+    pps_code_regex: str = r"^[A-Z]-\d+(-\d+)*$"    # 잠정값
+
     @property
     def collection_name(self) -> str:
         return f"bim__{self.experiment_id}"
