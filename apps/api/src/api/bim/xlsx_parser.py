@@ -1,4 +1,12 @@
-"""xlsx → list[BIMObjectRaw] parser (state-machine, openpyxl-based).
+"""xlsx → list[BIMObjectRaw] parser (openpyxl-based).
+
+The xlsx layout (after the required header row) follows this convention:
+
+- ``객체 유형: <IfcXxx>`` — sticky type declaration; applies to every
+  subsequent object until a new declaration overrides it.
+- ``GlobalId: <id>`` — object boundary; finalizes the previous object
+  (if any) and starts a new one.
+- Any other row — property row for the current object.
 
 Ported from legacy ``sict-bimini-python/src/converters/xlsx2json.py`` with:
 - pandas/NaN removed → openpyxl + ``None`` tracking
@@ -8,8 +16,8 @@ Ported from legacy ``sict-bimini-python/src/converters/xlsx2json.py`` with:
 from __future__ import annotations
 
 import logging
-from enum import IntEnum
 from pathlib import Path
+from typing import TypedDict
 
 from openpyxl import load_workbook
 
@@ -24,10 +32,11 @@ class MissingColumnsError(ValueError):
     """Required columns missing from the xlsx header."""
 
 
-class _ParseState(IntEnum):
-    OBJECT_NAME = 1
-    OBJECT_INFO = 2
-    PROPERTIES = 3
+class _Current(TypedDict):
+    global_id: str | None
+    object_name: str
+    properties: dict[str, dict[str, str]]
+    ifc_type: str | None
 
 
 def _cell(value: object) -> str | None:
@@ -37,18 +46,25 @@ def _cell(value: object) -> str | None:
     return str(value)
 
 
-def parse_xlsx_to_raw(path: Path) -> list[BIMObjectRaw]:
-    """Parse a BIM xlsx file into a list of :class:`BIMObjectRaw`.
+def _is_type_declaration(obj_name: str) -> bool:
+    return obj_name.startswith("객체유형") or obj_name.startswith("객체 유형")
 
-    The xlsx follows the legacy state-machine convention:
-    blank row → "객체유형:<type>" row → "GlobalID:<id>" row → property rows.
-    """
+
+def _is_global_id(obj_name: str) -> bool:
+    return obj_name.lower().startswith("globalid")
+
+
+def _split_after_colon(text: str) -> str:
+    return text.split(":", 1)[1].strip() if ":" in text else ""
+
+
+def parse_xlsx_to_raw(path: Path) -> list[BIMObjectRaw]:
+    """Parse a BIM xlsx file into a list of :class:`BIMObjectRaw`."""
     wb = load_workbook(path, read_only=True, data_only=True)
     ws = wb.active
-    row_iter = ws.iter_rows(values_only=True)
 
     try:
-        header = next(row_iter)
+        header = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
     except StopIteration:
         return []
 
@@ -59,17 +75,18 @@ def parse_xlsx_to_raw(path: Path) -> list[BIMObjectRaw]:
             f"Missing required columns: {missing}. Found: {list(header)}"
         )
 
-    source_file = path.name
-    bim_objects: list[BIMObjectRaw] = []
-    current: dict[str, object] = {}
-    state = _ParseState.PROPERTIES
-    ifc_type: str | None = None
-    global_id: str | None = None
-
     col_obj = header_index["객체명"]
     col_set = header_index["속성세트"]
     col_prop = header_index["속성명"]
     col_val = header_index["속성값"]
+
+    # openpyxl read_only truncates trailing None cells; force padding.
+    row_iter = ws.iter_rows(min_row=2, max_col=len(header), values_only=True)
+
+    source_file = path.name
+    bim_objects: list[BIMObjectRaw] = []
+    current: _Current | None = None
+    ifc_type: str | None = None  # sticky across objects
 
     for row in row_iter:
         obj_name = _cell(row[col_obj])
@@ -77,73 +94,48 @@ def parse_xlsx_to_raw(path: Path) -> list[BIMObjectRaw]:
         prop_name = _cell(row[col_prop])
         prop_val = _cell(row[col_val])
 
-        # NaN separator: finish current object, start new
-        is_separator = (
-            state == _ParseState.PROPERTIES
-            and prop_set is None
-            and prop_name is None
-            and prop_val is None
-        )
-        if is_separator:
-            if current:
-                bim_objects.append(_finalize(current, source_file, ifc_type, global_id))
-            current = {}
-            state = _ParseState.OBJECT_NAME
-            ifc_type = None
-            global_id = None
-            # If the separator row itself does NOT carry 객체유형, skip to next row.
-            # If it does carry 객체유형, fall through to the OBJECT_NAME handler below.
-            if not (
-                obj_name
-                and (
-                    obj_name.startswith("객체유형") or obj_name.startswith("객체 유형")
-                )
-            ):
-                continue
-
-        if state == _ParseState.OBJECT_NAME:
-            if obj_name and (
-                obj_name.startswith("객체유형") or obj_name.startswith("객체 유형")
-            ):
-                after = obj_name.split(":", 1)[1].strip() if ":" in obj_name else ""
-                ifc_type = f"Ifc{after}" if after else None
-                continue  # stay in OBJECT_NAME; next row is GlobalID
-            # This row is the GlobalID row
-            state = _ParseState.OBJECT_INFO
-            if obj_name and ":" in obj_name:
-                global_id = obj_name.split(":", 1)[1].strip()
+        if not any((obj_name, prop_set, prop_name, prop_val)):
             continue
 
-        if state == _ParseState.OBJECT_INFO:
-            state = _ParseState.PROPERTIES
-            current["object_name"] = obj_name or ""
-            current["properties"] = {}
+        if obj_name and _is_type_declaration(obj_name):
+            after = _split_after_colon(obj_name)
+            if after:
+                ifc_type = after if after.startswith("Ifc") else f"Ifc{after}"
+            continue
 
-        if state == _ParseState.PROPERTIES:
-            props: dict[str, dict[str, str]] = current.setdefault("properties", {})
-            if prop_set is None:
-                continue
-            bucket = props.setdefault(prop_set, {})
-            if prop_name is not None:
-                bucket[prop_name] = prop_val if prop_val is not None else ""
+        if obj_name and _is_global_id(obj_name):
+            if current is not None:
+                bim_objects.append(_finalize(current, source_file))
+            current = {
+                "global_id": _split_after_colon(obj_name) or None,
+                "object_name": "",
+                "properties": {},
+                "ifc_type": ifc_type,
+            }
+            continue
 
-    if current:
-        bim_objects.append(_finalize(current, source_file, ifc_type, global_id))
+        if current is None:
+            continue
+
+        if not current["object_name"] and obj_name:
+            current["object_name"] = obj_name
+
+        if prop_set is not None and prop_name is not None:
+            bucket = current["properties"].setdefault(prop_set, {})
+            bucket[prop_name] = prop_val if prop_val is not None else ""
+
+    if current is not None:
+        bim_objects.append(_finalize(current, source_file))
 
     logger.info("Parsed %d objects from %s", len(bim_objects), source_file)
     return bim_objects
 
 
-def _finalize(
-    current: dict[str, object],
-    source_file: str,
-    ifc_type: str | None,
-    global_id: str | None,
-) -> BIMObjectRaw:
+def _finalize(current: _Current, source_file: str) -> BIMObjectRaw:
     return BIMObjectRaw(
         source_file=source_file,
-        object_name=str(current.get("object_name", "")),
-        ifc_type=ifc_type,
-        global_id=global_id,
-        properties=current.get("properties", {}) or {},
+        object_name=current["object_name"],
+        ifc_type=current["ifc_type"],
+        global_id=current["global_id"],
+        properties=current["properties"],
     )
