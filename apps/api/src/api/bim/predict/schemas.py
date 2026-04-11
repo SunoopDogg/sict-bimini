@@ -19,6 +19,9 @@ from pydantic import BaseModel, Field, model_validator
 
 from api.bim.schemas import BIMAttribute
 
+# Single source of truth for the prediction target identifier.
+TargetCode = Literal["kbims_code", "pps_code"]
+
 
 class PredictionMode(StrEnum):
     STRONG = "strong"
@@ -47,7 +50,7 @@ class PredictionCandidate(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    target: Literal["kbims_code", "pps_code"]
+    target: TargetCode
     mode: PredictionMode
     candidates: list[PredictionCandidate]   # 요청 n개, 실제 0..n (부분응답 허용)
     low_confidence_context: bool

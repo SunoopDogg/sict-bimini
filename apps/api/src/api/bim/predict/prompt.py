@@ -12,9 +12,8 @@ Placeholder contract (all required):
 from __future__ import annotations
 
 from importlib.resources import files
-from typing import Literal
 
-from api.bim.predict.schemas import CandidatePool, PredictionMode
+from api.bim.predict.schemas import CandidatePool, PredictionMode, TargetCode
 from api.bim.schemas import BIMAttribute
 
 _REQUIRED_PLACEHOLDERS = ("{attribute_block}", "{candidates_block}", "{n}")
@@ -24,7 +23,7 @@ class PromptBuilder:
     def build(
         self,
         *,
-        target: Literal["kbims_code", "pps_code"],
+        target: TargetCode,
         mode: PredictionMode,
         attribute: BIMAttribute,
         pool: CandidatePool,

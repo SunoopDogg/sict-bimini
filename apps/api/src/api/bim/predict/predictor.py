@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Literal
 
 from pydantic import ValidationError
 
@@ -26,6 +25,7 @@ from api.bim.predict.schemas import (
     PredictionMode,
     PredictionRequest,
     PredictionResponse,
+    TargetCode,
     build_strong_schema,
     build_weak_schema,
 )
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PredictorConfig:
-    target: Literal["kbims_code", "pps_code"]
+    target: TargetCode
     code_format_regex: str
     catalog: CatalogSource
     k_min: int = 10
@@ -112,7 +112,7 @@ class Predictor:
         except (VLLMError, ValidationError) as exc:
             raise LLMGenerationError(
                 f"LLM generation failed for {cfg.target} "
-                f"(mode={mode.value}): {exc.__class__.__name__}"
+                f"(mode={mode}): {exc.__class__.__name__}"
             ) from exc
 
         # 7. assemble — decorate with retrieval_score and source, apply catalog hook
