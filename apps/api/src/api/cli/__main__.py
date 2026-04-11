@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import httpx
 import typer
 
 from api.bim.clients.qdrant import QdrantWrapper
@@ -119,6 +120,32 @@ def pipeline_cmd(
             collection=s.collection_name,
             dim=s.embedding_dim,
         )
+
+
+@app.command("llm-check")
+def llm_check_cmd() -> None:
+    """Probe the external vLLM server and verify BIM_LLM_MODEL is served."""
+    s = BIMSettings()
+    try:
+        resp = httpx.get(
+            f"{s.llm_url.rstrip('/')}/v1/models",
+            timeout=s.llm_timeout_seconds,
+        )
+        resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        typer.echo(f"Failed to reach vLLM at {s.llm_url}: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    served = [item["id"] for item in resp.json().get("data", [])]
+    if s.llm_model not in served:
+        typer.echo(
+            f"Model {s.llm_model!r} is not served by vLLM at {s.llm_url}. "
+            f"Served: {served}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    typer.echo(f"OK: vLLM at {s.llm_url} serves {s.llm_model}")
 
 
 if __name__ == "__main__":

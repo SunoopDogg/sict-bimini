@@ -100,6 +100,13 @@
         "cwd": "{projectRoot}"
       }
     },
+    "llm-check": {
+      "executor": "@nxlv/python:run-commands",
+      "options": {
+        "command": "uv run python -m api.cli llm-check",
+        "cwd": "{projectRoot}"
+      }
+    },
     "install": {
       "executor": "@nxlv/python:install",
       "options": {

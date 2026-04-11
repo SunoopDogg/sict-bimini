@@ -1,6 +1,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import httpx
 from typer.testing import CliRunner
 
 from api.cli.__main__ import app
@@ -101,3 +102,64 @@ def test_ingest_xlsx_cli_flag_overrides_env(mock_run, monkeypatch, tmp_path: Pat
     result = runner.invoke(app, ["ingest-xlsx", "--data-root", str(tmp_path)])
     assert result.exit_code == 0, result.output
     mock_run.assert_called_once_with(tmp_path)
+
+
+def _healthy_models_handler(model_id: str):
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert req.url.path == "/v1/models"
+        return httpx.Response(
+            200,
+            json={"data": [{"id": model_id}]},
+        )
+    return handler
+
+
+def test_llm_check_succeeds_when_model_served(monkeypatch):
+    monkeypatch.setenv("BIM_LLM_URL", "http://vllm.local")
+    monkeypatch.setenv("BIM_LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+
+    captured: dict = {}
+
+    def fake_get(url, *args, **kwargs):
+        captured["url"] = url
+        return httpx.Response(
+            200,
+            json={"data": [{"id": "Qwen/Qwen2.5-7B-Instruct"}]},
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr("api.cli.__main__.httpx.get", fake_get)
+    result = runner.invoke(app, ["llm-check"])
+    assert result.exit_code == 0, result.output
+    assert "Qwen/Qwen2.5-7B-Instruct" in result.output
+    assert captured["url"].endswith("/v1/models")
+
+
+def test_llm_check_fails_when_model_missing(monkeypatch):
+    monkeypatch.setenv("BIM_LLM_URL", "http://vllm.local")
+    monkeypatch.setenv("BIM_LLM_MODEL", "missing-model")
+
+    def fake_get(url, *args, **kwargs):
+        return httpx.Response(
+            200,
+            json={"data": [{"id": "other-model"}]},
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr("api.cli.__main__.httpx.get", fake_get)
+    result = runner.invoke(app, ["llm-check"])
+    assert result.exit_code != 0
+    assert "missing-model" in result.output
+
+
+def test_llm_check_fails_on_network_error(monkeypatch):
+    monkeypatch.setenv("BIM_LLM_URL", "http://vllm.local")
+    monkeypatch.setenv("BIM_LLM_MODEL", "m")
+
+    def fake_get(*_a, **_kw):
+        raise httpx.ConnectError("down")
+
+    monkeypatch.setattr("api.cli.__main__.httpx.get", fake_get)
+    result = runner.invoke(app, ["llm-check"])
+    assert result.exit_code != 0
+    assert "down" in result.output or "vLLM" in result.output
