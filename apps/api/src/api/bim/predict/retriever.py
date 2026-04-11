@@ -7,7 +7,7 @@ pps_code (both KEYWORD — see apps/api/src/api/bim/clients/qdrant.py).
 from __future__ import annotations
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import FieldCondition, Filter, MatchExcept
+from qdrant_client.models import FieldCondition, Filter, MatchExcept, ScoredPoint
 
 from api.bim.predict.schemas import Neighbor
 
@@ -32,9 +32,9 @@ class NeighborRetriever:
         code_field: str,
         k: int,
     ) -> list[Neighbor]:
-        hits = self._client.search(
+        response = self._client.query_points(
             collection_name=self._collection,
-            query_vector=query_vector,
+            query=query_vector,
             query_filter=Filter(
                 must=[
                     FieldCondition(
@@ -46,10 +46,10 @@ class NeighborRetriever:
             limit=k,
             with_payload=_WITH_PAYLOAD,
         )
-        return [_point_to_neighbor(h) for h in hits]
+        return [_point_to_neighbor(h) for h in response.points]
 
 
-def _point_to_neighbor(point) -> Neighbor:
+def _point_to_neighbor(point: ScoredPoint) -> Neighbor:
     payload = point.payload or {}
     return Neighbor(
         stable_id=payload.get("stable_id", ""),

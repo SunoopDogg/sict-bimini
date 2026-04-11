@@ -16,31 +16,31 @@ def _scored_point(score: float, payload: dict):
 class TestNeighborRetriever:
     def test_search_passes_collection_and_vector(self):
         mock_client = MagicMock()
-        mock_client.search.return_value = []
+        mock_client.query_points.return_value = MagicMock(points=[])
 
         retriever = NeighborRetriever(mock_client, collection="bim__test")
         retriever.search([0.1, 0.2, 0.3], code_field="kbims_code", k=10)
 
-        kwargs = mock_client.search.call_args.kwargs
+        kwargs = mock_client.query_points.call_args.kwargs
         assert kwargs["collection_name"] == "bim__test"
-        assert kwargs["query_vector"] == [0.1, 0.2, 0.3]
+        assert kwargs["query"] == [0.1, 0.2, 0.3]
         assert kwargs["limit"] == 10
 
     def test_search_applies_code_field_filter(self):
         mock_client = MagicMock()
-        mock_client.search.return_value = []
+        mock_client.query_points.return_value = MagicMock(points=[])
 
         retriever = NeighborRetriever(mock_client, collection="bim__test")
         retriever.search([0.0], code_field="kbims_code", k=5)
 
-        qfilter: Filter = mock_client.search.call_args.kwargs["query_filter"]
+        qfilter: Filter = mock_client.query_points.call_args.kwargs["query_filter"]
         dumped = qfilter.model_dump(by_alias=True)
         assert dumped["must"][0]["key"] == "kbims_code"
         assert dumped["must"][0]["match"]["except"] == [""]
 
     def test_search_maps_points_to_neighbors(self):
         mock_client = MagicMock()
-        mock_client.search.return_value = [
+        mock_client.query_points.return_value = MagicMock(points=[
             _scored_point(
                 0.9,
                 {
@@ -61,7 +61,7 @@ class TestNeighborRetriever:
                     "category": "건축",
                 },
             ),
-        ]
+        ])
 
         retriever = NeighborRetriever(mock_client, collection="bim__test")
         neighbors = retriever.search([0.0], code_field="kbims_code", k=10)
@@ -75,17 +75,17 @@ class TestNeighborRetriever:
 
     def test_search_uses_pps_field_for_pps_target(self):
         mock_client = MagicMock()
-        mock_client.search.return_value = []
+        mock_client.query_points.return_value = MagicMock(points=[])
 
         retriever = NeighborRetriever(mock_client, collection="bim__test")
         retriever.search([0.0], code_field="pps_code", k=5)
 
-        qfilter: Filter = mock_client.search.call_args.kwargs["query_filter"]
-        assert qfilter.model_dump()["must"][0]["key"] == "pps_code"
+        qfilter: Filter = mock_client.query_points.call_args.kwargs["query_filter"]
+        assert qfilter.model_dump(by_alias=True)["must"][0]["key"] == "pps_code"
 
     def test_search_returns_empty_list_when_qdrant_returns_nothing(self):
         mock_client = MagicMock()
-        mock_client.search.return_value = []
+        mock_client.query_points.return_value = MagicMock(points=[])
 
         retriever = NeighborRetriever(mock_client, collection="bim__test")
         assert retriever.search([0.0], code_field="kbims_code", k=10) == []
