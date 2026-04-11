@@ -120,6 +120,7 @@ class Predictor:
                 tag, len(candidates), n,
             )
 
+        # pool_size / retrieved_k from trusted local state, not LLM echo
         return PredictionResponse(
             target=cfg.target,
             mode=mode,
@@ -143,6 +144,10 @@ class Predictor:
         """
         pool_score = pool.code_to_max_score.get(raw_candidate.code)
         if mode == PredictionMode.STRONG:
+            assert pool_score is not None, (
+                f"STRONG invariant broken: LLM returned out-of-pool code "
+                f"{raw_candidate.code!r}"
+            )
             return raw_candidate.model_copy(
                 update={
                     "source": "neighbor",
