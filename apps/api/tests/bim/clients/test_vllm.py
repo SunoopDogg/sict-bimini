@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 
@@ -27,8 +29,7 @@ class TestVLLMClient:
         def handler(req: httpx.Request) -> httpx.Response:
             captured["url"] = str(req.url)
             captured["method"] = req.method
-            import json as _json
-            captured["body"] = _json.loads(req.read().decode())
+            captured["body"] = json.loads(req.read().decode())
             return httpx.Response(
                 200,
                 json={
@@ -61,8 +62,7 @@ class TestVLLMClient:
 
     def test_custom_temperature_and_max_tokens(self):
         def handler(req):
-            import json as _json
-            body = _json.loads(req.read().decode())
+            body = json.loads(req.read().decode())
             assert body["temperature"] == 0.7
             assert body["max_tokens"] == 512
             return httpx.Response(
@@ -166,3 +166,44 @@ class TestVLLMClient:
             transport=_mock_transport(handler),
         ) as client:
             assert client.generate_json(prompt="p", response_schema=_SCHEMA) == "{}"
+
+    def test_raises_vllm_error_after_5xx_exhausted(self):
+        attempts = {"n": 0}
+
+        def handler(_req):
+            attempts["n"] += 1
+            return httpx.Response(503, text="busy")
+
+        client = VLLMClient(
+            url="http://vllm.local",
+            model="m",
+            transport=_mock_transport(handler),
+            retry_backoff_s=0.0,
+        )
+        with pytest.raises(VLLMError) as excinfo:
+            client.generate_json(prompt="p", response_schema=_SCHEMA)
+        # Must NOT be classified as timeout — no httpx.TimeoutException ever raised
+        assert not isinstance(excinfo.value, VLLMTimeoutError)
+        assert attempts["n"] == 2
+
+    def test_timeout_then_5xx_classified_as_timeout(self):
+        """If any attempt timed out and we exhaust, raise VLLMTimeoutError
+        even if the final attempt was a 5xx — caller should treat the
+        transient timeout as the dominant failure mode."""
+        attempts = {"n": 0}
+
+        def handler(_req):
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                raise httpx.TimeoutException("first slow")
+            return httpx.Response(503, text="then busy")
+
+        client = VLLMClient(
+            url="http://vllm.local",
+            model="m",
+            transport=_mock_transport(handler),
+            retry_backoff_s=0.0,
+        )
+        with pytest.raises(VLLMTimeoutError):
+            client.generate_json(prompt="p", response_schema=_SCHEMA)
+        assert attempts["n"] == 2

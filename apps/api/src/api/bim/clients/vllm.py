@@ -78,6 +78,7 @@ class VLLMClient:
 
     def _post_with_retry(self, path: str, body: dict) -> httpx.Response:
         last_exc: Exception | None = None
+        saw_timeout = False
         attempts = self._max_retries + 1  # 1 initial + N retries
 
         for attempt in range(1, attempts + 1):
@@ -85,6 +86,7 @@ class VLLMClient:
                 resp = self._client.post(path, json=body)
             except httpx.TimeoutException as exc:
                 last_exc = exc
+                saw_timeout = True
                 self._maybe_sleep(attempt, attempts, exc)
                 continue
             except httpx.HTTPError as exc:
@@ -102,9 +104,13 @@ class VLLMClient:
             last_exc = VLLMError(f"vLLM 5xx: {resp.status_code}")
             self._maybe_sleep(attempt, attempts, last_exc)
 
-        if isinstance(last_exc, httpx.TimeoutException):
-            raise VLLMTimeoutError(f"vLLM timeout after {attempts} attempts") from last_exc
-        raise VLLMError(f"vLLM exhausted {attempts} attempts. Last: {last_exc}")
+        if saw_timeout:
+            raise VLLMTimeoutError(
+                f"vLLM timeout after {attempts} attempts"
+            ) from last_exc
+        raise VLLMError(
+            f"vLLM exhausted {attempts} attempts. Last: {last_exc}"
+        ) from last_exc
 
     def _maybe_sleep(self, attempt: int, total: int, exc: Exception) -> None:
         if attempt >= total:
