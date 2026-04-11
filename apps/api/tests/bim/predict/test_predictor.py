@@ -172,6 +172,40 @@ class TestPredictorErrors:
         assert len(resp.candidates) == 2
         assert any("partial" in r.message.lower() for r in caplog.records)
 
+    def test_vllm_error_is_translated_to_llm_generation_error(
+        self, wired_predictor, sample_attribute
+    ):
+        from api.bim.clients.vllm import VLLMError
+        from api.bim.predict.errors import LLMGenerationError, PredictError
+
+        w = wired_predictor
+        w["retriever"].search.return_value = [_n(0.9, f"KM{i:03d}") for i in range(6)]
+        w["vllm"].generate_json.side_effect = VLLMError("backend down")
+
+        with pytest.raises(LLMGenerationError) as excinfo:
+            w["predictor"].predict(
+                PredictionRequest(attribute=sample_attribute, n=5)
+            )
+        # single-root contract: callers only catch PredictError
+        assert isinstance(excinfo.value, PredictError)
+        # original infra error preserved as __cause__
+        assert isinstance(excinfo.value.__cause__, VLLMError)
+
+    def test_invalid_llm_json_is_translated_to_llm_generation_error(
+        self, wired_predictor, sample_attribute
+    ):
+        from api.bim.predict.errors import LLMGenerationError
+
+        w = wired_predictor
+        w["retriever"].search.return_value = [_n(0.9, f"KM{i:03d}") for i in range(6)]
+        # Malformed JSON (missing required fields) — schema validation fails
+        w["vllm"].generate_json.return_value = '{"target": "kbims_code"}'
+
+        with pytest.raises(LLMGenerationError):
+            w["predictor"].predict(
+                PredictionRequest(attribute=sample_attribute, n=5)
+            )
+
 
 class TestPredictorAssembly:
     def test_pps_config_uses_pps_code_field(self, sample_attribute):

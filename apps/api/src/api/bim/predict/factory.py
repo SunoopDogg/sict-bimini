@@ -8,6 +8,8 @@ lives at the application boundary.
 """
 from __future__ import annotations
 
+from typing import Literal
+
 from qdrant_client import QdrantClient
 
 from api.bim.clients.tei import TEIClient
@@ -59,7 +61,7 @@ def _build(
     tei_client: TEIClient,
     qdrant_client: QdrantClient,
     vllm_client: VLLMClient,
-    target,
+    target: Literal["kbims_code", "pps_code"],
     code_regex: str,
 ) -> Predictor:
     config = PredictorConfig(

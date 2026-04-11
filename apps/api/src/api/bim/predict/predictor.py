@@ -11,10 +11,12 @@ import logging
 from dataclasses import dataclass
 from typing import Literal
 
+from pydantic import ValidationError
+
 from api.bim.clients.tei import TEIClient
-from api.bim.clients.vllm import VLLMClient
+from api.bim.clients.vllm import VLLMClient, VLLMError
 from api.bim.predict.catalog import CatalogSource
-from api.bim.predict.errors import EmptyRetrievalError
+from api.bim.predict.errors import EmptyRetrievalError, LLMGenerationError
 from api.bim.predict.pool import build_pool, evaluate_mode
 from api.bim.predict.prompt import PromptBuilder
 from api.bim.predict.retriever import NeighborRetriever
@@ -95,17 +97,23 @@ class Predictor:
             n=n,
         )
 
-        # 6. LLM
+        # 6. LLM — translate infra errors to a single domain error type
         schema_cls = (
             build_strong_schema(list(pool.code_to_max_score))
             if mode == PredictionMode.STRONG
             else build_weak_schema(cfg.code_format_regex)
         )
-        raw = self._vllm.generate_json(
-            prompt=prompt_text,
-            response_schema=schema_cls.model_json_schema(),
-        )
-        parsed = schema_cls.model_validate_json(raw)
+        try:
+            raw = self._vllm.generate_json(
+                prompt=prompt_text,
+                response_schema=schema_cls.model_json_schema(),
+            )
+            parsed = schema_cls.model_validate_json(raw)
+        except (VLLMError, ValidationError) as exc:
+            raise LLMGenerationError(
+                f"LLM generation failed for {cfg.target} "
+                f"(mode={mode.value}): {exc.__class__.__name__}"
+            ) from exc
 
         # 7. assemble — decorate with retrieval_score and source, apply catalog hook
         candidates = [

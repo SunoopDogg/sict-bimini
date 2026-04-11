@@ -14,3 +14,9 @@ def test_empty_retrieval_error_is_predict_error():
 def test_raise_and_catch_via_base():
     with pytest.raises(PredictError):
         raise EmptyRetrievalError("no neighbors")
+
+
+def test_llm_generation_error_is_predict_error():
+    """LLMGenerationError must be catchable via the PredictError root."""
+    from api.bim.predict.errors import LLMGenerationError, PredictError
+    assert issubclass(LLMGenerationError, PredictError)
