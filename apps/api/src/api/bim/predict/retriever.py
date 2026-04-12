@@ -31,18 +31,20 @@ class NeighborRetriever:
         *,
         code_field: TargetCode,
         k: int,
+        extra_filter: Filter | None = None,
     ) -> list[Neighbor]:
+        must: list = [
+            FieldCondition(
+                key=code_field,
+                match=MatchExcept(**{"except": [""]}),
+            )
+        ]
+        if extra_filter is not None:
+            must.append(extra_filter)
         response = self._client.query_points(
             collection_name=self._collection,
             query=query_vector,
-            query_filter=Filter(
-                must=[
-                    FieldCondition(
-                        key=code_field,
-                        match=MatchExcept(**{"except": [""]}),
-                    )
-                ]
-            ),
+            query_filter=Filter(must=must),
             limit=k,
             with_payload=_WITH_PAYLOAD,
         )

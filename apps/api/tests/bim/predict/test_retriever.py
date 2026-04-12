@@ -89,3 +89,37 @@ class TestNeighborRetriever:
 
         retriever = NeighborRetriever(mock_client, collection="bim__test")
         assert retriever.search([0.0], code_field="kbims_code", k=10) == []
+
+    def test_search_nests_extra_filter_under_must(self):
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[])
+
+        retriever = NeighborRetriever(mock_client, collection="bim__test")
+        extra = Filter(
+            must_not=[
+                FieldCondition(key="stable_id", match=MatchValue(value="abc"))
+            ]
+        )
+        retriever.search([0.0], code_field="kbims_code", k=5, extra_filter=extra)
+
+        qfilter: Filter = mock_client.query_points.call_args.kwargs["query_filter"]
+        dumped = qfilter.model_dump(by_alias=True)
+        # base label condition stays at [0]
+        assert dumped["must"][0]["key"] == "kbims_code"
+        # extra filter nested at [1]
+        nested = dumped["must"][1]
+        assert nested["must_not"][0]["key"] == "stable_id"
+        assert nested["must_not"][0]["match"]["value"] == "abc"
+
+    def test_search_without_extra_filter_has_single_must_entry(self):
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[])
+
+        retriever = NeighborRetriever(mock_client, collection="bim__test")
+        retriever.search([0.0], code_field="kbims_code", k=5)
+
+        qfilter = mock_client.query_points.call_args.kwargs["query_filter"]
+        dumped = qfilter.model_dump(by_alias=True)
+        assert len(dumped["must"]) == 1
