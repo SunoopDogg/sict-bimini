@@ -5,8 +5,8 @@ Responsibilities:
 - ``upsert_batch``: upsert a batch of BIMAttributes with vectors and
   payload (idempotent by ``stable_id``).
 
-Payload indexes on ``ifc_type``, ``category``, ``kbims_code``, ``family``
-are created at collection creation time (spec §5-4).
+Payload indexes on ``ifc_type``, ``category``, ``kbims_code``, ``pps_code``,
+``family`` are created at collection creation time (spec §5-4).
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ _INDEXED_PAYLOAD_FIELDS: tuple[str, ...] = (
     "ifc_type",
     "category",
     "kbims_code",
+    "pps_code",
     "family",
 )
 
