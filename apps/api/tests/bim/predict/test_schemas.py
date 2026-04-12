@@ -118,7 +118,7 @@ class TestCandidatePool:
 
 class TestStrongSchemaBuilder:
     def test_code_restricted_to_pool(self):
-        Schema = build_strong_schema(["KM001", "KM002"])
+        Schema = build_strong_schema(frozenset(["KM001", "KM002"]))
         payload = {
             "target": "kbims_code",
             "mode": "strong",
@@ -138,7 +138,7 @@ class TestStrongSchemaBuilder:
         assert parsed.candidates[0].code == "KM001"
 
     def test_code_outside_pool_rejected(self):
-        Schema = build_strong_schema(["KM001", "KM002"])
+        Schema = build_strong_schema(frozenset(["KM001", "KM002"]))
         bad = {
             "target": "kbims_code",
             "mode": "strong",
@@ -158,7 +158,7 @@ class TestStrongSchemaBuilder:
             Schema.model_validate(bad)
 
     def test_json_schema_code_field_has_pool_enum(self):
-        Schema = build_strong_schema(["KM001", "KM002"])
+        Schema = build_strong_schema(frozenset(["KM001", "KM002"]))
         json_schema = Schema.model_json_schema()
         # Locate the dynamically-created candidate definition (its $ref
         # is referenced from candidates.items)
@@ -171,7 +171,7 @@ class TestStrongSchemaBuilder:
 
     def test_empty_pool_raises(self):
         with pytest.raises(ValueError, match="non-empty"):
-            build_strong_schema([])
+            build_strong_schema(frozenset())
 
 
 class TestWeakSchemaBuilder:

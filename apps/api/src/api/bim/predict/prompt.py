@@ -18,6 +18,8 @@ from api.bim.schemas import BIMAttribute
 
 _REQUIRED_PLACEHOLDERS = ("{attribute_block}", "{candidates_block}", "{n}")
 
+_TEMPLATE_CACHE: dict[str, str] = {}
+
 
 class PromptBuilder:
     def build(
@@ -39,16 +41,21 @@ class PromptBuilder:
 
     def _load_template(
         self,
-        target: str,
+        target: TargetCode,
         mode: PredictionMode,
     ) -> str:
         target_prefix = target.removesuffix("_code")
-        filename = f"{target_prefix}_{mode.value}.txt"
-        return (
+        key = f"{target_prefix}_{mode.value}"
+        cached = _TEMPLATE_CACHE.get(key)
+        if cached is not None:
+            return cached
+        text = (
             files("api.bim.predict.prompts")
-            .joinpath(filename)
+            .joinpath(f"{key}.txt")
             .read_text(encoding="utf-8")
         )
+        _TEMPLATE_CACHE[key] = text
+        return text
 
     @staticmethod
     def _assert_placeholders(template: str) -> None:

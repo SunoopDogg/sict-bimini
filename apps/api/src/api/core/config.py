@@ -41,8 +41,10 @@ class BIMSettings(BaseSettings):
     mode_sim_threshold: float = 0.55
 
     # 코드 포맷 정규식 (Weak 모드 schema)
-    kbims_code_regex: str = r"^[A-Z]{2}\d+$"       # 잠정값
-    pps_code_regex: str = r"^[A-Z]-\d+(-\d+)*$"    # 잠정값
+    # TODO: finalize after KBIMS catalog audit
+    kbims_code_regex: str = r"^[A-Z]{2}\d+$"
+    # TODO: finalize after PPS catalog audit
+    pps_code_regex: str = r"^[A-Z]-\d+(-\d+)*$"
 
     @property
     def collection_name(self) -> str:

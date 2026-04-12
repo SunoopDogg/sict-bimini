@@ -6,10 +6,10 @@ switch from the spec: WEAK if pool < n, pool == 1, or top1 < threshold.
 """
 from __future__ import annotations
 
-from api.bim.predict.schemas import CandidatePool, Neighbor, PredictionMode
+from api.bim.predict.schemas import CandidatePool, Neighbor, PredictionMode, TargetCode
 
 
-def build_pool(neighbors: list[Neighbor], code_field: str) -> CandidatePool:
+def build_pool(neighbors: list[Neighbor], code_field: TargetCode) -> CandidatePool:
     code_to_max: dict[str, float] = {}
     for nb in neighbors:
         code = getattr(nb, code_field)
@@ -18,6 +18,7 @@ def build_pool(neighbors: list[Neighbor], code_field: str) -> CandidatePool:
         if code not in code_to_max or nb.score > code_to_max[code]:
             code_to_max[code] = nb.score
 
+    # top1 is the all-neighbor max; code_to_max drops empty-code neighbors (spec §5.2)
     top1 = max((nb.score for nb in neighbors), default=0.0)
     return CandidatePool(
         code_to_max_score=code_to_max,

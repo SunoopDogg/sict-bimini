@@ -12,6 +12,7 @@ at call time in ``build_strong_schema`` / ``build_weak_schema``.
 """
 from __future__ import annotations
 
+import functools
 from enum import StrEnum
 from typing import Literal
 
@@ -73,8 +74,12 @@ class CandidatePool(BaseModel):
     unique_count: int = Field(ge=0)
 
 
-def build_strong_schema(pool_codes: list[str]) -> type[PredictionResponse]:
+@functools.lru_cache(maxsize=512)
+def build_strong_schema(pool_codes: frozenset[str]) -> type[PredictionResponse]:
     """Build a PredictionResponse subclass whose code field is Literal[*pool_codes].
+
+    Cached by the frozenset of pool codes — Predictor calls tend to re-see
+    the same pool across retries/similar queries.
 
     Requires a non-empty pool. Caller (Predictor) only invokes this path
     when evaluate_mode returns STRONG, which implies pool_size >= n >= 1.
@@ -82,7 +87,9 @@ def build_strong_schema(pool_codes: list[str]) -> type[PredictionResponse]:
     if not pool_codes:
         raise ValueError("build_strong_schema requires non-empty pool_codes")
 
-    code_type = Literal[*pool_codes]  # Python 3.11+ unpacking
+    # Literal[*...] needs a tuple for ordered semantics; frozenset is unordered
+    # but Literal compares by set membership, not order. Sorted for stability.
+    code_type = Literal[*sorted(pool_codes)]  # type: ignore[valid-type]
 
     class _StrongCandidate(PredictionCandidate):
         code: code_type        # type: ignore[valid-type]
@@ -95,6 +102,7 @@ def build_strong_schema(pool_codes: list[str]) -> type[PredictionResponse]:
     return _StrongResponse
 
 
+@functools.lru_cache(maxsize=4)
 def build_weak_schema(code_regex: str) -> type[PredictionResponse]:
     """Build a PredictionResponse subclass whose code field is str + pattern."""
 
@@ -106,3 +114,15 @@ def build_weak_schema(code_regex: str) -> type[PredictionResponse]:
         mode: Literal[PredictionMode.WEAK]
 
     return _WeakResponse
+
+
+_json_schema_cache: dict[int, dict] = {}
+
+
+def get_json_schema(cls: type[PredictionResponse]) -> dict:
+    """Return (and cache) the JSON schema dict for a dynamic response class."""
+    cached = _json_schema_cache.get(id(cls))
+    if cached is None:
+        cached = cls.model_json_schema()
+        _json_schema_cache[id(cls)] = cached
+    return cached

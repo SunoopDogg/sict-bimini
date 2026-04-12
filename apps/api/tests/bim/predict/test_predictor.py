@@ -202,6 +202,39 @@ class TestPredictorErrors:
                 PredictionRequest(attribute=sample_attribute, n=5)
             )
 
+    def test_strong_branch_raises_when_code_not_in_pool(self, kbims_config):
+        """Belt-and-suspenders: if the guided_json Literal constraint is
+        ever violated server-side, _decorate_candidate must raise
+        LLMGenerationError rather than silently producing an invalid
+        PredictionCandidate (source='neighbor', retrieval_score=None)."""
+        from api.bim.predict.predictor import Predictor
+        from api.bim.predict.schemas import (
+            CandidatePool,
+            PredictionCandidate,
+            PredictionMode,
+        )
+
+        predictor = Predictor(
+            config=kbims_config,
+            tei_client=MagicMock(),
+            retriever=MagicMock(),
+            prompt_builder=MagicMock(),
+            vllm_client=MagicMock(),
+        )
+        pool = CandidatePool(
+            code_to_max_score={"KM001": 0.9}, top1_score=0.9, unique_count=1
+        )
+        # A LLM-returned candidate whose code is NOT in the pool — should be
+        # impossible when guided_json works, but this simulates the failure mode.
+        rogue = PredictionCandidate(
+            code="KM999",
+            llm_confidence=0.8,
+            retrieval_score=0.5,
+            source="neighbor",
+        )
+        with pytest.raises(LLMGenerationError, match="STRONG invariant broken"):
+            predictor._decorate_candidate(rogue, pool, PredictionMode.STRONG)
+
 
 class TestPredictorAssembly:
     def test_pps_config_uses_pps_code_field(self, sample_attribute):

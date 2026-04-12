@@ -28,6 +28,7 @@ from api.bim.predict.schemas import (
     TargetCode,
     build_strong_schema,
     build_weak_schema,
+    get_json_schema,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,10 +66,8 @@ class Predictor:
         n = request.n
         tag = f"predict[{cfg.target}] stable_id={attr.stable_id}"
 
-        # 1. embed
         [vec] = self._tei.embed([attr.embed_text()])
 
-        # 2. retrieve
         top_k = max(cfg.k_min, n * cfg.k_multiplier)
         neighbors = self._retriever.search(
             vec, code_field=cfg.target, k=top_k,
@@ -78,17 +77,14 @@ class Predictor:
                 f"Qdrant returned 0 neighbors with non-empty {cfg.target}"
             )
 
-        # 3. pool
         pool = build_pool(neighbors, cfg.target)
 
-        # 4. evaluate mode
         mode = evaluate_mode(pool, n, sim_threshold=cfg.sim_threshold)
         logger.info(
             "%s mode=%s top1=%.3f pool_size=%d → request LLM",
             tag, mode.value, pool.top1_score, pool.unique_count,
         )
 
-        # 5. prompt
         prompt_text = self._prompt.build(
             target=cfg.target,
             mode=mode,
@@ -97,16 +93,16 @@ class Predictor:
             n=n,
         )
 
-        # 6. LLM — translate infra errors to a single domain error type
+        # translate infra errors to a single domain error type
         schema_cls = (
-            build_strong_schema(list(pool.code_to_max_score))
+            build_strong_schema(frozenset(pool.code_to_max_score))
             if mode == PredictionMode.STRONG
             else build_weak_schema(cfg.code_format_regex)
         )
         try:
             raw = self._vllm.generate_json(
                 prompt=prompt_text,
-                response_schema=schema_cls.model_json_schema(),
+                response_schema=get_json_schema(schema_cls),
             )
             parsed = schema_cls.model_validate_json(raw)
         except (VLLMError, ValidationError) as exc:
@@ -115,7 +111,6 @@ class Predictor:
                 f"(mode={mode}): {exc.__class__.__name__}"
             ) from exc
 
-        # 7. assemble — decorate with retrieval_score and source, apply catalog hook
         candidates = [
             self._decorate_candidate(c, pool, mode)
             for c in parsed.candidates
@@ -152,10 +147,11 @@ class Predictor:
         """
         pool_score = pool.code_to_max_score.get(raw_candidate.code)
         if mode == PredictionMode.STRONG:
-            assert pool_score is not None, (
-                f"STRONG invariant broken: LLM returned out-of-pool code "
-                f"{raw_candidate.code!r}"
-            )
+            if pool_score is None:
+                raise LLMGenerationError(
+                    f"STRONG invariant broken: LLM returned out-of-pool code "
+                    f"{raw_candidate.code!r}"
+                )
             return raw_candidate.model_copy(
                 update={
                     "source": "neighbor",

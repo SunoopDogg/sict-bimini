@@ -9,7 +9,7 @@ from __future__ import annotations
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchExcept, ScoredPoint
 
-from api.bim.predict.schemas import Neighbor
+from api.bim.predict.schemas import Neighbor, TargetCode
 
 _WITH_PAYLOAD = [
     "stable_id",
@@ -29,7 +29,7 @@ class NeighborRetriever:
         self,
         query_vector: list[float],
         *,
-        code_field: str,
+        code_field: TargetCode,
         k: int,
     ) -> list[Neighbor]:
         response = self._client.query_points(
