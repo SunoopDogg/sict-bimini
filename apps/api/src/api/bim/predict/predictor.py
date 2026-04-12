@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass
 
 from pydantic import ValidationError
+from qdrant_client.models import Filter as QdrantFilter
 
 from api.bim.clients.tei import TEIClient
 from api.bim.clients.vllm import VLLMClient, VLLMError
@@ -60,7 +61,12 @@ class Predictor:
         self._prompt = prompt_builder
         self._vllm = vllm_client
 
-    def predict(self, request: PredictionRequest) -> PredictionResponse:
+    def predict(
+        self,
+        request: PredictionRequest,
+        *,
+        extra_filter: QdrantFilter | None = None,
+    ) -> PredictionResponse:
         cfg = self._config
         attr = request.attribute
         n = request.n
@@ -70,7 +76,10 @@ class Predictor:
 
         top_k = max(cfg.k_min, n * cfg.k_multiplier)
         neighbors = self._retriever.search(
-            vec, code_field=cfg.target, k=top_k,
+            vec,
+            code_field=cfg.target,
+            k=top_k,
+            extra_filter=extra_filter,
         )
         if not neighbors:
             raise EmptyRetrievalError(

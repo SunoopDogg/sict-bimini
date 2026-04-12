@@ -78,6 +78,26 @@ class TestPredictorRetrievalParams:
         assert kwargs["code_field"] == "kbims_code"
         assert kwargs["k"] == 15  # max(10, 5*3)
 
+    def test_extra_filter_is_passed_to_retriever(
+        self, wired_predictor, sample_attribute
+    ):
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        w = wired_predictor
+        w["retriever"].search.return_value = [_n(0.9, f"KM{i:03d}") for i in range(6)]
+        pool_codes = [f"KM{i:03d}" for i in range(6)]
+        w["vllm"].generate_json.return_value = _valid_strong_json_str(pool_codes, n=5)
+
+        f = Filter(
+            must_not=[FieldCondition(key="stable_id", match=MatchValue(value="xyz"))]
+        )
+        w["predictor"].predict(
+            PredictionRequest(attribute=sample_attribute, n=5),
+            extra_filter=f,
+        )
+
+        assert w["retriever"].search.call_args.kwargs["extra_filter"] is f
+
     def test_top_k_floor_is_k_min(self, wired_predictor, sample_attribute):
         """If n=1 and K_MULTIPLIER=3, top_k = max(10, 3) = 10."""
         w = wired_predictor
