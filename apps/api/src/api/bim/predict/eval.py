@@ -8,6 +8,7 @@ accuracy / mode / latency metrics, and write per-run reports under
 from __future__ import annotations
 
 import random as _random
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,7 +21,9 @@ from qdrant_client.models import (
     MatchValue,
 )
 
-from api.bim.predict.schemas import PredictionMode, TargetCode
+from api.bim.predict.errors import PredictError
+from api.bim.predict.predictor import Predictor
+from api.bim.predict.schemas import PredictionMode, PredictionRequest, TargetCode
 from api.bim.schemas import BIMAttribute
 
 
@@ -137,3 +140,48 @@ def fetch_samples(
         )
         for r in selected
     ]
+
+
+def evaluate_one(
+    sample: EvalSample,
+    predictor: Predictor,
+    top_k: int,
+) -> EvalOutcome:
+    """Run a single leave-one-out prediction; domain errors become error outcomes."""
+    exclude_self = Filter(
+        must_not=[
+            FieldCondition(
+                key="stable_id",
+                match=MatchValue(value=sample.stable_id),
+            )
+        ]
+    )
+    t0 = time.perf_counter()
+    try:
+        resp = predictor.predict(
+            PredictionRequest(attribute=sample.attribute, n=top_k),
+            extra_filter=exclude_self,
+        )
+    except PredictError as exc:
+        latency_ms = (time.perf_counter() - t0) * 1000
+        return EvalOutcome(
+            sample=sample,
+            mode=None,
+            top1=None,
+            top_k_codes=[],
+            latency_ms=latency_ms,
+            pool_size=0,
+            error=exc.__class__.__name__,
+        )
+    latency_ms = (time.perf_counter() - t0) * 1000
+    top1 = resp.candidates[0].code if resp.candidates else None
+    top_k_codes = [c.code for c in resp.candidates]
+    return EvalOutcome(
+        sample=sample,
+        mode=resp.mode,
+        top1=top1,
+        top_k_codes=top_k_codes,
+        latency_ms=latency_ms,
+        pool_size=resp.pool_size,
+        error=None,
+    )

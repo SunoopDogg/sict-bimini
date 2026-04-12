@@ -8,14 +8,21 @@ from unittest.mock import MagicMock
 import pytest
 from qdrant_client.models import Filter
 
+from api.bim.predict.errors import EmptyRetrievalError, LLMGenerationError
 from api.bim.predict.eval import (
     AggregatedMetrics,
     EvalConfig,
     EvalOutcome,
     EvalSample,
+    evaluate_one,
     fetch_samples,
 )
-from api.bim.predict.schemas import PredictionMode
+from api.bim.predict.schemas import (
+    PredictionCandidate,
+    PredictionMode,
+    PredictionRequest,
+    PredictionResponse,
+)
 from api.bim.schemas import BIMAttribute
 
 
@@ -258,3 +265,102 @@ class TestFetchSamples:
 
         with pytest.raises(RuntimeError, match="identical offset"):
             fetch_samples(client, "c", self._cfg(tmp_path))
+
+
+def _response(codes: list[str], mode: PredictionMode = PredictionMode.STRONG,
+              pool_size: int = 6) -> PredictionResponse:
+    cands = [
+        PredictionCandidate(
+            code=c, llm_confidence=0.9 - 0.1 * i,
+            retrieval_score=0.9, source="neighbor",
+        )
+        for i, c in enumerate(codes)
+    ]
+    return PredictionResponse(
+        target="kbims_code",
+        mode=mode,
+        candidates=cands,
+        low_confidence_context=(mode == PredictionMode.WEAK),
+        pool_size=pool_size,
+        retrieved_k=pool_size,
+    )
+
+
+class TestEvaluateOne:
+    def _sample(self) -> EvalSample:
+        return EvalSample(stable_id="abc", attribute=_attr(), ground_truth="KM001")
+
+    def test_success_populates_outcome(self):
+        predictor = MagicMock()
+        predictor.predict.return_value = _response(["KM001", "KM002"])
+
+        out = evaluate_one(self._sample(), predictor, top_k=5)
+
+        assert out.top1 == "KM001"
+        assert out.top_k_codes == ["KM001", "KM002"]
+        assert out.mode == PredictionMode.STRONG
+        assert out.pool_size == 6
+        assert out.error is None
+        assert out.latency_ms >= 0
+
+    def test_passes_leave_one_out_filter(self):
+        predictor = MagicMock()
+        predictor.predict.return_value = _response(["KM001"])
+
+        evaluate_one(self._sample(), predictor, top_k=5)
+
+        kwargs = predictor.predict.call_args.kwargs
+        assert isinstance(kwargs["extra_filter"], Filter)
+        dumped = kwargs["extra_filter"].model_dump(by_alias=True)
+        assert dumped["must_not"][0]["key"] == "stable_id"
+        assert dumped["must_not"][0]["match"]["value"] == "abc"
+
+    def test_passes_top_k_as_n(self):
+        predictor = MagicMock()
+        predictor.predict.return_value = _response(["KM001"])
+
+        evaluate_one(self._sample(), predictor, top_k=7)
+
+        req = predictor.predict.call_args.args[0]
+        assert isinstance(req, PredictionRequest)
+        assert req.n == 7
+
+    def test_empty_retrieval_becomes_error_outcome(self):
+        predictor = MagicMock()
+        predictor.predict.side_effect = EmptyRetrievalError("boom")
+
+        out = evaluate_one(self._sample(), predictor, top_k=5)
+
+        assert out.error == "EmptyRetrievalError"
+        assert out.top1 is None
+        assert out.top_k_codes == []
+        assert out.mode is None
+
+    def test_llm_generation_error_becomes_error_outcome(self):
+        predictor = MagicMock()
+        predictor.predict.side_effect = LLMGenerationError("boom")
+
+        out = evaluate_one(self._sample(), predictor, top_k=5)
+        assert out.error == "LLMGenerationError"
+
+    def test_infra_error_propagates(self):
+        predictor = MagicMock()
+        predictor.predict.side_effect = ConnectionError("qdrant down")
+
+        with pytest.raises(ConnectionError):
+            evaluate_one(self._sample(), predictor, top_k=5)
+
+    def test_empty_candidate_list_yields_none_top1(self):
+        predictor = MagicMock()
+        predictor.predict.return_value = PredictionResponse(
+            target="kbims_code",
+            mode=PredictionMode.WEAK,
+            candidates=[],
+            low_confidence_context=True,
+            pool_size=1,
+            retrieved_k=10,
+        )
+
+        out = evaluate_one(self._sample(), predictor, top_k=5)
+        assert out.top1 is None
+        assert out.top_k_codes == []
