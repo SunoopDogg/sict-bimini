@@ -1,6 +1,7 @@
 """Unit tests for the predict-eval harness."""
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
@@ -52,7 +53,7 @@ class TestEvalConfig:
             top_k=5,
             output_root=tmp_path,
         )
-        with pytest.raises((AttributeError, Exception)):
+        with pytest.raises(FrozenInstanceError):
             cfg.target = "pps_code"  # type: ignore[misc]
 
 
