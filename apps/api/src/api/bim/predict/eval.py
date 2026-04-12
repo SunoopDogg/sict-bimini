@@ -8,7 +8,9 @@ accuracy / mode / latency metrics, and write per-run reports under
 from __future__ import annotations
 
 import random as _random
+import statistics
 import time
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -184,4 +186,85 @@ def evaluate_one(
         latency_ms=latency_ms,
         pool_size=resp.pool_size,
         error=None,
+    )
+
+
+def aggregate(outcomes: list[EvalOutcome], cfg: EvalConfig) -> AggregatedMetrics:
+    """Roll outcomes into summary metrics; every denominator-0 path yields None."""
+    total = len(outcomes)
+    errored = sum(1 for o in outcomes if o.error)
+
+    def _hits(subset: list[EvalOutcome]) -> int:
+        return sum(1 for o in subset if o.top1 == o.sample.ground_truth)
+
+    top1_correct = _hits(outcomes)
+    topk_correct = sum(
+        1 for o in outcomes if o.sample.ground_truth in o.top_k_codes
+    )
+
+    mode_dist: dict[str, int] = {"STRONG": 0, "WEAK": 0, "error": 0}
+    for o in outcomes:
+        if o.mode is None:
+            mode_dist["error"] += 1
+        else:
+            mode_dist[o.mode.value.upper()] += 1
+
+    acc_by_mode: dict[str, float | None] = {}
+    for mode_name in ("STRONG", "WEAK"):
+        subset = [
+            o for o in outcomes
+            if o.mode is not None and o.mode.value.upper() == mode_name
+        ]
+        acc_by_mode[mode_name] = (_hits(subset) / len(subset)) if subset else None
+
+    groups: dict[str, list[EvalOutcome]] = defaultdict(list)
+    for o in outcomes:
+        groups[o.sample.attribute.ifc_type].append(o)
+    by_ifc: dict[str, dict[str, int | float | None]] = {}
+    for ifc, group in groups.items():
+        correct = _hits(group)
+        by_ifc[ifc] = {
+            "total": len(group),
+            "correct": correct,
+            "accuracy": correct / len(group),
+        }
+
+    latencies = sorted(o.latency_ms for o in outcomes)
+    if len(latencies) >= 2:
+        q = statistics.quantiles(latencies, n=100)
+        p50: float | None = q[49]
+        p95: float | None = q[94]
+    elif len(latencies) == 1:
+        p50 = latencies[0]
+        p95 = latencies[0]
+    else:
+        p50 = None
+        p95 = None
+
+    errors_by_type: dict[str, int] = dict(
+        Counter(o.error for o in outcomes if o.error)
+    )
+
+    return AggregatedMetrics(
+        filter_summary={
+            "target": cfg.target,
+            "ifc_type": cfg.ifc_type,
+            "category": cfg.category,
+            "limit": cfg.limit,
+            "seed": cfg.seed,
+            "top_k": cfg.top_k,
+        },
+        samples_total=total,
+        samples_with_error=errored,
+        top1_correct=top1_correct,
+        top1_accuracy=(top1_correct / total) if total else None,
+        topk_correct=topk_correct,
+        topk_accuracy=(topk_correct / total) if total else None,
+        top_k=cfg.top_k,
+        mode_distribution=mode_dist,
+        accuracy_by_mode=acc_by_mode,
+        accuracy_by_ifc_type=by_ifc,
+        latency_p50_ms=p50,
+        latency_p95_ms=p95,
+        errors_by_type=errors_by_type,
     )
