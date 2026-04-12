@@ -3,14 +3,17 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
+from qdrant_client.models import Filter
 
 from api.bim.predict.eval import (
     AggregatedMetrics,
     EvalConfig,
     EvalOutcome,
     EvalSample,
+    fetch_samples,
 )
 from api.bim.predict.schemas import PredictionMode
 from api.bim.schemas import BIMAttribute
@@ -132,3 +135,118 @@ class TestAggregatedMetricsSerialization:
             errors_by_type={},
         )
         assert m.top1_accuracy is None
+
+
+def _record(stable_id: str, ifc: str = "IfcColumn", category: str = "건축",
+            kbims: str = "KM001", pps: str = "") -> MagicMock:
+    r = MagicMock()
+    r.payload = {
+        "stable_id": stable_id,
+        "ifc_type": ifc,
+        "category": category,
+        "family_name": "RC기둥",
+        "family": "기둥",
+        "type": "T1",
+        "type_id": stable_id,   # uniquify
+        "kbims_code": kbims,
+        "pps_code": pps,
+        "source_file": "dummy.xlsx",  # extra, should be ignored by BIMAttribute
+        "ingested_at": "2026-04-17T00:00:00Z",
+    }
+    return r
+
+
+class TestFetchSamples:
+    def _cfg(self, tmp_path: Path, **overrides) -> EvalConfig:
+        base = dict(
+            target="kbims_code",
+            ifc_type=None,
+            category=None,
+            limit=None,
+            seed=0,
+            top_k=5,
+            output_root=tmp_path,
+        )
+        base.update(overrides)
+        return EvalConfig(**base)
+
+    def test_paginates_until_offset_none(self, tmp_path: Path):
+        client = MagicMock()
+        page_1 = [_record(f"id-{i}") for i in range(3)]
+        page_2 = [_record(f"id-{i}") for i in range(3, 5)]
+        client.scroll.side_effect = [(page_1, "cursor-1"), (page_2, None)]
+
+        samples = fetch_samples(client, "bim__test", self._cfg(tmp_path))
+
+        assert len(samples) == 5
+        assert client.scroll.call_count == 2
+
+    def test_returns_empty_raises_value_error(self, tmp_path: Path):
+        client = MagicMock()
+        client.scroll.return_value = ([], None)
+        with pytest.raises(ValueError, match="No samples"):
+            fetch_samples(client, "bim__test", self._cfg(tmp_path))
+
+    def test_shuffle_is_seeded(self, tmp_path: Path):
+        client_a = MagicMock()
+        client_b = MagicMock()
+        records = [_record(f"id-{i}") for i in range(10)]
+        client_a.scroll.return_value = (list(records), None)
+        client_b.scroll.return_value = (list(records), None)
+
+        out_a = fetch_samples(client_a, "c", self._cfg(tmp_path, seed=42))
+        out_b = fetch_samples(client_b, "c", self._cfg(tmp_path, seed=42))
+
+        assert [s.stable_id for s in out_a] == [s.stable_id for s in out_b]
+
+    def test_limit_applied_after_shuffle(self, tmp_path: Path):
+        client = MagicMock()
+        client.scroll.return_value = ([_record(f"id-{i}") for i in range(100)], None)
+
+        out = fetch_samples(client, "c", self._cfg(tmp_path, limit=7))
+        assert len(out) == 7
+
+    def test_limit_none_returns_all(self, tmp_path: Path):
+        client = MagicMock()
+        client.scroll.return_value = ([_record(f"id-{i}") for i in range(4)], None)
+
+        out = fetch_samples(client, "c", self._cfg(tmp_path, limit=None))
+        assert len(out) == 4
+
+    def test_filter_has_label_nonempty_condition(self, tmp_path: Path):
+        client = MagicMock()
+        client.scroll.return_value = ([_record("a")], None)
+
+        fetch_samples(client, "c", self._cfg(tmp_path, target="kbims_code"))
+        qfilter: Filter = client.scroll.call_args.kwargs["scroll_filter"]
+        dumped = qfilter.model_dump(by_alias=True)
+        keys = [c["key"] for c in dumped["must"]]
+        assert "kbims_code" in keys
+
+    def test_filter_includes_ifc_type_when_set(self, tmp_path: Path):
+        client = MagicMock()
+        client.scroll.return_value = ([_record("a")], None)
+
+        fetch_samples(client, "c", self._cfg(tmp_path, ifc_type="IfcColumn"))
+        qfilter = client.scroll.call_args.kwargs["scroll_filter"]
+        dumped = qfilter.model_dump(by_alias=True)
+        keys = [c["key"] for c in dumped["must"]]
+        assert "ifc_type" in keys
+
+    def test_filter_includes_category_when_set(self, tmp_path: Path):
+        client = MagicMock()
+        client.scroll.return_value = ([_record("a")], None)
+
+        fetch_samples(client, "c", self._cfg(tmp_path, category="건축"))
+        qfilter = client.scroll.call_args.kwargs["scroll_filter"]
+        dumped = qfilter.model_dump(by_alias=True)
+        keys = [c["key"] for c in dumped["must"]]
+        assert "category" in keys
+
+    def test_builds_bim_attribute_from_payload(self, tmp_path: Path):
+        client = MagicMock()
+        client.scroll.return_value = ([_record("a", ifc="IfcBeam")], None)
+
+        [sample] = fetch_samples(client, "c", self._cfg(tmp_path))
+        assert sample.attribute.ifc_type == "IfcBeam"
+        assert sample.ground_truth == "KM001"
