@@ -99,6 +99,7 @@ def fetch_samples(
     scroll_filter = _build_scroll_filter(cfg)
     records: list = []
     offset = None
+    prev_offset: object = object()  # distinct sentinel
     while True:
         page, offset = qdrant.scroll(
             collection_name=collection,
@@ -111,6 +112,12 @@ def fetch_samples(
         records.extend(page)
         if offset is None:
             break
+        if offset == prev_offset:
+            raise RuntimeError(
+                f"Qdrant scroll returned identical offset twice ({offset!r}); "
+                "aborting to prevent infinite loop"
+            )
+        prev_offset = offset
 
     if not records:
         raise ValueError(

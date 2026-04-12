@@ -250,3 +250,11 @@ class TestFetchSamples:
         [sample] = fetch_samples(client, "c", self._cfg(tmp_path))
         assert sample.attribute.ifc_type == "IfcBeam"
         assert sample.ground_truth == "KM001"
+
+    def test_pagination_guard_detects_stuck_offset(self, tmp_path: Path):
+        client = MagicMock()
+        # Misbehaving client returns the same non-None offset every call
+        client.scroll.return_value = ([_record("a")], "stuck-cursor")
+
+        with pytest.raises(RuntimeError, match="identical offset"):
+            fetch_samples(client, "c", self._cfg(tmp_path))
