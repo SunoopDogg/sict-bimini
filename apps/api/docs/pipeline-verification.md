@@ -70,6 +70,55 @@ bunx nx run api:build
 
 **기대**: 모두 exit 0.
 
+## 6. Predict-eval smoke (RAG 평가 CLI)
+
+`api:pipeline`으로 라벨 있는 레코드가 Qdrant에 들어간 상태 + 외부 vLLM(`BIM_LLM_URL`) 기동 전제.
+
+```bash
+# vLLM 서빙 확인
+bunx nx run api:llm-check
+
+# 전량 평가 (kbims_code)
+bunx nx run api:predict-eval -- --target kbims_code
+
+# 필터 + 샘플 평가
+bunx nx run api:predict-eval -- --target kbims_code --ifc-type IfcColumn --limit 20 --seed 42
+```
+
+**기대 출력**:
+- stdout에 `=== predict-eval [kbims_code] ===` 헤더 + Top-1/Top-N accuracy + mode 분포 + latency p50/p95 + `Report: ...` 경로
+- `data/reports/predict-eval/{UTC_ISO}_{target}/summary.json` 생성됨 (Pydantic AggregatedMetrics 직렬화)
+- `data/reports/predict-eval/{UTC_ISO}_{target}/predictions.jsonl` 생성됨 (per-record `{stable_id, ground_truth, top1, top_k, mode, pool_size, latency_ms, error}` 1줄당 1레코드)
+
+**검증 커맨드**:
+
+```bash
+# 최신 실행 디렉토리
+LATEST=$(ls -td apps/api/data/reports/predict-eval/*/ | head -1)
+
+# summary.json 구조 확인
+jq 'keys' "$LATEST/summary.json"
+# 기대: ["accuracy_by_ifc_type", "accuracy_by_mode", "errors_by_type", ...]
+
+# top-1 accuracy
+jq '.top1_accuracy' "$LATEST/summary.json"
+
+# 틀린 예측만 필터링
+jq -c 'select(.top1 != .ground_truth)' "$LATEST/predictions.jsonl" | head -5
+```
+
+**실패 경로 확인**:
+
+```bash
+# 매칭 0개 필터 → exit 1
+bunx nx run api:predict-eval -- --target kbims_code --ifc-type IfcNonExistent
+# 기대: stderr "predict-eval: No samples match filter ..." + exit 1
+
+# 잘못된 target → exit 1
+bunx nx run api:predict-eval -- --target bogus
+# 기대: stderr "--target must be one of ..." + exit 1
+```
+
 ## 차원 불일치 에러 경로 (보너스 확인)
 
 ```bash
