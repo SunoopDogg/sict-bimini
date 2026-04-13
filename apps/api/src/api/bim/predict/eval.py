@@ -118,7 +118,7 @@ def fetch_samples(
     scroll_filter = _build_scroll_filter(cfg)
     records: list = []
     offset = None
-    prev_offset: object = object()  # distinct sentinel
+    prev_offset = None
     while True:
         page, offset = qdrant.scroll(
             collection_name=collection,
@@ -150,9 +150,9 @@ def fetch_samples(
 
     return [
         EvalSample(
-            stable_id=r.payload["stable_id"],
+            stable_id=r.payload.get("stable_id", ""),
             attribute=BIMAttribute.model_validate(r.payload),
-            ground_truth=r.payload[cfg.target],
+            ground_truth=r.payload.get(cfg.target) or "",
         )
         for r in selected
     ]
@@ -216,20 +216,18 @@ def aggregate(outcomes: list[EvalOutcome], cfg: EvalConfig) -> AggregatedMetrics
         1 for o in outcomes if o.sample.ground_truth in o.top_k_codes
     )
 
-    mode_dist: dict[str, int] = {"STRONG": 0, "WEAK": 0, "error": 0}
+    mode_dist: dict[str, int] = {mode.name: 0 for mode in PredictionMode}
+    mode_dist["error"] = 0
     for o in outcomes:
         if o.mode is None:
             mode_dist["error"] += 1
         else:
-            mode_dist[o.mode.value.upper()] += 1
+            mode_dist[o.mode.name] += 1
 
     acc_by_mode: dict[str, float | None] = {}
-    for mode_name in ("STRONG", "WEAK"):
-        subset = [
-            o for o in outcomes
-            if o.mode is not None and o.mode.value.upper() == mode_name
-        ]
-        acc_by_mode[mode_name] = (_hits(subset) / len(subset)) if subset else None
+    for mode in PredictionMode:
+        subset = [o for o in outcomes if o.mode is mode]
+        acc_by_mode[mode.name] = (_hits(subset) / len(subset)) if subset else None
 
     groups: dict[str, list[EvalOutcome]] = defaultdict(list)
     for o in outcomes:
@@ -243,7 +241,7 @@ def aggregate(outcomes: list[EvalOutcome], cfg: EvalConfig) -> AggregatedMetrics
             "accuracy": correct / len(group),
         }
 
-    latencies = sorted(o.latency_ms for o in outcomes)
+    latencies = [o.latency_ms for o in outcomes]
     if len(latencies) >= 2:
         q = statistics.quantiles(latencies, n=100)
         p50: float | None = q[49]
@@ -329,16 +327,16 @@ def run_eval(
 ) -> tuple[AggregatedMetrics, Path]:
     """Orchestrator: fetch → per-record predict → aggregate → write_report."""
     samples = fetch_samples(qdrant, collection, cfg)
-    logger.info("predict-eval: fetched %d samples", len(samples))
+    logger.info("fetched %d samples", len(samples))
 
     outcomes: list[EvalOutcome] = []
     for i, sample in enumerate(samples, start=1):
         outcomes.append(evaluate_one(sample, predictor, cfg.top_k))
         if i % 25 == 0:
-            logger.info("predict-eval: %d/%d", i, len(samples))
+            logger.info("progress %d/%d", i, len(samples))
 
     metrics = aggregate(outcomes, cfg)
     run_dir = cfg.output_root / f"{_timestamp()}_{cfg.target}"
     write_report(metrics, outcomes, run_dir)
-    logger.info("predict-eval: wrote report to %s", run_dir)
+    logger.info("wrote report to %s", run_dir)
     return metrics, run_dir

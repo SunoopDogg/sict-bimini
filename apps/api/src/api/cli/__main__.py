@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from pathlib import Path
+from typing import get_args
 
 import httpx
 import typer
@@ -19,6 +20,7 @@ from api.bim.predict.eval import (
     run_eval,
 )
 from api.bim.predict.factory import build_kbims_predictor, build_pps_predictor
+from api.bim.predict.schemas import TargetCode
 from api.core.config import BIMSettings
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -158,7 +160,8 @@ def llm_check_cmd() -> None:
     typer.echo(f"OK: vLLM at {s.llm_url} serves {s.llm_model}")
 
 
-_VALID_TARGETS = ("kbims_code", "pps_code")
+def _pct(v: float | None) -> str:
+    return f"{v * 100:.1f}%" if v is not None else "n/a"
 
 
 def _format_summary(metrics: AggregatedMetrics, run_dir: Path) -> str:
@@ -169,9 +172,6 @@ def _format_summary(metrics: AggregatedMetrics, run_dir: Path) -> str:
     if filt.get("category"):
         filter_parts.append(f"category={filt['category']}")
     filter_str = " AND ".join(filter_parts) if filter_parts else "none"
-
-    def _pct(v: float | None) -> str:
-        return f"{v * 100:.1f}%" if v is not None else "n/a"
 
     lines = [
         f"=== predict-eval [{filt.get('target')}] ===",
@@ -231,9 +231,10 @@ def predict_eval_cmd(
     ),
 ) -> None:
     """Leave-one-out evaluation of Predictor against labeled Qdrant records."""
-    if target not in _VALID_TARGETS:
+    valid_targets = get_args(TargetCode)
+    if target not in valid_targets:
         typer.echo(
-            f"--target must be one of {_VALID_TARGETS}, got {target!r}", err=True
+            f"--target must be one of {valid_targets}, got {target!r}", err=True
         )
         raise typer.Exit(code=1)
 
