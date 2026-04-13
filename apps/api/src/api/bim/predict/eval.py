@@ -34,6 +34,15 @@ from api.bim.schemas import BIMAttribute
 logger = logging.getLogger(__name__)
 
 
+class NoSamplesError(ValueError):
+    """Raised by ``fetch_samples`` when the filter matches zero labeled records.
+
+    Subclass of ValueError to preserve the catch-all ``except ValueError``
+    behavior for callers that don't distinguish; CLI callers that want
+    to surface only this specific case can catch it narrowly.
+    """
+
+
 @dataclass(frozen=True)
 class EvalConfig:
     target: TargetCode
@@ -130,7 +139,7 @@ def fetch_samples(
         prev_offset = offset
 
     if not records:
-        raise ValueError(
+        raise NoSamplesError(
             f"No samples match filter (target={cfg.target}, "
             f"ifc_type={cfg.ifc_type}, category={cfg.category})"
         )

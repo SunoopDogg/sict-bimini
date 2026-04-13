@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 from pathlib import Path
 
@@ -11,7 +12,12 @@ from api.bim.clients.qdrant import QdrantWrapper
 from api.bim.clients.tei import TEIClient
 from api.bim.clients.vllm import VLLMClient
 from api.bim.pipeline import run_ingest_xlsx, run_normalize, run_upsert_qdrant
-from api.bim.predict.eval import AggregatedMetrics, EvalConfig, run_eval
+from api.bim.predict.eval import (
+    AggregatedMetrics,
+    EvalConfig,
+    NoSamplesError,
+    run_eval,
+)
 from api.bim.predict.factory import build_kbims_predictor, build_pps_predictor
 from api.core.config import BIMSettings
 
@@ -245,7 +251,7 @@ def predict_eval_cmd(
     builder = (
         build_kbims_predictor if target == "kbims_code" else build_pps_predictor
     )
-    with TEIClient(
+    with contextlib.closing(qdrant), TEIClient(
         url=s.tei_url, model=s.embedding_model, dim=s.embedding_dim
     ) as tei, VLLMClient(
         url=s.llm_url, model=s.llm_model, timeout=s.llm_timeout_seconds
@@ -260,7 +266,7 @@ def predict_eval_cmd(
             metrics, run_dir = run_eval(
                 cfg, predictor, qdrant, collection=s.collection_name
             )
-        except ValueError as exc:
+        except NoSamplesError as exc:
             typer.echo(f"predict-eval: {exc}", err=True)
             raise typer.Exit(code=1) from exc
 

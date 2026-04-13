@@ -1,10 +1,10 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import httpx
 from typer.testing import CliRunner
 
-from api.bim.predict.eval import AggregatedMetrics
+from api.bim.predict.eval import AggregatedMetrics, NoSamplesError
 from api.cli.__main__ import app
 
 runner = CliRunner()
@@ -197,7 +197,7 @@ def test_predict_eval_builds_cfg_and_prints_summary(
 
     mock_tei_cls.return_value.__enter__.return_value = "TEI"
     mock_vllm_cls.return_value.__enter__.return_value = "VLLM"
-    mock_qdrant_cls.return_value = "QD"
+    mock_qdrant_cls.return_value = MagicMock()
     mock_build.return_value = "PRED"
 
     run_dir = tmp_path / "reports" / "predict-eval" / "2026-04-17T00-00-00Z_kbims_code"
@@ -245,7 +245,7 @@ def test_predict_eval_pps_target_uses_pps_builder(
 
     mock_tei_cls.return_value.__enter__.return_value = "TEI"
     mock_vllm_cls.return_value.__enter__.return_value = "VLLM"
-    mock_qdrant_cls.return_value = "QD"
+    mock_qdrant_cls.return_value = MagicMock()
     mock_pps_build.return_value = "PRED-PPS"
     mock_kbims_build.return_value = "PRED-KBIMS"
     mock_run_eval.return_value = (
@@ -280,9 +280,9 @@ def test_predict_eval_empty_samples_exits_with_code_1(
 
     mock_tei_cls.return_value.__enter__.return_value = "TEI"
     mock_vllm_cls.return_value.__enter__.return_value = "VLLM"
-    mock_qdrant_cls.return_value = "QD"
+    mock_qdrant_cls.return_value = MagicMock()
     mock_build.return_value = "PRED"
-    mock_run_eval.side_effect = ValueError("No samples match filter")
+    mock_run_eval.side_effect = NoSamplesError("No samples match filter")
 
     result = runner.invoke(app, ["predict-eval", "--target", "kbims_code"])
     assert result.exit_code != 0

@@ -16,6 +16,7 @@ from api.bim.predict.eval import (
     EvalConfig,
     EvalOutcome,
     EvalSample,
+    NoSamplesError,
     _timestamp,
     aggregate,
     evaluate_one,
@@ -197,7 +198,7 @@ class TestFetchSamples:
     def test_returns_empty_raises_value_error(self, tmp_path: Path):
         client = MagicMock()
         client.scroll.return_value = ([], None)
-        with pytest.raises(ValueError, match="No samples"):
+        with pytest.raises(NoSamplesError, match="No samples"):
             fetch_samples(client, "bim__test", self._cfg(tmp_path))
 
     def test_shuffle_is_seeded(self, tmp_path: Path):
