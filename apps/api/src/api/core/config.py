@@ -16,12 +16,12 @@ class BIMSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="BIM_", case_sensitive=False)
 
     # 실험 식별자 → Qdrant 컬렉션 네이밍
-    experiment_id: str = "qwen8b_d2048"
+    experiment_id: str = "qwen4b_d2048"
 
-    # 임베딩 (TEI)
-    tei_url: str = "http://localhost:8080"
-    embedding_model: str = "Qwen/Qwen3-Embedding-8B"
-    embedding_dim: int = 2048  # MRL 절단
+    # 임베딩 (vLLM /v1/embeddings)
+    embedding_url: str = "http://192.168.0.76:8080"
+    embedding_model: str = "Qwen/Qwen3-Embedding-4B"
+    embedding_dim: int = 2048  # MRL 절단 (native 2560 → 2048)
 
     # Qdrant
     qdrant_url: str = "http://localhost:6333"
