@@ -31,6 +31,8 @@ from api.bim.predict.predictor import Predictor
 from api.bim.predict.schemas import PredictionMode, PredictionRequest, TargetCode
 from api.bim.schemas import BIMAttribute
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class EvalConfig:
@@ -307,9 +309,6 @@ def write_report(
     ]
     body = ("\n".join(lines) + "\n") if lines else ""
     (output_dir / "predictions.jsonl").write_text(body, encoding="utf-8")
-
-
-logger = logging.getLogger(__name__)
 
 
 def run_eval(
