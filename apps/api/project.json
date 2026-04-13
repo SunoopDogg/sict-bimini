@@ -107,6 +107,13 @@
         "cwd": "{projectRoot}"
       }
     },
+    "predict-eval": {
+      "executor": "@nxlv/python:run-commands",
+      "options": {
+        "command": "uv run python -m api.cli predict-eval",
+        "cwd": "{projectRoot}"
+      }
+    },
     "install": {
       "executor": "@nxlv/python:install",
       "options": {

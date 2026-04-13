@@ -5,10 +5,14 @@ from pathlib import Path
 
 import httpx
 import typer
+from qdrant_client import QdrantClient
 
 from api.bim.clients.qdrant import QdrantWrapper
 from api.bim.clients.tei import TEIClient
+from api.bim.clients.vllm import VLLMClient
 from api.bim.pipeline import run_ingest_xlsx, run_normalize, run_upsert_qdrant
+from api.bim.predict.eval import AggregatedMetrics, EvalConfig, run_eval
+from api.bim.predict.factory import build_kbims_predictor, build_pps_predictor
 from api.core.config import BIMSettings
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -146,6 +150,121 @@ def llm_check_cmd() -> None:
         raise typer.Exit(code=1)
 
     typer.echo(f"OK: vLLM at {s.llm_url} serves {s.llm_model}")
+
+
+_VALID_TARGETS = ("kbims_code", "pps_code")
+
+
+def _format_summary(metrics: AggregatedMetrics, run_dir: Path) -> str:
+    filt = metrics.filter_summary
+    filter_parts: list[str] = []
+    if filt.get("ifc_type"):
+        filter_parts.append(f"ifc_type={filt['ifc_type']}")
+    if filt.get("category"):
+        filter_parts.append(f"category={filt['category']}")
+    filter_str = " AND ".join(filter_parts) if filter_parts else "none"
+
+    def _pct(v: float | None) -> str:
+        return f"{v * 100:.1f}%" if v is not None else "n/a"
+
+    lines = [
+        f"=== predict-eval [{filt.get('target')}] ===",
+        f"Samples: {metrics.samples_total} (filter: {filter_str})",
+        f"Top-1 accuracy: {_pct(metrics.top1_accuracy)} "
+        f"({metrics.top1_correct}/{metrics.samples_total})",
+        f"Top-{metrics.top_k} accuracy: {_pct(metrics.topk_accuracy)} "
+        f"({metrics.topk_correct}/{metrics.samples_total})",
+        "Mode distribution:   "
+        + "  ".join(
+            f"{k}={v}" for k, v in metrics.mode_distribution.items() if v
+        ),
+        "Accuracy by mode:    "
+        + "  ".join(
+            f"{k}={_pct(v)}" for k, v in metrics.accuracy_by_mode.items()
+        ),
+        "ifc_type breakdown:",
+    ]
+    for ifc, stats in metrics.accuracy_by_ifc_type.items():
+        lines.append(
+            f"  {ifc:<16}  {stats['total']}  top1={_pct(stats['accuracy'])}"
+        )
+    lines.append(
+        f"Latency p50={metrics.latency_p50_ms:.0f}ms  "
+        f"p95={metrics.latency_p95_ms:.0f}ms"
+        if metrics.latency_p50_ms is not None
+        else "Latency: n/a"
+    )
+    if metrics.errors_by_type:
+        lines.append(
+            "Errors: "
+            + "  ".join(
+                f"{k}={v}" for k, v in metrics.errors_by_type.items()
+            )
+        )
+    lines.append(f"Report: {run_dir}")
+    return "\n".join(lines)
+
+
+@app.command("predict-eval")
+def predict_eval_cmd(
+    target: str = typer.Option(
+        ..., "--target", help="Code field to evaluate: kbims_code or pps_code."
+    ),
+    ifc_type: str | None = typer.Option(
+        None, "--ifc-type", help="Optional payload filter on ifc_type."
+    ),
+    category: str | None = typer.Option(
+        None, "--category", help="Optional payload filter on category."
+    ),
+    limit: int | None = typer.Option(
+        None, "--limit", help="Upper bound on samples (default: entire matching set)."
+    ),
+    seed: int = typer.Option(0, "--seed", help="Shuffling seed for reproducibility."),
+    top_k: int = typer.Option(
+        5, "--top-k", help="Candidates requested per prediction."
+    ),
+) -> None:
+    """Leave-one-out evaluation of Predictor against labeled Qdrant records."""
+    if target not in _VALID_TARGETS:
+        typer.echo(
+            f"--target must be one of {_VALID_TARGETS}, got {target!r}", err=True
+        )
+        raise typer.Exit(code=1)
+
+    s = BIMSettings()
+    cfg = EvalConfig(
+        target=target,
+        ifc_type=ifc_type,
+        category=category,
+        limit=limit,
+        seed=seed,
+        top_k=top_k,
+        output_root=s.data_root / "reports" / "predict-eval",
+    )
+    qdrant = QdrantClient(url=s.qdrant_url, api_key=s.qdrant_api_key)
+    builder = (
+        build_kbims_predictor if target == "kbims_code" else build_pps_predictor
+    )
+    with TEIClient(
+        url=s.tei_url, model=s.embedding_model, dim=s.embedding_dim
+    ) as tei, VLLMClient(
+        url=s.llm_url, model=s.llm_model, timeout=s.llm_timeout_seconds
+    ) as vllm:
+        predictor = builder(
+            settings=s,
+            tei_client=tei,
+            qdrant_client=qdrant,
+            vllm_client=vllm,
+        )
+        try:
+            metrics, run_dir = run_eval(
+                cfg, predictor, qdrant, collection=s.collection_name
+            )
+        except ValueError as exc:
+            typer.echo(f"predict-eval: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+
+    typer.echo(_format_summary(metrics, run_dir))
 
 
 if __name__ == "__main__":
