@@ -7,11 +7,13 @@ accuracy / mode / latency metrics, and write per-run reports under
 """
 from __future__ import annotations
 
+import json as _json
 import random as _random
 import statistics
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -268,3 +270,39 @@ def aggregate(outcomes: list[EvalOutcome], cfg: EvalConfig) -> AggregatedMetrics
         latency_p95_ms=p95,
         errors_by_type=errors_by_type,
     )
+
+
+def _timestamp(now: datetime | None = None) -> str:
+    t = now if now is not None else datetime.now(UTC)
+    return t.strftime("%Y-%m-%dT%H-%M-%SZ")
+
+
+def write_report(
+    metrics: AggregatedMetrics,
+    outcomes: list[EvalOutcome],
+    output_dir: Path,
+) -> None:
+    """Create ``output_dir`` and write summary.json + predictions.jsonl."""
+    output_dir.mkdir(parents=True, exist_ok=False)
+    (output_dir / "summary.json").write_text(
+        metrics.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    lines = [
+        _json.dumps(
+            {
+                "stable_id": o.sample.stable_id,
+                "ground_truth": o.sample.ground_truth,
+                "top1": o.top1,
+                "top_k": o.top_k_codes,
+                "mode": o.mode.value if o.mode is not None else None,
+                "pool_size": o.pool_size,
+                "latency_ms": o.latency_ms,
+                "error": o.error,
+            },
+            ensure_ascii=False,
+        )
+        for o in outcomes
+    ]
+    body = ("\n".join(lines) + "\n") if lines else ""
+    (output_dir / "predictions.jsonl").write_text(body, encoding="utf-8")

@@ -1,7 +1,9 @@
 """Unit tests for the predict-eval harness."""
 from __future__ import annotations
 
+import json
 from dataclasses import FrozenInstanceError
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -14,9 +16,11 @@ from api.bim.predict.eval import (
     EvalConfig,
     EvalOutcome,
     EvalSample,
+    _timestamp,
     aggregate,
     evaluate_one,
     fetch_samples,
+    write_report,
 )
 from api.bim.predict.schemas import (
     PredictionCandidate,
@@ -513,3 +517,100 @@ class TestAggregate:
         assert m.filter_summary["limit"] == 50
         assert m.filter_summary["seed"] == 7
         assert m.filter_summary["top_k"] == 3
+
+
+class TestTimestamp:
+    def test_strftime_format_is_filesystem_safe(self):
+        fixed = datetime(2026, 4, 17, 3, 45, 12, tzinfo=UTC)
+        assert _timestamp(fixed) == "2026-04-17T03-45-12Z"
+
+    def test_uses_utc_now_by_default(self):
+        ts = _timestamp()
+        assert ts.endswith("Z")
+        assert len(ts) == 20  # YYYY-MM-DDTHH-MM-SSZ
+
+
+class TestWriteReport:
+    def _metrics(self) -> AggregatedMetrics:
+        return AggregatedMetrics(
+            filter_summary={"target": "kbims_code"},
+            samples_total=2,
+            samples_with_error=0,
+            top1_correct=1, top1_accuracy=0.5,
+            topk_correct=2, topk_accuracy=1.0,
+            top_k=5,
+            mode_distribution={"STRONG": 2, "WEAK": 0, "error": 0},
+            accuracy_by_mode={"STRONG": 0.5, "WEAK": None},
+            accuracy_by_ifc_type={
+                "IfcColumn": {"total": 2, "correct": 1, "accuracy": 0.5},
+            },
+            latency_p50_ms=100.0, latency_p95_ms=200.0,
+            errors_by_type={},
+        )
+
+    def _outcomes(self) -> list[EvalOutcome]:
+        return [
+            _outcome("a", "KM001", "KM001", top_k=["KM001", "KM002"]),
+            _outcome("b", "KM002", "KM999", top_k=["KM999", "KM002"],
+                    mode=PredictionMode.STRONG),
+        ]
+
+    def test_creates_both_files(self, tmp_path: Path):
+        run_dir = tmp_path / "run-1"
+        write_report(self._metrics(), self._outcomes(), run_dir)
+
+        assert (run_dir / "summary.json").exists()
+        assert (run_dir / "predictions.jsonl").exists()
+
+    def test_summary_json_roundtrips(self, tmp_path: Path):
+        run_dir = tmp_path / "run-1"
+        write_report(self._metrics(), self._outcomes(), run_dir)
+
+        data = (run_dir / "summary.json").read_text(encoding="utf-8")
+        back = AggregatedMetrics.model_validate_json(data)
+        assert back == self._metrics()
+
+    def test_predictions_jsonl_line_count_equals_outcomes(self, tmp_path: Path):
+        run_dir = tmp_path / "run-1"
+        outs = self._outcomes()
+        write_report(self._metrics(), outs, run_dir)
+
+        lines = (run_dir / "predictions.jsonl").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        assert len(lines) == len(outs)
+
+    def test_predictions_jsonl_schema(self, tmp_path: Path):
+        run_dir = tmp_path / "run-1"
+        outs = [_outcome("abc", "KM001", "KM001", top_k=["KM001"])]
+        write_report(self._metrics(), outs, run_dir)
+
+        line = (run_dir / "predictions.jsonl").read_text(
+            encoding="utf-8"
+        ).splitlines()[0]
+        row = json.loads(line)
+        assert row["stable_id"] == "abc"
+        assert row["ground_truth"] == "KM001"
+        assert row["top1"] == "KM001"
+        assert row["top_k"] == ["KM001"]
+        assert row["mode"] == "strong"
+        assert row["error"] is None
+
+    def test_error_outcome_mode_is_null(self, tmp_path: Path):
+        run_dir = tmp_path / "run-1"
+        outs = [_outcome("abc", "K", None, top_k=[],
+                         mode=None, error="LLMGenerationError")]
+        write_report(self._metrics(), outs, run_dir)
+
+        line = (run_dir / "predictions.jsonl").read_text(
+            encoding="utf-8"
+        ).splitlines()[0]
+        row = json.loads(line)
+        assert row["mode"] is None
+        assert row["error"] == "LLMGenerationError"
+
+    def test_refuses_existing_directory(self, tmp_path: Path):
+        run_dir = tmp_path / "existing"
+        run_dir.mkdir()
+        with pytest.raises(FileExistsError):
+            write_report(self._metrics(), self._outcomes(), run_dir)
