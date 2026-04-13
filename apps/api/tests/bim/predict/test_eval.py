@@ -20,6 +20,7 @@ from api.bim.predict.eval import (
     aggregate,
     evaluate_one,
     fetch_samples,
+    run_eval,
     write_report,
 )
 from api.bim.predict.schemas import (
@@ -614,3 +615,45 @@ class TestWriteReport:
         run_dir.mkdir()
         with pytest.raises(FileExistsError):
             write_report(self._metrics(), self._outcomes(), run_dir)
+
+
+class TestRunEval:
+    def test_end_to_end_with_mocks(self, tmp_path: Path):
+        qdrant = MagicMock()
+        qdrant.scroll.return_value = (
+            [_record("a"), _record("b"), _record("c")],
+            None,
+        )
+        predictor = MagicMock()
+        predictor.predict.return_value = _response(["KM001"])
+
+        cfg = EvalConfig(
+            target="kbims_code",
+            ifc_type=None,
+            category=None,
+            limit=None,
+            seed=0,
+            top_k=5,
+            output_root=tmp_path,
+        )
+
+        metrics, run_dir = run_eval(cfg, predictor, qdrant, collection="bim__test")
+
+        assert metrics.samples_total == 3
+        assert run_dir.parent == tmp_path
+        assert run_dir.name.endswith("_kbims_code")
+        assert (run_dir / "summary.json").exists()
+        assert (run_dir / "predictions.jsonl").exists()
+
+    def test_propagates_infra_errors_from_fetch(self, tmp_path: Path):
+        qdrant = MagicMock()
+        qdrant.scroll.side_effect = ConnectionError("qdrant down")
+        predictor = MagicMock()
+
+        cfg = EvalConfig(
+            target="kbims_code", ifc_type=None, category=None,
+            limit=None, seed=0, top_k=5, output_root=tmp_path,
+        )
+
+        with pytest.raises(ConnectionError):
+            run_eval(cfg, predictor, qdrant, collection="bim__test")

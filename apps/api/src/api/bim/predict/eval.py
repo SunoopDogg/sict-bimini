@@ -8,6 +8,7 @@ accuracy / mode / latency metrics, and write per-run reports under
 from __future__ import annotations
 
 import json as _json
+import logging
 import random as _random
 import statistics
 import time
@@ -306,3 +307,30 @@ def write_report(
     ]
     body = ("\n".join(lines) + "\n") if lines else ""
     (output_dir / "predictions.jsonl").write_text(body, encoding="utf-8")
+
+
+logger = logging.getLogger(__name__)
+
+
+def run_eval(
+    cfg: EvalConfig,
+    predictor: Predictor,
+    qdrant: QdrantClient,
+    *,
+    collection: str,
+) -> tuple[AggregatedMetrics, Path]:
+    """Orchestrator: fetch → per-record predict → aggregate → write_report."""
+    samples = fetch_samples(qdrant, collection, cfg)
+    logger.info("predict-eval: fetched %d samples", len(samples))
+
+    outcomes: list[EvalOutcome] = []
+    for i, sample in enumerate(samples, start=1):
+        outcomes.append(evaluate_one(sample, predictor, cfg.top_k))
+        if i % 25 == 0:
+            logger.info("predict-eval: %d/%d", i, len(samples))
+
+    metrics = aggregate(outcomes, cfg)
+    run_dir = cfg.output_root / f"{_timestamp()}_{cfg.target}"
+    write_report(metrics, outcomes, run_dir)
+    logger.info("predict-eval: wrote report to %s", run_dir)
+    return metrics, run_dir
