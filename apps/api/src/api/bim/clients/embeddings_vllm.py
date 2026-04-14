@@ -1,7 +1,7 @@
 """Minimal vLLM embedding client (OpenAI-compatible /v1/embeddings).
 
-OpenAI-compatible /v1/embeddings client. Performs MRL truncation +
-L2 renormalization client-side because vLLM returns native-dim embeddings.
+Performs MRL truncation + L2 renormalization client-side because vLLM
+returns native-dim embeddings.
 """
 
 from __future__ import annotations
