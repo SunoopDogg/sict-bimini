@@ -9,8 +9,8 @@ import httpx
 import typer
 from qdrant_client import QdrantClient
 
+from api.bim.clients.embeddings_vllm import VLLMEmbedClient
 from api.bim.clients.qdrant import QdrantWrapper
-from api.bim.clients.tei import TEIClient
 from api.bim.clients.vllm import VLLMClient
 from api.bim.pipeline import run_ingest_xlsx, run_normalize, run_upsert_qdrant
 from api.bim.predict.eval import (
@@ -34,7 +34,7 @@ logging.basicConfig(
 def _settings_from_args(
     experiment_id: str | None,
     dim: int | None,
-    tei_url: str | None,
+    embedding_url: str | None,
     qdrant_url: str | None,
     model: str | None,
     data_root: Path | None,
@@ -45,7 +45,7 @@ def _settings_from_args(
         for k, v in {
             "experiment_id": experiment_id,
             "embedding_dim": dim,
-            "tei_url": tei_url,
+            "embedding_url": embedding_url,
             "qdrant_url": qdrant_url,
             "embedding_model": model,
             "data_root": data_root,
@@ -71,7 +71,7 @@ def _resolve_data_root(data_root: Path | None) -> Path:
 
 _ExpId = typer.Option(None, help="Override BIM_EXPERIMENT_ID.")
 _Dim = typer.Option(None, help="Override BIM_EMBEDDING_DIM.")
-_TeiUrl = typer.Option(None, help="Override BIM_TEI_URL.")
+_EmbeddingUrl = typer.Option(None, help="Override BIM_EMBEDDING_URL.")
 _QdrantUrl = typer.Option(None, help="Override BIM_QDRANT_URL.")
 _Model = typer.Option(None, help="Override BIM_EMBEDDING_MODEL.")
 
@@ -93,17 +93,21 @@ def upsert_qdrant_cmd(
     data_root: Path | None = _DataRoot,
     experiment_id: str | None = _ExpId,
     dim: int | None = _Dim,
-    tei_url: str | None = _TeiUrl,
+    embedding_url: str | None = _EmbeddingUrl,
     qdrant_url: str | None = _QdrantUrl,
     model: str | None = _Model,
 ) -> None:
-    """Stage 3: normalized JSON → TEI embeddings → Qdrant upsert."""
-    s = _settings_from_args(experiment_id, dim, tei_url, qdrant_url, model, data_root)
-    with TEIClient(url=s.tei_url, model=s.embedding_model, dim=s.embedding_dim) as tei:
+    """Stage 3: normalized JSON → vLLM embeddings → Qdrant upsert."""
+    s = _settings_from_args(
+        experiment_id, dim, embedding_url, qdrant_url, model, data_root
+    )
+    with VLLMEmbedClient(
+        url=s.embedding_url, model=s.embedding_model, dim=s.embedding_dim
+    ) as embed:
         qw = QdrantWrapper.from_settings(url=s.qdrant_url, api_key=s.qdrant_api_key)
         run_upsert_qdrant(
             data_root=s.data_root,
-            tei_client=tei,
+            embed_client=embed,
             qdrant=qw,
             collection=s.collection_name,
             dim=s.embedding_dim,
@@ -115,19 +119,23 @@ def pipeline_cmd(
     data_root: Path | None = _DataRoot,
     experiment_id: str | None = _ExpId,
     dim: int | None = _Dim,
-    tei_url: str | None = _TeiUrl,
+    embedding_url: str | None = _EmbeddingUrl,
     qdrant_url: str | None = _QdrantUrl,
     model: str | None = _Model,
 ) -> None:
     """Run all 3 stages sequentially."""
-    s = _settings_from_args(experiment_id, dim, tei_url, qdrant_url, model, data_root)
+    s = _settings_from_args(
+        experiment_id, dim, embedding_url, qdrant_url, model, data_root
+    )
     run_ingest_xlsx(s.data_root)
     run_normalize(s.data_root)
-    with TEIClient(url=s.tei_url, model=s.embedding_model, dim=s.embedding_dim) as tei:
+    with VLLMEmbedClient(
+        url=s.embedding_url, model=s.embedding_model, dim=s.embedding_dim
+    ) as embed:
         qw = QdrantWrapper.from_settings(url=s.qdrant_url, api_key=s.qdrant_api_key)
         run_upsert_qdrant(
             data_root=s.data_root,
-            tei_client=tei,
+            embed_client=embed,
             qdrant=qw,
             collection=s.collection_name,
             dim=s.embedding_dim,
@@ -252,14 +260,14 @@ def predict_eval_cmd(
     builder = (
         build_kbims_predictor if target == "kbims_code" else build_pps_predictor
     )
-    with contextlib.closing(qdrant), TEIClient(
-        url=s.tei_url, model=s.embedding_model, dim=s.embedding_dim
-    ) as tei, VLLMClient(
+    with contextlib.closing(qdrant), VLLMEmbedClient(
+        url=s.embedding_url, model=s.embedding_model, dim=s.embedding_dim
+    ) as embed, VLLMClient(
         url=s.llm_url, model=s.llm_model, timeout=s.llm_timeout_seconds
     ) as vllm:
         predictor = builder(
             settings=s,
-            tei_client=tei,
+            embed_client=embed,
             qdrant_client=qdrant,
             vllm_client=vllm,
         )

@@ -25,12 +25,12 @@ def test_normalize_calls_pipeline_function(mock_run, tmp_path: Path):
 
 
 @patch("api.cli.__main__.run_upsert_qdrant")
-@patch("api.cli.__main__.TEIClient")
+@patch("api.cli.__main__.VLLMEmbedClient")
 @patch("api.cli.__main__.QdrantWrapper")
 def test_upsert_qdrant_wires_clients(
-    mock_qdrant_cls, mock_tei_cls, mock_run, tmp_path: Path
+    mock_qdrant_cls, mock_embed_cls, mock_run, tmp_path: Path
 ):
-    mock_tei_cls.return_value.__enter__.return_value = "TEI"
+    mock_embed_cls.return_value.__enter__.return_value = "EMB"
     mock_qdrant_cls.from_settings.return_value = "QW"
 
     result = runner.invoke(
@@ -38,32 +38,32 @@ def test_upsert_qdrant_wires_clients(
         [
             "upsert-qdrant",
             "--data-root", str(tmp_path),
-            "--experiment-id", "qwen8b_d2048",
+            "--experiment-id", "qwen4b_d2048",
             "--dim", "2048",
-            "--tei-url", "http://tei",
+            "--embedding-url", "http://embed",
             "--qdrant-url", "http://qdrant",
-            "--model", "Qwen/Qwen3-Embedding-8B",
+            "--model", "Qwen/Qwen3-Embedding-4B",
         ],
     )
     assert result.exit_code == 0, result.output
     mock_run.assert_called_once()
     _, kwargs = mock_run.call_args
     assert kwargs["data_root"] == tmp_path
-    assert kwargs["collection"] == "bim__qwen8b_d2048"
+    assert kwargs["collection"] == "bim__qwen4b_d2048"
     assert kwargs["dim"] == 2048
-    assert kwargs["tei_client"] == "TEI"
+    assert kwargs["embed_client"] == "EMB"
     assert kwargs["qdrant"] == "QW"
 
 
 @patch("api.cli.__main__.run_upsert_qdrant")
 @patch("api.cli.__main__.run_normalize")
 @patch("api.cli.__main__.run_ingest_xlsx")
-@patch("api.cli.__main__.TEIClient")
+@patch("api.cli.__main__.VLLMEmbedClient")
 @patch("api.cli.__main__.QdrantWrapper")
 def test_pipeline_runs_all_three_stages_in_order(
-    mock_qdrant_cls, mock_tei_cls, mock_ingest, mock_norm, mock_upsert, tmp_path: Path
+    mock_qdrant_cls, mock_embed_cls, mock_ingest, mock_norm, mock_upsert, tmp_path: Path
 ):
-    mock_tei_cls.return_value.__enter__.return_value = "TEI"
+    mock_embed_cls.return_value.__enter__.return_value = "EMB"
     mock_qdrant_cls.from_settings.return_value = "QW"
 
     call_order: list[str] = []
@@ -186,16 +186,16 @@ def _metrics_stub() -> AggregatedMetrics:
 
 @patch("api.cli.__main__.run_eval")
 @patch("api.cli.__main__.VLLMClient")
-@patch("api.cli.__main__.TEIClient")
+@patch("api.cli.__main__.VLLMEmbedClient")
 @patch("api.cli.__main__.QdrantClient")
 @patch("api.cli.__main__.build_kbims_predictor")
 def test_predict_eval_builds_cfg_and_prints_summary(
-    mock_build, mock_qdrant_cls, mock_tei_cls, mock_vllm_cls,
+    mock_build, mock_qdrant_cls, mock_embed_cls, mock_vllm_cls,
     mock_run_eval, tmp_path: Path, monkeypatch,
 ):
     monkeypatch.setenv("BIM_DATA_ROOT", str(tmp_path))
 
-    mock_tei_cls.return_value.__enter__.return_value = "TEI"
+    mock_embed_cls.return_value.__enter__.return_value = "EMB"
     mock_vllm_cls.return_value.__enter__.return_value = "VLLM"
     mock_qdrant_cls.return_value = MagicMock()
     mock_build.return_value = "PRED"
@@ -233,17 +233,17 @@ def test_predict_eval_builds_cfg_and_prints_summary(
 
 @patch("api.cli.__main__.run_eval")
 @patch("api.cli.__main__.VLLMClient")
-@patch("api.cli.__main__.TEIClient")
+@patch("api.cli.__main__.VLLMEmbedClient")
 @patch("api.cli.__main__.QdrantClient")
 @patch("api.cli.__main__.build_pps_predictor")
 @patch("api.cli.__main__.build_kbims_predictor")
 def test_predict_eval_pps_target_uses_pps_builder(
-    mock_kbims_build, mock_pps_build, mock_qdrant_cls, mock_tei_cls,
+    mock_kbims_build, mock_pps_build, mock_qdrant_cls, mock_embed_cls,
     mock_vllm_cls, mock_run_eval, tmp_path: Path, monkeypatch,
 ):
     monkeypatch.setenv("BIM_DATA_ROOT", str(tmp_path))
 
-    mock_tei_cls.return_value.__enter__.return_value = "TEI"
+    mock_embed_cls.return_value.__enter__.return_value = "EMB"
     mock_vllm_cls.return_value.__enter__.return_value = "VLLM"
     mock_qdrant_cls.return_value = MagicMock()
     mock_pps_build.return_value = "PRED-PPS"
@@ -269,16 +269,16 @@ def test_predict_eval_rejects_unknown_target(tmp_path: Path, monkeypatch):
 
 @patch("api.cli.__main__.run_eval")
 @patch("api.cli.__main__.VLLMClient")
-@patch("api.cli.__main__.TEIClient")
+@patch("api.cli.__main__.VLLMEmbedClient")
 @patch("api.cli.__main__.QdrantClient")
 @patch("api.cli.__main__.build_kbims_predictor")
 def test_predict_eval_empty_samples_exits_with_code_1(
-    mock_build, mock_qdrant_cls, mock_tei_cls, mock_vllm_cls,
+    mock_build, mock_qdrant_cls, mock_embed_cls, mock_vllm_cls,
     mock_run_eval, tmp_path: Path, monkeypatch,
 ):
     monkeypatch.setenv("BIM_DATA_ROOT", str(tmp_path))
 
-    mock_tei_cls.return_value.__enter__.return_value = "TEI"
+    mock_embed_cls.return_value.__enter__.return_value = "EMB"
     mock_vllm_cls.return_value.__enter__.return_value = "VLLM"
     mock_qdrant_cls.return_value = MagicMock()
     mock_build.return_value = "PRED"
