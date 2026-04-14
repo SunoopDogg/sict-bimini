@@ -94,7 +94,7 @@ def run_upsert_qdrant(
     total = 0
     ingested_at = datetime.now(UTC).isoformat(timespec="seconds")
 
-    # Stage 3 is intentionally fail-fast (no per-file try/except): TEI/Qdrant
+    # Stage 3 is intentionally fail-fast (no per-file try/except): embeddings/Qdrant
     # errors typically indicate systemic issues (auth, dim mismatch, bad
     # collection state) where continuing masks real problems. Per-file
     # isolation in stages 1-2 is safe because parse errors are local to a
