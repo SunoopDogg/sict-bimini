@@ -3,7 +3,7 @@
 Stages:
 1. ``run_ingest_xlsx``: xlsx → ``data_root/json/raw/<stem>.json``
 2. ``run_normalize``:   raw JSON → ``data_root/json/normalized/<stem>.json``
-3. ``run_upsert_qdrant``: normalized JSON → Qdrant collection (embed via TEI)
+3. ``run_upsert_qdrant``: normalized JSON → Qdrant collection (embed via vLLM)
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from pathlib import Path
 
 from pydantic import TypeAdapter
 
+from api.bim.clients.embeddings_vllm import VLLMEmbedClient
 from api.bim.clients.qdrant import QdrantWrapper
-from api.bim.clients.tei import TEIClient
 from api.bim.normalizer import normalize_raw_objects
 from api.bim.schemas import BIMAttribute, BIMObjectRaw
 from api.bim.xlsx_parser import parse_xlsx_to_raw
@@ -78,7 +78,7 @@ def run_normalize(data_root: Path) -> None:
 
 def run_upsert_qdrant(
     data_root: Path,
-    tei_client: TEIClient,
+    embed_client: VLLMEmbedClient,
     qdrant: QdrantWrapper,
     *,
     collection: str,
@@ -106,7 +106,7 @@ def run_upsert_qdrant(
 
         for chunk_start in range(0, len(attrs), batch_size):
             chunk = attrs[chunk_start : chunk_start + batch_size]
-            vectors = tei_client.embed([a.embed_text() for a in chunk])
+            vectors = embed_client.embed([a.embed_text() for a in chunk])
             total += qdrant.upsert_batch(
                 collection=collection,
                 attributes=chunk,

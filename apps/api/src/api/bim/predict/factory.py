@@ -2,7 +2,7 @@
 
 Two separate entry points (kbims vs pps) so callers can hold whichever
 predictor(s) they need. Factory is responsible for wiring the shared
-PromptBuilder, retriever, and config; clients (TEI/Qdrant/vLLM) are
+PromptBuilder, retriever, and config; clients (embeddings/Qdrant/vLLM) are
 injected because their lifecycle (context managers, shared connections)
 lives at the application boundary.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from qdrant_client import QdrantClient
 
-from api.bim.clients.tei import TEIClient
+from api.bim.clients.embeddings_vllm import VLLMEmbedClient
 from api.bim.clients.vllm import VLLMClient
 from api.bim.predict.catalog import NoOpCatalog
 from api.bim.predict.predictor import Predictor, PredictorConfig
@@ -23,13 +23,13 @@ from api.core.config import BIMSettings
 def build_kbims_predictor(
     *,
     settings: BIMSettings,
-    tei_client: TEIClient,
+    embed_client: VLLMEmbedClient,
     qdrant_client: QdrantClient,
     vllm_client: VLLMClient,
 ) -> Predictor:
     return _build(
         settings=settings,
-        tei_client=tei_client,
+        embed_client=embed_client,
         qdrant_client=qdrant_client,
         vllm_client=vllm_client,
         target="kbims_code",
@@ -40,13 +40,13 @@ def build_kbims_predictor(
 def build_pps_predictor(
     *,
     settings: BIMSettings,
-    tei_client: TEIClient,
+    embed_client: VLLMEmbedClient,
     qdrant_client: QdrantClient,
     vllm_client: VLLMClient,
 ) -> Predictor:
     return _build(
         settings=settings,
-        tei_client=tei_client,
+        embed_client=embed_client,
         qdrant_client=qdrant_client,
         vllm_client=vllm_client,
         target="pps_code",
@@ -57,7 +57,7 @@ def build_pps_predictor(
 def _build(
     *,
     settings: BIMSettings,
-    tei_client: TEIClient,
+    embed_client: VLLMEmbedClient,
     qdrant_client: QdrantClient,
     vllm_client: VLLMClient,
     target: TargetCode,
@@ -73,7 +73,7 @@ def _build(
     )
     return Predictor(
         config=config,
-        tei_client=tei_client,
+        embed_client=embed_client,
         retriever=NeighborRetriever(
             qdrant_client, collection=settings.collection_name
         ),

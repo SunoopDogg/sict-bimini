@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pydantic import ValidationError
 from qdrant_client.models import Filter as QdrantFilter
 
-from api.bim.clients.tei import TEIClient
+from api.bim.clients.embeddings_vllm import VLLMEmbedClient
 from api.bim.clients.vllm import VLLMClient, VLLMError
 from api.bim.predict.catalog import CatalogSource
 from api.bim.predict.errors import EmptyRetrievalError, LLMGenerationError
@@ -50,13 +50,13 @@ class Predictor:
         self,
         *,
         config: PredictorConfig,
-        tei_client: TEIClient,
+        embed_client: VLLMEmbedClient,
         retriever: NeighborRetriever,
         prompt_builder: PromptBuilder,
         vllm_client: VLLMClient,
     ) -> None:
         self._config = config
-        self._tei = tei_client
+        self._embed = embed_client
         self._retriever = retriever
         self._prompt = prompt_builder
         self._vllm = vllm_client
@@ -72,7 +72,7 @@ class Predictor:
         n = request.n
         tag = f"predict[{cfg.target}] stable_id={attr.stable_id}"
 
-        [vec] = self._tei.embed([attr.embed_text()])
+        [vec] = self._embed.embed([attr.embed_text()])
 
         top_k = max(cfg.k_min, n * cfg.k_multiplier)
         neighbors = self._retriever.search(

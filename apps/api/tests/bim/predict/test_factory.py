@@ -11,13 +11,13 @@ from api.core.config import BIMSettings
 
 def test_build_kbims_predictor_uses_kbims_config():
     settings = BIMSettings()  # defaults
-    tei = MagicMock()
+    embed = MagicMock()
     qdrant = MagicMock()
     vllm = MagicMock()
 
     predictor = build_kbims_predictor(
         settings=settings,
-        tei_client=tei,
+        embed_client=embed,
         qdrant_client=qdrant,
         vllm_client=vllm,
     )
@@ -35,7 +35,7 @@ def test_build_pps_predictor_uses_pps_config():
     settings = BIMSettings()
     predictor = build_pps_predictor(
         settings=settings,
-        tei_client=MagicMock(),
+        embed_client=MagicMock(),
         qdrant_client=MagicMock(),
         vllm_client=MagicMock(),
     )
@@ -48,7 +48,7 @@ def test_build_pps_predictor_uses_pps_config():
 def test_two_predictors_are_independent_instances():
     settings = BIMSettings()
     shared = dict(
-        tei_client=MagicMock(),
+        embed_client=MagicMock(),
         qdrant_client=MagicMock(),
         vllm_client=MagicMock(),
     )

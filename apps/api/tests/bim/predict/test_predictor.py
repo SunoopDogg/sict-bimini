@@ -39,8 +39,8 @@ def kbims_config():
 
 @pytest.fixture
 def wired_predictor(kbims_config):
-    tei = MagicMock()
-    tei.embed.return_value = [[0.1, 0.2, 0.3]]
+    embed = MagicMock()
+    embed.embed.return_value = [[0.1, 0.2, 0.3]]
     retriever = MagicMock()
     vllm = MagicMock()
     prompt_builder = MagicMock()
@@ -48,12 +48,12 @@ def wired_predictor(kbims_config):
     return dict(
         predictor=Predictor(
             config=kbims_config,
-            tei_client=tei,
+            embed_client=embed,
             retriever=retriever,
             prompt_builder=prompt_builder,
             vllm_client=vllm,
         ),
-        tei=tei,
+        embed=embed,
         retriever=retriever,
         vllm=vllm,
         prompt_builder=prompt_builder,
@@ -164,11 +164,11 @@ class TestPredictorErrors:
                 PredictionRequest(attribute=sample_attribute, n=5)
             )
 
-    def test_tei_error_propagates(self, wired_predictor, sample_attribute):
+    def test_embed_error_propagates(self, wired_predictor, sample_attribute):
         w = wired_predictor
-        w["tei"].embed.side_effect = RuntimeError("TEI down")
+        w["embed"].embed.side_effect = RuntimeError("embed down")
 
-        with pytest.raises(RuntimeError, match="TEI down"):
+        with pytest.raises(RuntimeError, match="embed down"):
             w["predictor"].predict(
                 PredictionRequest(attribute=sample_attribute, n=5)
             )
@@ -236,7 +236,7 @@ class TestPredictorErrors:
 
         predictor = Predictor(
             config=kbims_config,
-            tei_client=MagicMock(),
+            embed_client=MagicMock(),
             retriever=MagicMock(),
             prompt_builder=MagicMock(),
             vllm_client=MagicMock(),
@@ -266,8 +266,8 @@ class TestPredictorAssembly:
             k_multiplier=3,
             sim_threshold=0.55,
         )
-        tei = MagicMock()
-        tei.embed.return_value = [[0.1]]
+        embed = MagicMock()
+        embed.embed.return_value = [[0.1]]
         retriever = MagicMock()
         retriever.search.return_value = [
             Neighbor(
@@ -286,7 +286,7 @@ class TestPredictorAssembly:
 
         predictor = Predictor(
             config=cfg,
-            tei_client=tei,
+            embed_client=embed,
             retriever=retriever,
             prompt_builder=prompt,
             vllm_client=vllm,

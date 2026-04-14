@@ -5,8 +5,8 @@ import httpx
 import pytest
 from qdrant_client import QdrantClient
 
+from api.bim.clients.embeddings_vllm import VLLMEmbedClient
 from api.bim.clients.qdrant import QdrantWrapper
-from api.bim.clients.tei import TEIClient
 from api.bim.pipeline import run_ingest_xlsx, run_normalize, run_upsert_qdrant
 
 
@@ -85,19 +85,28 @@ class TestRunNormalize:
 
 
 class TestRunUpsertQdrant:
-    def _mock_tei(self, dim: int = 4) -> TEIClient:
+    def _mock_embed(self, dim: int = 4) -> VLLMEmbedClient:
         def handler(req: httpx.Request) -> httpx.Response:
             body = req.read()
             import json as _json
             parsed = _json.loads(body)
-            n = len(parsed["inputs"])
+            n = len(parsed["input"])
             return httpx.Response(
                 200,
-                json=[[1.0] + [0.0] * (dim - 1)] * n,
+                json={
+                    "object": "list",
+                    "model": "m",
+                    "data": [
+                        {"index": i, "object": "embedding",
+                         "embedding": [1.0] + [0.0] * (dim - 1)}
+                        for i in range(n)
+                    ],
+                    "usage": {"prompt_tokens": 0, "total_tokens": 0},
+                },
             )
 
-        return TEIClient(
-            url="http://tei.mock",
+        return VLLMEmbedClient(
+            url="http://embed.mock",
             model="m",
             dim=dim,
             transport=httpx.MockTransport(handler),
@@ -108,10 +117,10 @@ class TestRunUpsertQdrant:
         run_normalize(data_root)
 
         qdrant = QdrantWrapper(QdrantClient(":memory:"))
-        tei = self._mock_tei(dim=4)
+        embed = self._mock_embed(dim=4)
         run_upsert_qdrant(
             data_root=data_root,
-            tei_client=tei,
+            embed_client=embed,
             qdrant=qdrant,
             collection="bim__test",
             dim=4,
@@ -123,43 +132,45 @@ class TestRunUpsertQdrant:
         run_normalize(data_root)
 
         qdrant = QdrantWrapper(QdrantClient(":memory:"))
-        tei = self._mock_tei(dim=4)
+        embed = self._mock_embed(dim=4)
 
-        run_upsert_qdrant(data_root, tei, qdrant, collection="bim__test", dim=4)
+        run_upsert_qdrant(data_root, embed, qdrant, collection="bim__test", dim=4)
         first = qdrant.count("bim__test")
-        run_upsert_qdrant(data_root, tei, qdrant, collection="bim__test", dim=4)
+        run_upsert_qdrant(data_root, embed, qdrant, collection="bim__test", dim=4)
         second = qdrant.count("bim__test")
 
         assert first == second == 1
 
     def test_skips_empty_normalized_file(self, data_root):
-        """Normalized file with zero attrs should not invoke TEI or Qdrant upsert."""
+        """Normalized file with zero attrs should not invoke embed or Qdrant upsert."""
         (data_root / "json" / "normalized" / "empty.json").write_text(
             "[]", encoding="utf-8"
         )
 
-        tei_calls = {"n": 0}
+        embed_calls = {"n": 0}
 
         def handler(_req):
-            tei_calls["n"] += 1
-            return httpx.Response(200, json=[])
+            embed_calls["n"] += 1
+            return httpx.Response(
+                200,
+                json={"object": "list", "model": "m", "data": [],
+                      "usage": {"prompt_tokens": 0, "total_tokens": 0}},
+            )
 
-        tei = TEIClient(
-            url="http://tei.mock",
-            model="m",
-            dim=4,
+        embed = VLLMEmbedClient(
+            url="http://embed.mock", model="m", dim=4,
             transport=httpx.MockTransport(handler),
         )
         qdrant = QdrantWrapper(QdrantClient(":memory:"))
         total = run_upsert_qdrant(
             data_root=data_root,
-            tei_client=tei,
+            embed_client=embed,
             qdrant=qdrant,
             collection="bim__test",
             dim=4,
         )
         assert total == 0
-        assert tei_calls["n"] == 0  # no embed call made for empty attrs
+        assert embed_calls["n"] == 0  # no embed call made for empty attrs
 
     def test_batches_at_configured_batch_size(self, data_root):
         """Stage 3 should issue ceil(N / batch_size) embed calls."""
@@ -190,12 +201,24 @@ class TestRunUpsertQdrant:
         def handler(req: httpx.Request) -> httpx.Response:
             import json as _json
             parsed = _json.loads(req.read())
-            n = len(parsed["inputs"])
+            n = len(parsed["input"])
             embed_call_sizes.append(n)
-            return httpx.Response(200, json=[[1.0, 0.0, 0.0, 0.0]] * n)
+            return httpx.Response(
+                200,
+                json={
+                    "object": "list",
+                    "model": "m",
+                    "data": [
+                        {"index": i, "object": "embedding",
+                         "embedding": [1.0, 0.0, 0.0, 0.0]}
+                        for i in range(n)
+                    ],
+                    "usage": {"prompt_tokens": 0, "total_tokens": 0},
+                },
+            )
 
-        tei = TEIClient(
-            url="http://tei.mock",
+        embed = VLLMEmbedClient(
+            url="http://embed.mock",
             model="m",
             dim=4,
             transport=httpx.MockTransport(handler),
@@ -203,7 +226,7 @@ class TestRunUpsertQdrant:
         qdrant = QdrantWrapper(QdrantClient(":memory:"))
         total = run_upsert_qdrant(
             data_root=data_root,
-            tei_client=tei,
+            embed_client=embed,
             qdrant=qdrant,
             collection="bim__test",
             dim=4,
