@@ -10,6 +10,24 @@ def _mock_transport(handler):
     return httpx.MockTransport(handler)
 
 
+def _embed_response(*vectors, indices=None):
+    """Build a vLLM /v1/embeddings response envelope.
+
+    Pass vectors positionally; pass `indices=[...]` to override the
+    default 0..n-1 ordering (used by the index-sort test).
+    """
+    idxs = list(indices) if indices is not None else range(len(vectors))
+    return {
+        "object": "list",
+        "model": "m",
+        "data": [
+            {"index": i, "object": "embedding", "embedding": list(v)}
+            for i, v in zip(idxs, vectors, strict=True)
+        ],
+        "usage": {"prompt_tokens": 0, "total_tokens": 0},
+    }
+
+
 class TestVLLMEmbedClient:
     def test_embed_returns_vectors(self):
         captured = {}
@@ -19,24 +37,7 @@ class TestVLLMEmbedClient:
             captured["method"] = request.method
             captured["json"] = request.read().decode()
             return httpx.Response(
-                200,
-                json={
-                    "object": "list",
-                    "model": "m",
-                    "data": [
-                        {
-                            "index": 0,
-                            "object": "embedding",
-                            "embedding": [0.1, 0.2, 0.3],
-                        },
-                        {
-                            "index": 1,
-                            "object": "embedding",
-                            "embedding": [0.4, 0.5, 0.6],
-                        },
-                    ],
-                    "usage": {"prompt_tokens": 0, "total_tokens": 0},
-                },
+                200, json=_embed_response([0.1, 0.2, 0.3], [0.4, 0.5, 0.6])
             )
 
         client = VLLMEmbedClient(
@@ -59,15 +60,7 @@ class TestVLLMEmbedClient:
         def handler(_req):
             return httpx.Response(
                 200,
-                json={
-                    "object": "list",
-                    "model": "m",
-                    "data": [
-                        {"index": 1, "object": "embedding", "embedding": [0.4, 0.5]},
-                        {"index": 0, "object": "embedding", "embedding": [0.1, 0.2]},
-                    ],
-                    "usage": {"prompt_tokens": 0, "total_tokens": 0},
-                },
+                json=_embed_response([0.4, 0.5], [0.1, 0.2], indices=[1, 0]),
             )
 
         client = VLLMEmbedClient(
@@ -81,18 +74,7 @@ class TestVLLMEmbedClient:
         """vLLM이 native 4-D를 반환할 때 dim=2로 truncate + L2 renorm."""
 
         def handler(_req):
-            return httpx.Response(
-                200,
-                json={
-                    "object": "list", "model": "m",
-                    "data": [{
-                        "index": 0,
-                        "object": "embedding",
-                        "embedding": [3.0, 4.0, 0.0, 0.0],
-                    }],
-                    "usage": {"prompt_tokens": 0, "total_tokens": 0},
-                },
-            )
+            return httpx.Response(200, json=_embed_response([3.0, 4.0, 0.0, 0.0]))
 
         client = VLLMEmbedClient(
             url="http://embed.local", model="m", dim=2,
@@ -107,18 +89,7 @@ class TestVLLMEmbedClient:
         """dim==native이면 패스스루(정규화 없음)."""
 
         def handler(_req):
-            return httpx.Response(
-                200,
-                json={
-                    "object": "list", "model": "m",
-                    "data": [{
-                        "index": 0,
-                        "object": "embedding",
-                        "embedding": [0.6, 0.8],
-                    }],
-                    "usage": {"prompt_tokens": 0, "total_tokens": 0},
-                },
-            )
+            return httpx.Response(200, json=_embed_response([0.6, 0.8]))
 
         client = VLLMEmbedClient(
             url="http://embed.local", model="m", dim=2,
@@ -131,18 +102,7 @@ class TestVLLMEmbedClient:
         """dim > native는 misconfig → VLLMEmbedError."""
 
         def handler(_req):
-            return httpx.Response(
-                200,
-                json={
-                    "object": "list", "model": "m",
-                    "data": [{
-                        "index": 0,
-                        "object": "embedding",
-                        "embedding": [0.1, 0.2],
-                    }],
-                    "usage": {"prompt_tokens": 0, "total_tokens": 0},
-                },
-            )
+            return httpx.Response(200, json=_embed_response([0.1, 0.2]))
 
         client = VLLMEmbedClient(
             url="http://embed.local", model="m", dim=4,
@@ -158,18 +118,7 @@ class TestVLLMEmbedClient:
             attempts["n"] += 1
             if attempts["n"] < 3:
                 return httpx.Response(500, json={"error": "transient"})
-            return httpx.Response(
-                200,
-                json={
-                    "object": "list", "model": "m",
-                    "data": [{
-                        "index": 0,
-                        "object": "embedding",
-                        "embedding": [0.1, 0.2],
-                    }],
-                    "usage": {"prompt_tokens": 0, "total_tokens": 0},
-                },
-            )
+            return httpx.Response(200, json=_embed_response([0.1, 0.2]))
 
         client = VLLMEmbedClient(
             url="http://embed.local", model="m", dim=2,
@@ -200,18 +149,7 @@ class TestVLLMEmbedClient:
             attempts["n"] += 1
             if attempts["n"] < 2:
                 raise httpx.ConnectError("boom")
-            return httpx.Response(
-                200,
-                json={
-                    "object": "list", "model": "m",
-                    "data": [{
-                        "index": 0,
-                        "object": "embedding",
-                        "embedding": [0.1, 0.2],
-                    }],
-                    "usage": {"prompt_tokens": 0, "total_tokens": 0},
-                },
-            )
+            return httpx.Response(200, json=_embed_response([0.1, 0.2]))
 
         client = VLLMEmbedClient(
             url="http://embed.local", model="m", dim=2,
