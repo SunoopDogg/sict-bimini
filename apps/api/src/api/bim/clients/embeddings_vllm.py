@@ -1,7 +1,6 @@
 """Minimal vLLM embedding client (OpenAI-compatible /v1/embeddings).
 
-Mirrors the shape of TEIClient (same external interface) so callers can swap
-backends with a single import + class-name change. Performs MRL truncation +
+OpenAI-compatible /v1/embeddings client. Performs MRL truncation +
 L2 renormalization client-side because vLLM returns native-dim embeddings.
 """
 

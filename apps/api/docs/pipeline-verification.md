@@ -3,7 +3,7 @@
 **언제 사용**: Task 1~9 구현 완료 후, 본 스펙(§13)의 성공 기준을 로컬에서 확인할 때.
 
 **전제**:
-- 외부 TEI 서비스가 기동 중이며 Qwen3-Embedding-8B를 서빙 (예: `http://localhost:8080`)
+- 외부 vLLM 임베딩 서버가 기동 중이며 `BIM_EMBEDDING_MODEL`을 서빙 (예: `http://192.168.0.76:8080`에서 `Qwen/Qwen3-Embedding-4B`)
 - 외부 Qdrant가 기동 중 (예: `http://localhost:6333`)
 - `apps/api/data/xlsx/`에 최소 1개의 BIM xlsx 파일이 있음
 
@@ -24,7 +24,7 @@ bunx nx run api:pipeline
 **기대 출력**:
 - `apps/api/data/json/raw/<name>.json` 생성됨
 - `apps/api/data/json/normalized/<name>.json` 생성됨
-- Qdrant 컬렉션 `bim__qwen8b_d2048`에 최소 1개 point 존재
+- Qdrant 컬렉션 `bim__qwen4b_d2048`에 최소 1개 point 존재
 
 **검증 커맨드**:
 
@@ -32,7 +32,7 @@ bunx nx run api:pipeline
 ls apps/api/data/json/raw/
 ls apps/api/data/json/normalized/
 
-curl -s http://localhost:6333/collections/bim__qwen8b_d2048 | jq '.result.points_count'
+curl -s http://localhost:6333/collections/bim__qwen4b_d2048 | jq '.result.points_count'
 # 기대: 1 이상
 ```
 
@@ -42,7 +42,7 @@ curl -s http://localhost:6333/collections/bim__qwen8b_d2048 | jq '.result.points
 # 2번째 실행
 bunx nx run api:pipeline
 
-curl -s http://localhost:6333/collections/bim__qwen8b_d2048 | jq '.result.points_count'
+curl -s http://localhost:6333/collections/bim__qwen4b_d2048 | jq '.result.points_count'
 # 기대: 1번째 실행과 동일한 카운트 (stable_id upsert)
 ```
 
@@ -50,13 +50,13 @@ curl -s http://localhost:6333/collections/bim__qwen8b_d2048 | jq '.result.points
 
 ```bash
 # experiment_id를 바꿔 재실행
-BIM_EXPERIMENT_ID=qwen8b_d1024 BIM_EMBEDDING_DIM=1024 bunx nx run api:pipeline
+BIM_EXPERIMENT_ID=qwen4b_d1024 BIM_EMBEDDING_DIM=1024 bunx nx run api:pipeline
 
 # 원래 컬렉션 점수 불변 확인
-curl -s http://localhost:6333/collections/bim__qwen8b_d2048 | jq '.result.points_count'
+curl -s http://localhost:6333/collections/bim__qwen4b_d2048 | jq '.result.points_count'
 
 # 새 컬렉션 생성 확인
-curl -s http://localhost:6333/collections/bim__qwen8b_d1024 | jq '.result.points_count'
+curl -s http://localhost:6333/collections/bim__qwen4b_d1024 | jq '.result.points_count'
 # 기대: 둘 다 ≥1, 서로 독립
 ```
 
@@ -75,6 +75,9 @@ bunx nx run api:build
 `api:pipeline`으로 라벨 있는 레코드가 Qdrant에 들어간 상태 + 외부 vLLM(`BIM_LLM_URL`) 기동 전제.
 
 ```bash
+# 임베딩 서버 서빙 확인
+bunx nx run api:embed-check
+
 # vLLM 서빙 확인
 bunx nx run api:llm-check
 
@@ -122,7 +125,7 @@ bunx nx run api:predict-eval -- --target bogus
 ## 차원 불일치 에러 경로 (보너스 확인)
 
 ```bash
-# 기존 bim__qwen8b_d2048가 2048-D인 상태에서 1024로 시도
-BIM_EXPERIMENT_ID=qwen8b_d2048 BIM_EMBEDDING_DIM=1024 bunx nx run api:upsert-qdrant
+# 기존 bim__qwen4b_d2048가 2048-D인 상태에서 1024로 시도
+BIM_EXPERIMENT_ID=qwen4b_d2048 BIM_EMBEDDING_DIM=1024 bunx nx run api:upsert-qdrant
 # 기대: DimensionMismatchError로 즉시 종료 (upsert 수행되지 않음)
 ```

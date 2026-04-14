@@ -1,9 +1,8 @@
 """Minimal vLLM client (OpenAI-compatible /v1/chat/completions + guided_json).
 
 Only ``generate_json`` is exposed — free-text completion would invite
-parsing drift. Retry policy matches TEIClient style but caps at 1 retry
-for vLLM (generation is expensive; transient 5xx / timeouts retry,
-4xx does not).
+parsing drift. Retry policy caps at 1 retry (generation is expensive;
+transient 5xx / timeouts retry, 4xx does not).
 
 Requires vLLM ≥ 0.5.x that accepts ``extra_body.guided_json`` with a
 JSON-schema dict (outlines backend).
