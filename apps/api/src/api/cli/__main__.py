@@ -168,6 +168,35 @@ def llm_check_cmd() -> None:
     typer.echo(f"OK: vLLM at {s.llm_url} serves {s.llm_model}")
 
 
+@app.command("embed-check")
+def embed_check_cmd() -> None:
+    """Probe the vLLM embedding server and verify BIM_EMBEDDING_MODEL is served."""
+    s = BIMSettings()
+    try:
+        resp = httpx.get(
+            f"{s.embedding_url.rstrip('/')}/v1/models",
+            timeout=s.llm_timeout_seconds,
+        )
+        resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        typer.echo(
+            f"Failed to reach embedding server at {s.embedding_url}: {exc}",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+
+    served = [item["id"] for item in resp.json().get("data", [])]
+    if s.embedding_model not in served:
+        typer.echo(
+            f"Model {s.embedding_model!r} is not served by vLLM at {s.embedding_url}. "
+            f"Served: {served}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    typer.echo(f"OK: vLLM embeddings at {s.embedding_url} serves {s.embedding_model}")
+
+
 def _pct(v: float | None) -> str:
     return f"{v * 100:.1f}%" if v is not None else "n/a"
 

@@ -166,6 +166,57 @@ def test_llm_check_fails_on_network_error(monkeypatch):
     assert "down" in result.output or "vLLM" in result.output
 
 
+def test_embed_check_succeeds_when_model_served(monkeypatch):
+    monkeypatch.setenv("BIM_EMBEDDING_URL", "http://embed.local")
+    monkeypatch.setenv("BIM_EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-4B")
+
+    captured: dict = {}
+
+    def fake_get(url, *args, **kwargs):
+        captured["url"] = url
+        return httpx.Response(
+            200,
+            json={"data": [{"id": "Qwen/Qwen3-Embedding-4B"}]},
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr("api.cli.__main__.httpx.get", fake_get)
+    result = runner.invoke(app, ["embed-check"])
+    assert result.exit_code == 0, result.output
+    assert "Qwen/Qwen3-Embedding-4B" in result.output
+    assert captured["url"].endswith("/v1/models")
+
+
+def test_embed_check_fails_when_model_missing(monkeypatch):
+    monkeypatch.setenv("BIM_EMBEDDING_URL", "http://embed.local")
+    monkeypatch.setenv("BIM_EMBEDDING_MODEL", "missing-embed-model")
+
+    def fake_get(url, *args, **kwargs):
+        return httpx.Response(
+            200,
+            json={"data": [{"id": "other-model"}]},
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr("api.cli.__main__.httpx.get", fake_get)
+    result = runner.invoke(app, ["embed-check"])
+    assert result.exit_code != 0
+    assert "missing-embed-model" in result.output
+
+
+def test_embed_check_fails_on_network_error(monkeypatch):
+    monkeypatch.setenv("BIM_EMBEDDING_URL", "http://embed.local")
+    monkeypatch.setenv("BIM_EMBEDDING_MODEL", "m")
+
+    def fake_get(*_a, **_kw):
+        raise httpx.ConnectError("down")
+
+    monkeypatch.setattr("api.cli.__main__.httpx.get", fake_get)
+    result = runner.invoke(app, ["embed-check"])
+    assert result.exit_code != 0
+    assert "down" in result.output or "embedding" in result.output
+
+
 def _metrics_stub() -> AggregatedMetrics:
     return AggregatedMetrics(
         filter_summary={"target": "kbims_code"},

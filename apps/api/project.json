@@ -107,6 +107,13 @@
         "cwd": "{projectRoot}"
       }
     },
+    "embed-check": {
+      "executor": "@nxlv/python:run-commands",
+      "options": {
+        "command": "uv run python -m api.cli embed-check",
+        "cwd": "{projectRoot}"
+      }
+    },
     "predict-eval": {
       "executor": "@nxlv/python:run-commands",
       "options": {
