@@ -88,19 +88,7 @@ def normalize_cmd(data_root: Path | None = _DataRoot) -> None:
     run_normalize(_resolve_data_root(data_root))
 
 
-@app.command("upsert-qdrant")
-def upsert_qdrant_cmd(
-    data_root: Path | None = _DataRoot,
-    experiment_id: str | None = _ExpId,
-    dim: int | None = _Dim,
-    embedding_url: str | None = _EmbeddingUrl,
-    qdrant_url: str | None = _QdrantUrl,
-    model: str | None = _Model,
-) -> None:
-    """Stage 3: normalized JSON → vLLM embeddings → Qdrant upsert."""
-    s = _settings_from_args(
-        experiment_id, dim, embedding_url, qdrant_url, model, data_root
-    )
+def _run_upsert_stage(s: BIMSettings) -> None:
     with VLLMEmbedClient(
         url=s.embedding_url, model=s.embedding_model, dim=s.embedding_dim
     ) as embed:
@@ -112,6 +100,23 @@ def upsert_qdrant_cmd(
             collection=s.collection_name,
             dim=s.embedding_dim,
         )
+
+
+@app.command("upsert-qdrant")
+def upsert_qdrant_cmd(
+    data_root: Path | None = _DataRoot,
+    experiment_id: str | None = _ExpId,
+    dim: int | None = _Dim,
+    embedding_url: str | None = _EmbeddingUrl,
+    qdrant_url: str | None = _QdrantUrl,
+    model: str | None = _Model,
+) -> None:
+    """Stage 3: normalized JSON → vLLM embeddings → Qdrant upsert."""
+    _run_upsert_stage(
+        _settings_from_args(
+            experiment_id, dim, embedding_url, qdrant_url, model, data_root
+        )
+    )
 
 
 @app.command("pipeline")
@@ -129,17 +134,7 @@ def pipeline_cmd(
     )
     run_ingest_xlsx(s.data_root)
     run_normalize(s.data_root)
-    with VLLMEmbedClient(
-        url=s.embedding_url, model=s.embedding_model, dim=s.embedding_dim
-    ) as embed:
-        qw = QdrantWrapper.from_settings(url=s.qdrant_url, api_key=s.qdrant_api_key)
-        run_upsert_qdrant(
-            data_root=s.data_root,
-            embed_client=embed,
-            qdrant=qw,
-            collection=s.collection_name,
-            dim=s.embedding_dim,
-        )
+    _run_upsert_stage(s)
 
 
 def _probe_vllm_model(*, label: str, url: str, model: str, timeout: float) -> None:
