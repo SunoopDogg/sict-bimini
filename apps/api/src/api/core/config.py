@@ -31,8 +31,8 @@ class BIMSettings(BaseSettings):
     data_root: Path = Path("data")
 
     # vLLM (외부 독립 운영 서버)
-    llm_url: str = "http://localhost:8001"
-    llm_model: str = "Qwen/Qwen2.5-7B-Instruct"
+    llm_url: str = "http://localhost:8000"
+    llm_model: str = "gemma-4"
     llm_timeout_seconds: float = 60.0
 
     # RAG 튜닝
@@ -41,10 +41,10 @@ class BIMSettings(BaseSettings):
     mode_sim_threshold: float = 0.55
 
     # 코드 포맷 정규식 (Weak 모드 schema)
-    # TODO: finalize after KBIMS catalog audit
-    kbims_code_regex: str = r"^[A-Z]{2}\d+$"
-    # TODO: finalize after PPS catalog audit
-    pps_code_regex: str = r"^[A-Z]-\d+(-\d+)*$"
+    # 실데이터(속성테이블 xlsx): KBIMS는 단일 'E' prefix + 숫자 (E77, E275 …)
+    kbims_code_regex: str = r"^E\d+$"
+    # 실데이터: 대문자+영숫자 세그먼트를 `+`로 결합 (AMB161A, AJG3, AND011+AGA3105C+…)
+    pps_code_regex: str = r"^[A-Z][A-Z0-9]*(\+[A-Z][A-Z0-9]*)*$"
 
     @property
     def collection_name(self) -> str:
