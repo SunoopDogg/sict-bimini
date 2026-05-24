@@ -104,9 +104,9 @@ class Predictor:
 
         # translate infra errors to a single domain error type
         schema_cls = (
-            build_strong_schema(frozenset(pool.code_to_max_score))
+            build_strong_schema(frozenset(pool.code_to_max_score), target=cfg.target)
             if mode == PredictionMode.STRONG
-            else build_weak_schema(cfg.code_format_regex)
+            else build_weak_schema(cfg.code_format_regex, target=cfg.target)
         )
         try:
             raw = self._vllm.generate_json(

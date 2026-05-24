@@ -74,15 +74,28 @@ class CandidatePool(BaseModel):
     unique_count: int = Field(ge=0)
 
 
-@functools.lru_cache(maxsize=512)
-def build_strong_schema(pool_codes: frozenset[str]) -> type[PredictionResponse]:
+@functools.lru_cache(maxsize=1024)
+def build_strong_schema(
+    pool_codes: frozenset[str], *, target: TargetCode
+) -> type[PredictionResponse]:
     """Build a PredictionResponse subclass whose code field is Literal[*pool_codes].
 
-    Cached by the frozenset of pool codes — Predictor calls tend to re-see
-    the same pool across retries/similar queries.
+    Cached by (pool_codes, target) — Predictor calls tend to re-see the same
+    pool across retries/similar queries.
 
     Requires a non-empty pool. Caller (Predictor) only invokes this path
     when evaluate_mode returns STRONG, which implies pool_size >= n >= 1.
+
+    ``target`` is pinned to a single literal so guided decoding doesn't give
+    the LLM a meaningless kbims/pps choice at inference time — gemma-4 has
+    been observed to spiral into a whitespace loop when it can pick either.
+
+    The parent ``_check_source_score_consistency`` invariant is overridden
+    here: the LLM only produces ``code``/``llm_confidence``/``source`` — the
+    ``retrieval_score`` is re-stamped from the pool in
+    ``Predictor._decorate_candidate``, so requiring it at raw-parse time would
+    reject every well-formed response. Invariant is preserved in the decorate
+    step itself.
     """
     if not pool_codes:
         raise ValueError("build_strong_schema requires non-empty pool_codes")
@@ -90,28 +103,57 @@ def build_strong_schema(pool_codes: frozenset[str]) -> type[PredictionResponse]:
     # Literal[*...] needs a tuple for ordered semantics; frozenset is unordered
     # but Literal compares by set membership, not order. Sorted for stability.
     code_type = Literal[*sorted(pool_codes)]  # type: ignore[valid-type]
+    target_type = Literal[target]  # type: ignore[valid-type]
 
     class _StrongCandidate(PredictionCandidate):
         code: code_type        # type: ignore[valid-type]
         source: Literal["neighbor"]
 
+        @model_validator(mode="after")
+        def _check_source_score_consistency(self) -> _StrongCandidate:
+            return self
+
     class _StrongResponse(PredictionResponse):
+        target: target_type        # type: ignore[valid-type]
         candidates: list[_StrongCandidate]
         mode: Literal[PredictionMode.STRONG]
+        # Defaults: these are re-assembled from Predictor local state, so the
+        # LLM never needs to emit them. Required-in-JSON-schema ⇒ gemma-4 has
+        # been observed to freeze in whitespace after closing the candidates
+        # array because guided decoding waits for the next required key.
+        low_confidence_context: bool = False
+        pool_size: int = 0
+        retrieved_k: int = 0
 
     return _StrongResponse
 
 
-@functools.lru_cache(maxsize=4)
-def build_weak_schema(code_regex: str) -> type[PredictionResponse]:
-    """Build a PredictionResponse subclass whose code field is str + pattern."""
+@functools.lru_cache(maxsize=8)
+def build_weak_schema(
+    code_regex: str, *, target: TargetCode
+) -> type[PredictionResponse]:
+    """Build a PredictionResponse subclass whose code field is str + pattern.
+
+    See ``build_strong_schema`` for why ``target`` is pinned and why the
+    source/score invariant is disabled at raw-parse time.
+    """
+    target_type = Literal[target]  # type: ignore[valid-type]
 
     class _WeakCandidate(PredictionCandidate):
         code: str = Field(pattern=code_regex)
 
+        @model_validator(mode="after")
+        def _check_source_score_consistency(self) -> _WeakCandidate:
+            return self
+
     class _WeakResponse(PredictionResponse):
+        target: target_type        # type: ignore[valid-type]
         candidates: list[_WeakCandidate]
         mode: Literal[PredictionMode.WEAK]
+        # See _StrongResponse above — these are re-assembled by Predictor.
+        low_confidence_context: bool = True
+        pool_size: int = 0
+        retrieved_k: int = 0
 
     return _WeakResponse
 
