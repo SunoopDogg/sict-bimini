@@ -34,7 +34,7 @@ class PromptBuilder:
         template = self._load_template(target, mode)
         self._assert_placeholders(template)
         return template.format(
-            attribute_block=self._render_attribute(attribute),
+            attribute_block=self._render_attribute(attribute, target=target),
             candidates_block=self._render_candidates(pool),
             n=n,
         )
@@ -66,11 +66,14 @@ class PromptBuilder:
                 )
 
     @staticmethod
-    def _render_attribute(attr: BIMAttribute) -> str:
+    def _render_attribute(attr: BIMAttribute, *, target: TargetCode) -> str:
+        # Exclude the target field — eval reconstitutes the attribute from
+        # Qdrant payload, so including its ground-truth label in the prompt
+        # would leak the answer the LLM is being asked to predict.
         existing = []
-        if attr.kbims_code:
+        if target != "kbims_code" and attr.kbims_code:
             existing.append(f"(existing kbims_code={attr.kbims_code})")
-        if attr.pps_code:
+        if target != "pps_code" and attr.pps_code:
             existing.append(f"(existing pps_code={attr.pps_code})")
         suffix = " " + " ".join(existing) if existing else ""
         return attr.embed_text() + suffix
