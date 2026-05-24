@@ -33,6 +33,7 @@ class BIMSettings(BaseSettings):
     # vLLM (외부 독립 운영 서버)
     llm_url: str = "http://localhost:8000"
     llm_model: str = "gemma-4"
+    # llm_model: str = "gpt-oss-20b"
     llm_timeout_seconds: float = 60.0
 
     # RAG 튜닝
