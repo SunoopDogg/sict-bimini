@@ -55,12 +55,18 @@ class TestEvaluateMode:
     @pytest.mark.parametrize(
         "unique_count, top1, n, sim_threshold, expected",
         [
+            # STRONG: top1 ≥ threshold and at least one pool code, regardless of
+            # pool diversity vs n. Pool size is "how many distinct answers were
+            # retrieved"; it is not a confidence signal.
             (5, 0.8, 5, 0.55, PredictionMode.STRONG),
-            (3, 0.8, 5, 0.55, PredictionMode.WEAK),
-            (1, 0.9, 1, 0.55, PredictionMode.WEAK),
+            (3, 0.8, 5, 0.55, PredictionMode.STRONG),  # was WEAK pre-fix
+            (1, 0.9, 1, 0.55, PredictionMode.STRONG),  # was WEAK pre-fix
+            (2, 0.96, 5, 0.55, PredictionMode.STRONG),  # IfcRamp AD repro
+            # WEAK: genuine low-similarity retrieval or empty pool.
             (5, 0.4, 5, 0.55, PredictionMode.WEAK),
-            (5, 0.55, 5, 0.55, PredictionMode.STRONG),
             (0, 0.0, 5, 0.55, PredictionMode.WEAK),
+            # Boundary: top1 == threshold stays STRONG (strict < in condition).
+            (5, 0.55, 5, 0.55, PredictionMode.STRONG),
         ],
     )
     def test_table(self, unique_count, top1, n, sim_threshold, expected):

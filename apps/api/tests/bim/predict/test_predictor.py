@@ -102,7 +102,9 @@ class TestPredictorRetrievalParams:
         """If n=1 and K_MULTIPLIER=3, top_k = max(10, 3) = 10."""
         w = wired_predictor
         w["retriever"].search.return_value = [_n(0.9, "KM001")]
-        w["vllm"].generate_json.return_value = _valid_weak_json_str(n=1)
+        w["vllm"].generate_json.return_value = _valid_strong_json_str(
+            pool_codes=["KM001"], n=1
+        )
 
         w["predictor"].predict(PredictionRequest(attribute=sample_attribute, n=1))
         assert w["retriever"].search.call_args.kwargs["k"] == 10
@@ -127,18 +129,25 @@ class TestPredictorModes:
         assert all(c.source == "neighbor" for c in resp.candidates)
         assert all(c.retrieval_score is not None for c in resp.candidates)
 
-    def test_weak_path_when_pool_smaller_than_n(
+    def test_strong_path_when_pool_smaller_than_n_but_top1_confident(
         self, wired_predictor, sample_attribute
     ):
+        """Regression: pool diversity < n used to force WEAK (`cond_a`), which
+        broke the PPS IfcRamp case where 14/15 neighbors agreed on 'AD' but
+        pool_size=2 < n=5. Now the only WEAK signal is top1 < sim_threshold."""
         w = wired_predictor
         w["retriever"].search.return_value = [_n(0.9, "KM001"), _n(0.8, "KM002")]
-        w["vllm"].generate_json.return_value = _valid_weak_json_str(n=5)
+        w["vllm"].generate_json.return_value = _valid_strong_json_str(
+            pool_codes=["KM001", "KM002"], n=2
+        )
 
         resp = w["predictor"].predict(
             PredictionRequest(attribute=sample_attribute, n=5)
         )
-        assert resp.mode == PredictionMode.WEAK
-        assert resp.low_confidence_context is True
+        assert resp.mode == PredictionMode.STRONG
+        assert resp.low_confidence_context is False
+        # Partial response: pool has 2 codes, requested 5 — LLM returns 2.
+        assert len(resp.candidates) == 2
 
     def test_weak_path_when_top1_below_threshold(
         self, wired_predictor, sample_attribute
@@ -280,7 +289,9 @@ class TestPredictorAssembly:
             )
         ]
         vllm = MagicMock()
-        vllm.generate_json.return_value = _valid_weak_json_str(n=1, target="pps_code")
+        vllm.generate_json.return_value = _valid_strong_json_str(
+            pool_codes=["A-1"], n=1, target="pps_code"
+        )
         prompt = MagicMock()
         prompt.build.return_value = "P"
 
@@ -300,7 +311,9 @@ class TestPredictorAssembly:
 # ---------- helpers ----------
 
 
-def _valid_strong_json_str(pool_codes: list[str], *, n: int) -> str:
+def _valid_strong_json_str(
+    pool_codes: list[str], *, n: int, target: str = "kbims_code"
+) -> str:
     import json as _json
     items = [
         {
@@ -313,7 +326,7 @@ def _valid_strong_json_str(pool_codes: list[str], *, n: int) -> str:
     ]
     return _json.dumps(
         {
-            "target": "kbims_code",
+            "target": target,
             "mode": "strong",
             "candidates": items,
             "low_confidence_context": False,
