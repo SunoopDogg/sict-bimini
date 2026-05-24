@@ -6,7 +6,7 @@ Responsibilities:
   payload (idempotent by ``stable_id``).
 
 Payload indexes on ``ifc_type``, ``category``, ``kbims_code``, ``pps_code``,
-``family`` are created at collection creation time (spec §5-4).
+``family`` are created at collection creation time.
 """
 
 from __future__ import annotations
@@ -104,6 +104,7 @@ class QdrantWrapper:
                 vector=vec,
                 payload={
                     **attr.model_dump(),
+                    "stable_id": attr.stable_id,
                     "source_file": source_file,
                     "ingested_at": ingested_at,
                 },

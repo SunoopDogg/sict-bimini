@@ -101,9 +101,10 @@ class TestQdrantWrapper:
         payload = points[0].payload
         for field in (
             "ifc_type", "category", "family_name", "family", "type", "type_id",
-            "kbims_code", "pps_code", "source_file", "ingested_at",
+            "kbims_code", "pps_code", "stable_id", "source_file", "ingested_at",
         ):
             assert field in payload
+        assert payload["stable_id"] == attr.stable_id
         assert payload["source_file"] == "속성테이블(10층).xlsx"
         assert payload["ingested_at"] == "2026-04-16T10:30:00Z"
 
