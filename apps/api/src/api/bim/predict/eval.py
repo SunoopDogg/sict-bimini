@@ -19,15 +19,11 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 from qdrant_client import QdrantClient
-from qdrant_client.models import (
-    FieldCondition,
-    Filter,
-    MatchExcept,
-    MatchValue,
-)
+from qdrant_client.models import FieldCondition, Filter, MatchValue
 
 from api.bim.predict.errors import PredictError
 from api.bim.predict.predictor import Predictor
+from api.bim.predict.retriever import non_empty_code_condition
 from api.bim.predict.schemas import PredictionMode, PredictionRequest, TargetCode
 from api.bim.schemas import BIMAttribute
 
@@ -95,9 +91,7 @@ _SCROLL_PAGE_SIZE = 256
 
 
 def _build_scroll_filter(cfg: EvalConfig) -> Filter:
-    must: list = [
-        FieldCondition(key=cfg.target, match=MatchExcept(**{"except": [""]})),
-    ]
+    must: list = [non_empty_code_condition(cfg.target)]
     if cfg.ifc_type is not None:
         must.append(
             FieldCondition(key="ifc_type", match=MatchValue(value=cfg.ifc_type))

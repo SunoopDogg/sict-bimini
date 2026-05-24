@@ -20,6 +20,11 @@ _WITH_PAYLOAD = [
 ]
 
 
+def non_empty_code_condition(field: TargetCode) -> FieldCondition:
+    # `except` is a Python keyword — MatchExcept requires kwarg unpack.
+    return FieldCondition(key=field, match=MatchExcept(**{"except": [""]}))
+
+
 class NeighborRetriever:
     def __init__(self, client: QdrantClient, *, collection: str) -> None:
         self._client = client
@@ -33,12 +38,7 @@ class NeighborRetriever:
         k: int,
         extra_filter: Filter | None = None,
     ) -> list[Neighbor]:
-        must: list = [
-            FieldCondition(
-                key=code_field,
-                match=MatchExcept(**{"except": [""]}),
-            )
-        ]
+        must: list = [non_empty_code_condition(code_field)]
         if extra_filter is not None:
             must.append(extra_filter)
         response = self._client.query_points(
