@@ -1,11 +1,13 @@
-"""Minimal vLLM client (OpenAI-compatible /v1/chat/completions + guided_json).
+"""Minimal vLLM client (OpenAI-compatible /v1/chat/completions).
 
 Only ``generate_json`` is exposed — free-text completion would invite
 parsing drift. Retry policy caps at 1 retry (generation is expensive;
 transient 5xx / timeouts retry, 4xx does not).
 
-Requires vLLM ≥ 0.5.x that accepts ``extra_body.guided_json`` with a
-JSON-schema dict (outlines backend).
+Uses OpenAI-standard ``response_format={"type":"json_schema", ...}`` for
+constrained decoding — works on vLLM ≥ 0.10 and OpenAI itself. The legacy
+``extra_body.guided_json`` field is ignored when sent over raw HTTP
+(it's an OpenAI Python SDK convention, not a wire-level vLLM field).
 """
 from __future__ import annotations
 
@@ -70,7 +72,14 @@ class VLLMClient:
             "messages": [{"role": "user", "content": prompt}],
             "temperature": temperature,
             "max_tokens": max_tokens,
-            "extra_body": {"guided_json": response_schema},
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "prediction",
+                    "strict": True,
+                    "schema": response_schema,
+                },
+            },
         }
         resp = self._post_with_retry("/v1/chat/completions", body)
         return self._extract_content(resp)

@@ -58,7 +58,13 @@ class TestVLLMClient:
         assert body["messages"][0]["content"] == "hello"
         assert body["temperature"] == 0.2  # default
         assert body["max_tokens"] == 2048  # default
-        assert body["extra_body"]["guided_json"] == _SCHEMA
+        # vLLM ≥0.10 / OpenAI standard: response_format={"type":"json_schema",...}.
+        # extra_body.guided_json is silently ignored when sent over raw HTTP.
+        rf = body["response_format"]
+        assert rf["type"] == "json_schema"
+        assert rf["json_schema"]["strict"] is True
+        assert rf["json_schema"]["schema"] == _SCHEMA
+        assert "extra_body" not in body
 
     def test_custom_temperature_and_max_tokens(self):
         def handler(req):
