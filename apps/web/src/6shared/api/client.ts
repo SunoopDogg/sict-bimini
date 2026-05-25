@@ -58,7 +58,7 @@ export async function convertXlsxToJson(
 
 export async function batchPredictCode(
   inputs: BIMObjectInput[],
-  topK: number = 3,
+  topK = 3,
 ): Promise<APIResponse<BatchPredictResult>> {
   return apiRequest(
     `${BACKEND_URL}${API_VERSION}/batch-predict`,
@@ -73,7 +73,7 @@ export async function batchPredictCode(
 
 export async function predictSingleCode(
   input: BIMObjectInput,
-  topK: number = 3,
+  topK = 3,
 ): Promise<APIResponse<PredictionCandidates>> {
   return apiRequest(
     `${BACKEND_URL}${API_VERSION}/predict?top_k=${topK}`,
@@ -87,8 +87,8 @@ export async function predictSingleCode(
 }
 
 export async function fetchBimAttributes(
-  page: number = 1,
-  pageSize: number = 20,
+  page = 1,
+  pageSize = 20,
 ): Promise<APIResponse<BIMAttributeListResponse>> {
   return apiRequest(
     `${BACKEND_URL}${API_VERSION}/bim-attributes?page=${page}&page_size=${pageSize}`,

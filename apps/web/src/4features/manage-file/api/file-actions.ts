@@ -47,7 +47,7 @@ export async function listXlsxFilesAction(): Promise<XlsxFileListResult> {
 
 export async function uploadAndConvertXlsxAction(
   formData: FormData,
-  overwrite: boolean = true,
+  overwrite = true,
 ): Promise<XlsxUploadActionResult> {
   let xlsxFilePath: string | null = null;
 
