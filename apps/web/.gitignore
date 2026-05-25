@@ -1,0 +1,6 @@
+
+# Data files — keep directory structure, not content
+/data/json/*.json
+/data/xlsx/*.xlsx
+/data/predictions/*.json
+/data/selections/*.json
