@@ -2,8 +2,8 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 
-import type { PredictionSession } from '@/src/5entities/prediction';
-import { toErrorResponse } from '@/src/6shared/lib/toErrorResponse';
+import type { PredictionSession } from '@/5entities/prediction';
+import { toErrorResponse } from '@/6shared/lib/toErrorResponse';
 
 import type { PredictionLoadResult, PredictionSaveResult } from './types';
 import {
@@ -11,7 +11,7 @@ import {
   deriveJsonPath,
   ensureDirectoryExists,
   isValidXlsxFileName,
-} from '@/src/6shared/lib/file-utils';
+} from '@/6shared/lib/file-utils';
 
 export async function savePredictionsAction(
   xlsxFileName: string,

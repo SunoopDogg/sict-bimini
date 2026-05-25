@@ -3,10 +3,10 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-import type { SelectionFileData, SelectionFileInfo, UserSelection } from '@/src/5entities/prediction';
-import type { APIResponse } from '@/src/6shared/api/types';
-import { SELECTIONS_DIR, ensureDirectoryExists } from '@/src/6shared/lib/file-utils';
-import { toErrorResponse } from '@/src/6shared/lib/toErrorResponse';
+import type { SelectionFileData, SelectionFileInfo, UserSelection } from '@/5entities/prediction';
+import type { APIResponse } from '@/6shared/api/types';
+import { SELECTIONS_DIR, ensureDirectoryExists } from '@/6shared/lib/file-utils';
+import { toErrorResponse } from '@/6shared/lib/toErrorResponse';
 
 const SELECTIONS_FILE = 'user-selections.json';
 

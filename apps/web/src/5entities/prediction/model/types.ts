@@ -1,4 +1,4 @@
-import type { BIMObjectInput } from '@/src/5entities/bim-object';
+import type { BIMObjectInput } from '@/5entities/bim-object';
 
 export interface PredictionResult {
   predicted_code: string | null;

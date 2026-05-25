@@ -3,14 +3,14 @@
 import { existsSync, readFileSync } from 'fs';
 import { basename } from 'path';
 
-import type { BIMObjectInput } from '@/src/5entities/bim-object';
+import type { BIMObjectInput } from '@/5entities/bim-object';
 import {
   JSON_DIR,
   deriveJsonPath,
   ensureDirectoryExists,
   isValidXlsxFileName,
-} from '@/src/6shared/lib/file-utils';
-import { toErrorResponse } from '@/src/6shared/lib/toErrorResponse';
+} from '@/6shared/lib/file-utils';
+import { toErrorResponse } from '@/6shared/lib/toErrorResponse';
 
 import type { JsonReadResult } from './types';
 

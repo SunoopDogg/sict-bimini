@@ -11,24 +11,24 @@ import {
 
 import { useState } from 'react';
 
-import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import type { PredictionResult, PredictionSession } from '@/src/5entities/prediction';
-import { cn } from '@/src/6shared/lib/cn';
-import { Button } from '@/src/6shared/ui/primitive/button';
+import type { BIMObjectInput } from '@/5entities/bim-object';
+import type { PredictionResult, PredictionSession } from '@/5entities/prediction';
+import { cn } from '@/6shared/lib/cn';
+import { Button } from '@/6shared/ui/primitive/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/src/6shared/ui/primitive/card';
-import { Checkbox } from '@/src/6shared/ui/primitive/checkbox';
+} from '@/6shared/ui/primitive/card';
+import { Checkbox } from '@/6shared/ui/primitive/checkbox';
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationLink,
-} from '@/src/6shared/ui/primitive/pagination';
+} from '@/6shared/ui/primitive/pagination';
 import {
   Table,
   TableBody,
@@ -36,7 +36,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/src/6shared/ui/primitive/table';
+} from '@/6shared/ui/primitive/table';
 
 interface ObjectListPanelProps {
   selectedFile?: string;

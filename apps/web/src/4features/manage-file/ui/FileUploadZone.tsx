@@ -4,7 +4,7 @@ import { CheckCircle, Loader2, Upload } from 'lucide-react';
 
 import { useCallback, useState } from 'react';
 
-import { cn } from '@/src/6shared/lib/cn';
+import { cn } from '@/6shared/lib/cn';
 
 import type { UploadStatus } from '../api/types';
 

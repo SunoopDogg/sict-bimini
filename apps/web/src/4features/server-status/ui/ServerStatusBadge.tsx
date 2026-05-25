@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import type { HealthStatus } from '@/src/5entities/health';
-import { checkHealth } from '@/src/6shared/api';
-import { cn } from '@/src/6shared/lib/cn';
-import { Badge } from '@/src/6shared/ui/primitive/badge';
+import type { HealthStatus } from '@/5entities/health';
+import { checkHealth } from '@/6shared/api';
+import { cn } from '@/6shared/lib/cn';
+import { Badge } from '@/6shared/ui/primitive/badge';
 
 type ServerState = 'healthy' | 'degraded' | 'offline';
 

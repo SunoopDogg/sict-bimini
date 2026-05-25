@@ -4,8 +4,8 @@ import type {
   PredictionCandidates,
   PredictionResult,
   PredictionSession,
-} from '@/src/5entities/prediction';
-import { savePredictionsAction } from '@/src/4features/predict-code';
+} from '@/5entities/prediction';
+import { savePredictionsAction } from '@/4features/predict-code';
 
 function toSession(candidates: PredictionCandidates): PredictionSession {
   return {

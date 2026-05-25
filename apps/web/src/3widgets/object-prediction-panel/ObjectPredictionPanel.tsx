@@ -3,24 +3,24 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
-import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import type { PredictionResult, PredictionSession } from '@/src/5entities/prediction';
-import { Badge } from '@/src/6shared/ui/primitive/badge';
-import { Button } from '@/src/6shared/ui/primitive/button';
-import { Input } from '@/src/6shared/ui/primitive/input';
+import type { BIMObjectInput } from '@/5entities/bim-object';
+import type { PredictionResult, PredictionSession } from '@/5entities/prediction';
+import { Badge } from '@/6shared/ui/primitive/badge';
+import { Button } from '@/6shared/ui/primitive/button';
+import { Input } from '@/6shared/ui/primitive/input';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/src/6shared/ui/primitive/card';
+} from '@/6shared/ui/primitive/card';
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationLink,
-} from '@/src/6shared/ui/primitive/pagination';
-import { cn } from '@/src/6shared/lib/cn';
+} from '@/6shared/ui/primitive/pagination';
+import { cn } from '@/6shared/lib/cn';
 
 interface ObjectPredictionPanelProps {
   object: BIMObjectInput | null;

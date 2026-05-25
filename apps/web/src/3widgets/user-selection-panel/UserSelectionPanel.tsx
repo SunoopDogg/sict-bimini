@@ -2,15 +2,15 @@
 
 import { Check, FileText } from 'lucide-react';
 
-import type { SelectionFileInfo } from '@/src/5entities/prediction';
-import { cn } from '@/src/6shared/lib/cn';
-import { formatDateTime } from '@/src/6shared/lib/format';
+import type { SelectionFileInfo } from '@/5entities/prediction';
+import { cn } from '@/6shared/lib/cn';
+import { formatDateTime } from '@/6shared/lib/format';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/src/6shared/ui/primitive/card';
+} from '@/6shared/ui/primitive/card';
 
 interface UserSelectionPanelProps {
   files: SelectionFileInfo[];

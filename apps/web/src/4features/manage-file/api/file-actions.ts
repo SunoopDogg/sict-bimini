@@ -9,15 +9,15 @@ import {
 } from 'fs';
 import { join } from 'path';
 
-import { convertXlsxToJson } from '@/src/6shared/api';
+import { convertXlsxToJson } from '@/6shared/api';
 import {
   JSON_DIR,
   XLSX_DIR,
   deriveJsonPath,
   ensureDirectoryExists,
   isValidXlsxFileName,
-} from '@/src/6shared/lib/file-utils';
-import { toErrorResponse } from '@/src/6shared/lib/toErrorResponse';
+} from '@/6shared/lib/file-utils';
+import { toErrorResponse } from '@/6shared/lib/toErrorResponse';
 
 import type { XlsxFileListResult, XlsxUploadActionResult } from './types';
 

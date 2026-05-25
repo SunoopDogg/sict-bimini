@@ -2,9 +2,9 @@
 
 import { Check, FileSpreadsheet } from 'lucide-react';
 
-import type { XlsxFileInfo } from '@/src/5entities/xlsx-file';
-import { cn } from '@/src/6shared/lib/cn';
-import { formatDateTime } from '@/src/6shared/lib/format';
+import type { XlsxFileInfo } from '@/5entities/xlsx-file';
+import { cn } from '@/6shared/lib/cn';
+import { formatDateTime } from '@/6shared/lib/format';
 
 interface FileListSelectProps {
   files: XlsxFileInfo[];

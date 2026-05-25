@@ -1,8 +1,8 @@
-import type { BIMAttributeListResponse } from '@/src/5entities/bim-attribute';
-import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import type { HealthStatus } from '@/src/5entities/health';
-import type { BatchPredictResult, PredictionCandidates } from '@/src/5entities/prediction';
-import type { XLSXConversionResult } from '@/src/5entities/xlsx-file';
+import type { BIMAttributeListResponse } from '@/5entities/bim-attribute';
+import type { BIMObjectInput } from '@/5entities/bim-object';
+import type { HealthStatus } from '@/5entities/health';
+import type { BatchPredictResult, PredictionCandidates } from '@/5entities/prediction';
+import type { XLSXConversionResult } from '@/5entities/xlsx-file';
 
 import type { APIResponse } from './types';
 

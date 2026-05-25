@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useTransition } from 'react';
 
-import { usePredictionSessions } from '@/src/2pages/predict/hooks/usePredictionSessions';
-import { useUserSelections } from '@/src/2pages/predict/hooks/useUserSelections';
-import { ObjectPredictionPanel } from '@/src/3widgets/object-prediction-panel';
-import { UserSelectionPanel } from '@/src/3widgets/user-selection-panel';
-import { BimAttributeTableModal } from '@/src/4features/bim-attribute-viewer';
-import { ServerStatusBadge } from '@/src/4features/server-status';
+import { usePredictionSessions } from '@/2pages/predict/hooks/usePredictionSessions';
+import { useUserSelections } from '@/2pages/predict/hooks/useUserSelections';
+import { ObjectPredictionPanel } from '@/3widgets/object-prediction-panel';
+import { UserSelectionPanel } from '@/3widgets/user-selection-panel';
+import { BimAttributeTableModal } from '@/4features/bim-attribute-viewer';
+import { ServerStatusBadge } from '@/4features/server-status';
 import {
   FileListSelect,
   FileUploadZone,
@@ -17,19 +17,19 @@ import {
   readJsonFileAction,
   uploadAndConvertXlsxAction,
   loadUserSelectionsAction,
-} from '@/src/4features/manage-file';
-import { loadPredictionsAction } from '@/src/4features/predict-code';
-import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import type { PredictionSession } from '@/src/5entities/prediction';
-import type { XlsxFileInfo } from '@/src/5entities/xlsx-file';
-import { batchPredictCode, predictSingleCode } from '@/src/6shared/api';
-import { Alert, AlertDescription } from '@/src/6shared/ui/primitive/alert';
+} from '@/4features/manage-file';
+import { loadPredictionsAction } from '@/4features/predict-code';
+import type { BIMObjectInput } from '@/5entities/bim-object';
+import type { PredictionSession } from '@/5entities/prediction';
+import type { XlsxFileInfo } from '@/5entities/xlsx-file';
+import { batchPredictCode, predictSingleCode } from '@/6shared/api';
+import { Alert, AlertDescription } from '@/6shared/ui/primitive/alert';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/src/6shared/ui/primitive/card';
+} from '@/6shared/ui/primitive/card';
 
 type DataSource =
   | { type: 'xlsx'; fileName: string }

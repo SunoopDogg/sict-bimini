@@ -1,14 +1,14 @@
 import { useRef, useState } from 'react';
 
-import type { BIMObjectInput } from '@/src/5entities/bim-object';
-import { EMPTY_BIM_OBJECT } from '@/src/5entities/bim-object';
-import type { PredictionSession, UserSelection } from '@/src/5entities/prediction';
+import type { BIMObjectInput } from '@/5entities/bim-object';
+import { EMPTY_BIM_OBJECT } from '@/5entities/bim-object';
+import type { PredictionSession, UserSelection } from '@/5entities/prediction';
 import {
   saveUserSelectionsAction,
   loadUserSelectionsAction,
   listSelectionFilesAction,
-} from '@/src/4features/manage-file';
-import type { SelectionFileInfo } from '@/src/5entities/prediction';
+} from '@/4features/manage-file';
+import type { SelectionFileInfo } from '@/5entities/prediction';
 
 export function useUserSelections(objects: BIMObjectInput[]) {
   const [selectionFiles, setSelectionFiles] = useState<SelectionFileInfo[]>([]);

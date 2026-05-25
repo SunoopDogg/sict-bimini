@@ -4,9 +4,9 @@ import { TableProperties } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
 
-import type { BIMAttributeListResponse } from '@/src/5entities/bim-attribute';
-import { fetchBimAttributes } from '@/src/6shared/api';
-import { Button } from '@/src/6shared/ui/primitive/button';
+import type { BIMAttributeListResponse } from '@/5entities/bim-attribute';
+import { fetchBimAttributes } from '@/6shared/api';
+import { Button } from '@/6shared/ui/primitive/button';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/src/6shared/ui/primitive/dialog';
+} from '@/6shared/ui/primitive/dialog';
 import {
   Pagination,
   PaginationContent,
@@ -23,8 +23,8 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from '@/src/6shared/ui/primitive/pagination';
-import { Skeleton } from '@/src/6shared/ui/primitive/skeleton';
+} from '@/6shared/ui/primitive/pagination';
+import { Skeleton } from '@/6shared/ui/primitive/skeleton';
 import {
   Table,
   TableBody,
@@ -32,7 +32,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/src/6shared/ui/primitive/table';
+} from '@/6shared/ui/primitive/table';
 
 const PAGE_SIZE = 20;
 
