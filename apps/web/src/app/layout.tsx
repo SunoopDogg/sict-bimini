@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import localFont from 'next/font/local';
 
 import '@/1app/styles/globals.css';
+import { ThemeProvider } from '@/1app/providers/ThemeProvider';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -34,8 +35,11 @@ export default function RootLayout({
     <html
       lang="ko"
       className={`${pretendardFont.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
+      suppressHydrationWarning
     >
-      <body className={pretendardFont.className}>{children}</body>
+      <body className={pretendardFont.className}>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }
