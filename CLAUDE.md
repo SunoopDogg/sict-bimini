@@ -21,3 +21,9 @@
 - The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
 
 <!-- nx configuration end-->
+
+## 이 프로젝트
+
+- 패키지 매니저: **bun** → `bunx nx <target>` (위 Nx 예시의 `pnpm`/`npm exec` 무시)
+- `apps/api` — Python 3.13 / FastAPI / uv (상세: `apps/api/CLAUDE.md`)
+- `apps/web` — Next.js 16 / TypeScript / Tailwind CSS
