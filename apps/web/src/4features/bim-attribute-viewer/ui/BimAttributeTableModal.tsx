@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 
 import type { BIMAttributeListResponse } from '@/5entities/bim-attribute';
 import { fetchBimAttributes } from '@/6shared/api';
+import { useLocale } from '@/6shared/i18n';
 import { Button } from '@/6shared/ui/primitive/button';
 import {
   Dialog,
@@ -42,6 +43,7 @@ export function BimAttributeTableModal() {
   const [data, setData] = useState<BIMAttributeListResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useLocale();
 
   const fetchData = async (pageNum: number) => {
     setLoading(true);
@@ -51,10 +53,10 @@ export function BimAttributeTableModal() {
       if (response.success && response.data) {
         setData(response.data);
       } else {
-        setError(response.error || '데이터를 불러오는데 실패했습니다.');
+        setError(response.error || t.bimAttr.loadFailed);
       }
     } catch {
-      setError('데이터를 불러오는 중 오류가 발생했습니다.');
+      setError(t.bimAttr.loadError);
     } finally {
       setLoading(false);
     }
@@ -80,7 +82,6 @@ export function BimAttributeTableModal() {
     const current = page;
     const items = [];
 
-    // Always show first page
     items.push(
       <PaginationItem key={1}>
         <PaginationLink onClick={() => setPage(1)} isActive={current === 1}>
@@ -89,12 +90,10 @@ export function BimAttributeTableModal() {
       </PaginationItem>,
     );
 
-    // Show ellipsis if needed
     if (current > 3) {
       items.push(<PaginationEllipsis key="ellipsis-start" />);
     }
 
-    // Show pages around current
     const start = Math.max(2, current - 1);
     const end = Math.min(totalPages - 1, current + 1);
 
@@ -108,12 +107,10 @@ export function BimAttributeTableModal() {
       );
     }
 
-    // Show ellipsis if needed
     if (current < totalPages - 2) {
       items.push(<PaginationEllipsis key="ellipsis-end" />);
     }
 
-    // Always show last page if there's more than 1 page
     if (totalPages > 1) {
       items.push(
         <PaginationItem key={totalPages}>
@@ -135,14 +132,14 @@ export function BimAttributeTableModal() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <TableProperties className="mr-2 h-4 w-4" />
-          속성 데이터
+          {t.bimAttr.trigger}
         </Button>
       </DialogTrigger>
       <DialogContent className="flex h-[80vh] max-w-6xl flex-col">
         <DialogHeader>
-          <DialogTitle>BIM 속성 데이터 (CSV)</DialogTitle>
+          <DialogTitle>{t.bimAttr.title}</DialogTitle>
           <DialogDescription>
-            벡터 데이터베이스에 저장된 BIM 속성 목록입니다.
+            {t.bimAttr.subtitle}
           </DialogDescription>
         </DialogHeader>
 
@@ -158,14 +155,14 @@ export function BimAttributeTableModal() {
               <Table className="table-fixed">
                 <TableHeader>
                   <TableRow className="bg-muted">
-                    <TableHead className="w-[12%]">IFC 타입</TableHead>
-                    <TableHead className="w-[10%]">분류</TableHead>
-                    <TableHead className="w-[12%]">패밀리명</TableHead>
-                    <TableHead className="w-[12%]">KBIMS 코드</TableHead>
-                    <TableHead className="w-[14%]">PPS 코드</TableHead>
-                    <TableHead className="w-[18%]">패밀리</TableHead>
-                    <TableHead className="w-[12%]">유형</TableHead>
-                    <TableHead className="w-[10%]">유형ID</TableHead>
+                    <TableHead className="w-[12%]">{t.bimAttr.colIfcType}</TableHead>
+                    <TableHead className="w-[10%]">{t.bimAttr.colCategory}</TableHead>
+                    <TableHead className="w-[12%]">{t.bimAttr.colFamilyName}</TableHead>
+                    <TableHead className="w-[12%]">{t.bimAttr.colKbimsCode}</TableHead>
+                    <TableHead className="w-[14%]">{t.bimAttr.colPpsCode}</TableHead>
+                    <TableHead className="w-[18%]">{t.bimAttr.colFamily}</TableHead>
+                    <TableHead className="w-[12%]">{t.bimAttr.colType}</TableHead>
+                    <TableHead className="w-[10%]">{t.bimAttr.colTypeId}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -185,7 +182,7 @@ export function BimAttributeTableModal() {
                         colSpan={8}
                         className="text-center text-muted-foreground"
                       >
-                        데이터가 없습니다.
+                        {t.bimAttr.noData}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -208,7 +205,7 @@ export function BimAttributeTableModal() {
 
             <div className="flex items-center justify-between pt-4">
               <p className="w-16 text-sm text-muted-foreground">
-                {data ? `총 ${data.total.toLocaleString()}건` : '\u00A0'}
+                {data ? t.bimAttr.total(data.total) : ' '}
               </p>
               {data && (
                 <Pagination>
