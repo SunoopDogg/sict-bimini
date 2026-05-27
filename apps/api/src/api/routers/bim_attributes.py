@@ -1,3 +1,99 @@
-from fastapi import APIRouter
+import logging
+import math
+
+from fastapi import APIRouter, HTTPException, Query, Request
+from qdrant_client.models import PointStruct
+
+from api.bim.clients.embeddings_vllm import VLLMEmbedError
+from api.bim.schemas import BIMAttribute
+from api.routers.schemas import (
+    BIMAttributeCreateRequest,
+    BIMAttributeCreateResponse,
+    BIMAttributeListResponse,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["bim-attributes"])
+
+
+@router.get("/bim-attributes", response_model=BIMAttributeListResponse)
+def list_bim_attributes(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> BIMAttributeListResponse:
+    qdrant = request.app.state.qdrant
+    bim = request.app.state.bim
+
+    count_result = qdrant.count(collection_name=bim.collection_name, exact=True)
+    total = count_result.count
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+
+    # Skip (page-1)*page_size records without loading payload
+    skip = (page - 1) * page_size
+    offset = None
+
+    while skip > 0:
+        batch_size = min(skip, 250)
+        points, offset = qdrant.scroll(
+            collection_name=bim.collection_name,
+            limit=batch_size,
+            offset=offset,
+            with_payload=False,
+            with_vectors=False,
+        )
+        skip -= len(points)
+        if not points or offset is None:
+            return BIMAttributeListResponse(
+                items=[], total=total, page=page,
+                page_size=page_size, total_pages=total_pages,
+            )
+
+    # Fetch the requested page
+    points, _ = qdrant.scroll(
+        collection_name=bim.collection_name,
+        limit=page_size,
+        offset=offset,
+        with_payload=True,
+        with_vectors=False,
+    )
+
+    items = []
+    for point in points:
+        payload = point.payload or {}
+        attr_data = {k: payload.get(k, "") for k in BIMAttribute.model_fields}
+        items.append(BIMAttribute(**attr_data))
+
+    return BIMAttributeListResponse(
+        items=items, total=total, page=page,
+        page_size=page_size, total_pages=total_pages,
+    )
+
+
+@router.post("/bim-attributes", response_model=BIMAttributeCreateResponse)
+def create_bim_attributes(
+    request: Request,
+    body: BIMAttributeCreateRequest,
+) -> BIMAttributeCreateResponse:
+    qdrant = request.app.state.qdrant
+    embed = request.app.state.embed
+    bim = request.app.state.bim
+
+    try:
+        vectors = embed.embed([attr.embed_text() for attr in body.items])
+    except VLLMEmbedError as e:
+        raise HTTPException(status_code=503, detail=f"Embedding service unavailable: {e}")
+
+    points = [
+        PointStruct(
+            id=attr.stable_id,
+            vector=vec,
+            payload={**attr.model_dump(), "stable_id": attr.stable_id},
+        )
+        for attr, vec in zip(body.items, vectors, strict=True)
+    ]
+    qdrant.upsert(collection_name=bim.collection_name, points=points, wait=True)
+
+    count_result = qdrant.count(collection_name=bim.collection_name, exact=True)
+    return BIMAttributeCreateResponse(added=len(body.items), total=count_result.count)
