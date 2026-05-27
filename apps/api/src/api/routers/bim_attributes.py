@@ -105,18 +105,19 @@ def create_bim_attributes(
         ) from e
 
     ingested_at = datetime.now(UTC).isoformat(timespec="seconds")
+    stable_ids = [attr.stable_id for attr in deduped]
     points = [
         PointStruct(
-            id=attr.stable_id,
+            id=sid,
             vector=vec,
             payload={
                 **attr.model_dump(),
-                "stable_id": attr.stable_id,
+                "stable_id": sid,
                 "source_file": "",
                 "ingested_at": ingested_at,
             },
         )
-        for attr, vec in zip(deduped, vectors)
+        for attr, vec, sid in zip(deduped, vectors, stable_ids)
     ]
     qdrant.upsert(collection_name=bim.collection_name, points=points, wait=True)
 

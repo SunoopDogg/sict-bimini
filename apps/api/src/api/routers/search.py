@@ -39,11 +39,10 @@ def search_similar_objects(
         with_payload=True,
     )
 
-    results = []
-    for point in response.points:
-        attr = bim_attr_from_payload(point.payload or {})
-        if attr is None:
-            continue
-        results.append(SearchResult(attribute=attr, score=point.score))
+    results = [
+        SearchResult(attribute=attr, score=point.score)
+        for point in response.points
+        if (attr := bim_attr_from_payload(point.payload or {})) is not None
+    ]
 
     return SearchResponse(results=results)

@@ -19,11 +19,12 @@ ALLOWED_EXTENSIONS = {".xlsx"}  # openpyxl does not support legacy .xls format
 @router.post("/convert/xlsx-to-json", response_model=XLSXConversionResult)
 async def convert_xlsx_to_json(file: UploadFile) -> XLSXConversionResult:
     filename = file.filename or "upload"
-    ext = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ""
+    ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
+        allowed = ", ".join(sorted(ALLOWED_EXTENSIONS))
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid extension. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",  # noqa: E501
+            detail=f"Invalid extension. Allowed: {allowed}",
         )
 
     content = await file.read()
