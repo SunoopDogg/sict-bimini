@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import localFont from 'next/font/local';
 
 import '@/1app/styles/globals.css';
+import { LocaleProvider } from '@/1app/providers/LocaleProvider';
 import { ThemeProvider } from '@/1app/providers/ThemeProvider';
 
 const geistSans = Geist({
@@ -38,7 +39,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className={pretendardFont.className}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <LocaleProvider>{children}</LocaleProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

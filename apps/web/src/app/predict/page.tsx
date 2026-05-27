@@ -23,6 +23,7 @@ import type { BIMObjectInput } from '@/5entities/bim-object';
 import type { PredictionSession } from '@/5entities/prediction';
 import type { XlsxFileInfo } from '@/5entities/xlsx-file';
 import { batchPredictCode, predictSingleCode } from '@/6shared/api';
+import { LocaleToggle } from '@/6shared/ui/LocaleToggle';
 import { ThemeToggle } from '@/6shared/ui/ThemeToggle';
 import { Alert, AlertDescription } from '@/6shared/ui/primitive/alert';
 import {
@@ -267,6 +268,7 @@ export default function PredictPage() {
         <h1 className="text-3xl font-bold">KBIMS 코드 예측</h1>
         <div className="absolute right-0 flex items-center gap-2">
           <ServerStatusBadge />
+          <LocaleToggle />
           <ThemeToggle />
         </div>
       </div>
