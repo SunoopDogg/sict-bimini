@@ -3,6 +3,7 @@
 import { Check, FileSpreadsheet } from 'lucide-react';
 
 import type { XlsxFileInfo } from '@/5entities/xlsx-file';
+import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 import { formatDateTime } from '@/6shared/lib/format';
 
@@ -23,10 +24,12 @@ export function FileListSelect({
   selectedFile,
   onSelect,
 }: FileListSelectProps) {
+  const { t } = useLocale();
+
   if (files.length === 0) {
     return (
       <div className="text-muted-foreground py-8 text-center text-sm">
-        업로드된 파일이 없습니다.
+        {t.file.noFiles}
       </div>
     );
   }
@@ -34,7 +37,7 @@ export function FileListSelect({
   return (
     <div className="space-y-2">
       <p className="text-muted-foreground text-sm font-medium">
-        업로드된 파일 ({files.length}개)
+        {t.file.uploadedFiles(files.length)}
       </p>
       <ul className="space-y-2">
         {files.map((file) => (

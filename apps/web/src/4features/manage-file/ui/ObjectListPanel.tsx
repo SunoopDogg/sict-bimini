@@ -13,6 +13,7 @@ import { useState } from 'react';
 
 import type { BIMObjectInput } from '@/5entities/bim-object';
 import type { PredictionResult, PredictionSession } from '@/5entities/prediction';
+import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 import { Button } from '@/6shared/ui/primitive/button';
 import {
@@ -107,6 +108,7 @@ export function ObjectListPanel({
 }: ObjectListPanelProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [previousObjects, setPrevObjects] = useState(objects);
+  const { t } = useLocale();
 
   if (objects !== previousObjects) {
     setPrevObjects(objects);
@@ -133,7 +135,7 @@ export function ObjectListPanel({
     if (!selectedFile) {
       return (
         <div className="text-muted-foreground flex items-center justify-center py-12">
-          파일을 선택하면 객체 리스트가 표시됩니다.
+          {t.file.selectFilePrompt}
         </div>
       );
     }
@@ -149,7 +151,7 @@ export function ObjectListPanel({
     if (objects.length === 0) {
       return (
         <div className="text-muted-foreground flex items-center justify-center py-12">
-          객체가 없습니다.
+          {t.file.noObjects}
         </div>
       );
     }
@@ -184,9 +186,9 @@ export function ObjectListPanel({
                   />
                 </TableHead>
                 <TableHead className="text-center">#</TableHead>
-                <TableHead>객체 이름</TableHead>
-                <TableHead>부위코드</TableHead>
-                <TableHead>PPS 코드</TableHead>
+                <TableHead>{t.object.colName}</TableHead>
+                <TableHead>{t.object.colPartCode}</TableHead>
+                <TableHead>{t.object.colPpsCode}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -268,7 +270,7 @@ export function ObjectListPanel({
                     e.preventDefault();
                     if (currentPage > 1) setCurrentPage((p) => p - 1);
                   }}
-                  aria-label="이전 페이지"
+                  aria-label={t.file.prevPage}
                   className={cn(
                     'h-8 w-8 cursor-pointer p-0',
                     currentPage === 1 && 'pointer-events-none opacity-50',
@@ -299,7 +301,7 @@ export function ObjectListPanel({
                     e.preventDefault();
                     if (currentPage < totalPages) setCurrentPage((p) => p + 1);
                   }}
-                  aria-label="다음 페이지"
+                  aria-label={t.file.nextPage}
                   className={cn(
                     'h-8 w-8 cursor-pointer p-0',
                     currentPage === totalPages &&
@@ -320,7 +322,7 @@ export function ObjectListPanel({
     <Card className="flex flex-col">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>객체 리스트</CardTitle>
+          <CardTitle>{t.file.objectList}</CardTitle>
           {selectedFile && objects.length > 0 && (
             <Button
               size="sm"
@@ -330,13 +332,13 @@ export function ObjectListPanel({
               {isPredicting && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              선택 예측 ({selectedIndices.size}개)
+              {t.predict.batchPredict(selectedIndices.size)}
             </Button>
           )}
         </div>
         {selectedFile && (
           <CardDescription>
-            {selectedFile} ({objects.length}개 객체)
+            {selectedFile} ({t.file.objects(objects.length)})
           </CardDescription>
         )}
       </CardHeader>

@@ -4,6 +4,7 @@ import { CheckCircle, Loader2, Upload } from 'lucide-react';
 
 import { useCallback, useState } from 'react';
 
+import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 
 import type { UploadStatus } from '../api/types';
@@ -18,6 +19,7 @@ export function FileUploadZone({
   uploadStatus = 'idle',
 }: FileUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const { t } = useLocale();
 
   const isProcessing = uploadStatus === 'uploading';
 
@@ -62,8 +64,8 @@ export function FileUploadZone({
           <>
             <Loader2 className="text-primary h-10 w-10 animate-spin" />
             <div className="text-center">
-              <p className="text-sm font-medium">업로드 및 변환 중...</p>
-              <p className="text-muted-foreground text-xs">잠시만 기다려주세요</p>
+              <p className="text-sm font-medium">{t.upload.uploading}</p>
+              <p className="text-muted-foreground text-xs">{t.upload.pleaseWait}</p>
             </div>
           </>
         );
@@ -71,7 +73,7 @@ export function FileUploadZone({
         return (
           <>
             <CheckCircle className="h-10 w-10 text-green-500" />
-            <p className="text-sm font-medium text-green-600">변환 완료!</p>
+            <p className="text-sm font-medium text-green-600">{t.upload.done}</p>
           </>
         );
       default:
@@ -79,9 +81,9 @@ export function FileUploadZone({
           <>
             <Upload className="text-muted-foreground h-10 w-10" />
             <div className="text-center">
-              <p className="text-sm font-medium">xlsx 파일을 드래그하거나</p>
+              <p className="text-sm font-medium">{t.upload.dragOrClick}</p>
               <label className="text-primary cursor-pointer text-sm hover:underline">
-                파일 선택
+                {t.upload.selectFile}
                 <input
                   type="file"
                   accept=".xlsx"
@@ -90,7 +92,7 @@ export function FileUploadZone({
                 />
               </label>
             </div>
-            <p className="text-muted-foreground text-xs">.xlsx 형식만 지원됩니다</p>
+            <p className="text-muted-foreground text-xs">{t.upload.xlsxOnly}</p>
           </>
         );
     }
