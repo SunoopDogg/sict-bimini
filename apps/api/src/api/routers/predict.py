@@ -20,27 +20,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["prediction"])
 
 
-def _predict_both(request: Request, pred_req: PredictionRequest) -> CombinedPredictionResponse:
+def _predict_both(
+    request: Request, pred_req: PredictionRequest
+) -> CombinedPredictionResponse:
     kbims_pred = request.app.state.kbims
     pps_pred = request.app.state.pps
 
     try:
         kbims_result = kbims_pred.predict(pred_req)
-    except EmptyRetrievalError:
-        raise HTTPException(status_code=422, detail="No similar objects found")
-    except LLMGenerationError:
-        raise HTTPException(status_code=503, detail="LLM unavailable")
+    except EmptyRetrievalError as e:
+        raise HTTPException(status_code=422, detail="No similar objects found") from e
+    except LLMGenerationError as e:
+        raise HTTPException(status_code=503, detail="LLM unavailable") from e
     except PredictError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
     try:
         pps_result = pps_pred.predict(pred_req)
-    except EmptyRetrievalError:
-        raise HTTPException(status_code=422, detail="No similar objects found")
-    except LLMGenerationError:
-        raise HTTPException(status_code=503, detail="LLM unavailable")
+    except EmptyRetrievalError as e:
+        raise HTTPException(status_code=422, detail="No similar objects found") from e
+    except LLMGenerationError as e:
+        raise HTTPException(status_code=503, detail="LLM unavailable") from e
     except PredictError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
     return CombinedPredictionResponse(kbims=kbims_result, pps=pps_result)
 

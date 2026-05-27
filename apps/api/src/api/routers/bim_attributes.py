@@ -1,9 +1,8 @@
 import logging
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import ValidationError
 from qdrant_client.models import PointStruct
 
 from api.bim.clients.embeddings_vllm import VLLMEmbedError
@@ -12,6 +11,7 @@ from api.routers.schemas import (
     BIMAttributeCreateRequest,
     BIMAttributeCreateResponse,
     BIMAttributeListResponse,
+    bim_attr_from_payload,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,13 +61,10 @@ def list_bim_attributes(
         with_vectors=False,
     )
 
-    items = []
-    for point in points:
-        payload = point.payload or {}
-        try:
-            items.append(BIMAttribute.model_validate(payload))
-        except ValidationError:
-            logger.warning("Skipping point with invalid payload: stable_id=%s", payload.get("stable_id"))
+    items = [
+        attr for point in points
+        if (attr := bim_attr_from_payload(point.payload or {})) is not None
+    ]
 
     return BIMAttributeListResponse(
         items=items, total=total, page=page,
@@ -84,20 +81,30 @@ def create_bim_attributes(
     embed = request.app.state.embed
     bim = request.app.state.bim
 
-    # Dedup by stable_id — Qdrant upsert is idempotent but `added` should reflect distinct points
-    seen: dict[str, BIMAttribute] = {}
-    for attr in body.items:
-        seen[attr.stable_id] = attr
-    deduped = list(seen.values())
+    # Dedup by stable_id (last wins) — matches pipeline normalizer semantics
+    deduped = list({attr.stable_id: attr for attr in body.items}.values())
 
     try:
         vectors = embed.embed([attr.embed_text() for attr in deduped])
+        if len(vectors) != len(deduped):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    f"Embedding service returned {len(vectors)} vectors"
+                    f" for {len(deduped)} inputs"
+                ),
+            )
     except VLLMEmbedError as e:
-        raise HTTPException(status_code=503, detail=f"Embedding service unavailable: {e}")
+        raise HTTPException(
+            status_code=503, detail=f"Embedding service unavailable: {e}"
+        ) from e
     except ValueError as e:
-        raise HTTPException(status_code=503, detail=f"Embedding service returned unexpected result: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Embedding service returned unexpected result: {e}",
+        ) from e
 
-    ingested_at = datetime.now(timezone.utc).isoformat()
+    ingested_at = datetime.now(UTC).isoformat(timespec="seconds")
     points = [
         PointStruct(
             id=attr.stable_id,
@@ -109,7 +116,7 @@ def create_bim_attributes(
                 "ingested_at": ingested_at,
             },
         )
-        for attr, vec in zip(deduped, vectors, strict=True)
+        for attr, vec in zip(deduped, vectors)
     ]
     qdrant.upsert(collection_name=bim.collection_name, points=points, wait=True)
 

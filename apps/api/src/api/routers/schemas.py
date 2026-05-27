@@ -1,7 +1,23 @@
-from pydantic import BaseModel, Field
+import logging
+
+from pydantic import BaseModel, Field, ValidationError
 
 from api.bim.predict.schemas import PredictionResponse
 from api.bim.schemas import BIMAttribute
+
+_logger = logging.getLogger(__name__)
+
+
+def bim_attr_from_payload(payload: dict) -> BIMAttribute | None:
+    """Parse BIMAttribute from a Qdrant point payload; returns None on invalid data."""
+    try:
+        return BIMAttribute.model_validate(payload)
+    except ValidationError:
+        _logger.warning(
+            "Skipping point with invalid payload: stable_id=%s",
+            payload.get("stable_id"),
+        )
+        return None
 
 
 class CombinedPredictionResponse(BaseModel):

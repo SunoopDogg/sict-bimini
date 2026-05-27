@@ -1,11 +1,9 @@
 import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import ValidationError
 
 from api.bim.clients.embeddings_vllm import VLLMEmbedError
-from api.bim.schemas import BIMAttribute
-from api.routers.schemas import SearchResponse, SearchResult
+from api.routers.schemas import SearchResponse, SearchResult, bim_attr_from_payload
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +23,14 @@ def search_similar_objects(
     try:
         [vector] = embed.embed([query])
     except VLLMEmbedError as e:
-        raise HTTPException(status_code=503, detail=f"Embedding service unavailable: {e}")
+        raise HTTPException(
+            status_code=503, detail=f"Embedding service unavailable: {e}"
+        ) from e
     except ValueError as e:
-        raise HTTPException(status_code=503, detail=f"Embedding service returned unexpected result: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Embedding service returned unexpected result: {e}",
+        ) from e
 
     response = qdrant.query_points(
         collection_name=bim.collection_name,
@@ -38,11 +41,8 @@ def search_similar_objects(
 
     results = []
     for point in response.points:
-        payload = point.payload or {}
-        try:
-            attr = BIMAttribute.model_validate(payload)
-        except ValidationError:
-            logger.warning("Skipping search result with invalid payload: stable_id=%s", payload.get("stable_id"))
+        attr = bim_attr_from_payload(point.payload or {})
+        if attr is None:
             continue
         results.append(SearchResult(attribute=attr, score=point.score))
 

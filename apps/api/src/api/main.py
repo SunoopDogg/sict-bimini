@@ -1,4 +1,5 @@
-from contextlib import asynccontextmanager, closing
+import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from qdrant_client import QdrantClient
@@ -10,13 +11,26 @@ from api.core.config import BIMSettings, settings
 from api.routers import health
 from api.routers import bim_attributes, conversion, predict, search
 
+logger = logging.getLogger(__name__)
+
+
+def _close_clients(*clients) -> None:
+    """Close each client independently; one failure won't prevent others."""
+    for client in clients:
+        try:
+            client.close()
+        except Exception as e:
+            logger.warning("Error closing %s: %s", type(client).__name__, e)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     bim = BIMSettings()
     embed = VLLMEmbedClient(bim.embedding_url, bim.embedding_model, bim.embedding_dim)
     qdrant = QdrantClient(url=bim.qdrant_url, api_key=bim.qdrant_api_key)
-    vllm = VLLMClient(url=bim.llm_url, model=bim.llm_model, timeout=bim.llm_timeout_seconds)
+    vllm = VLLMClient(
+        url=bim.llm_url, model=bim.llm_model, timeout=bim.llm_timeout_seconds
+    )
 
     try:
         app.state.kbims = build_kbims_predictor(
@@ -27,18 +41,14 @@ async def lifespan(app: FastAPI):
         )
         app.state.qdrant = qdrant
         app.state.embed = embed
-        app.state.vllm = vllm
         app.state.bim = bim
     except Exception:
-        # Close clients that were already constructed before re-raising
-        with closing(qdrant), closing(embed), closing(vllm):
-            pass
+        _close_clients(qdrant, embed, vllm)
         raise
 
     yield
 
-    with closing(qdrant), closing(embed), closing(vllm):
-        pass
+    _close_clients(qdrant, embed, vllm)
 
 
 app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)

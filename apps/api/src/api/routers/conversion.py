@@ -23,7 +23,7 @@ async def convert_xlsx_to_json(file: UploadFile) -> XLSXConversionResult:
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid extension. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+            detail=f"Invalid extension. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",  # noqa: E501
         )
 
     content = await file.read()
@@ -42,10 +42,12 @@ async def convert_xlsx_to_json(file: UploadFile) -> XLSXConversionResult:
         try:
             objects = parse_xlsx_to_raw(Path(tmp.name))
         except MissingColumnsError as e:
-            raise HTTPException(status_code=422, detail=str(e))
+            raise HTTPException(status_code=422, detail=str(e)) from e
         except Exception as e:
             logger.error("xlsx conversion error: %s", e)
-            raise HTTPException(status_code=500, detail="Internal error during conversion")
+            raise HTTPException(
+                status_code=500, detail="Internal error during conversion"
+            ) from None
 
     return XLSXConversionResult(
         objects=[obj.model_dump() for obj in objects],
