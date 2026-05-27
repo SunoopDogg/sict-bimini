@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { HealthStatus } from '@/5entities/health';
 import { checkHealth } from '@/6shared/api';
+import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 import { Badge } from '@/6shared/ui/primitive/badge';
 
@@ -16,12 +17,6 @@ interface StatusInfo {
 
 const POLL_INTERVAL = 30_000;
 
-const stateConfig: Record<ServerState, { dotClass: string; label: string }> = {
-  healthy: { dotClass: 'bg-green-500', label: '서버 온라인' },
-  degraded: { dotClass: 'bg-yellow-500', label: '서버 불안정' },
-  offline: { dotClass: 'bg-red-500', label: '서버 오프라인' },
-};
-
 export function ServerStatusBadge() {
   const [statusInfo, setStatusInfo] = useState<StatusInfo>({
     health: null,
@@ -29,6 +24,13 @@ export function ServerStatusBadge() {
   });
   const [showDetail, setShowDetail] = useState(false);
   const badgeRef = useRef<HTMLDivElement>(null);
+  const { t } = useLocale();
+
+  const stateConfig: Record<ServerState, { dotClass: string; label: string }> = {
+    healthy: { dotClass: 'bg-green-500', label: t.server.online },
+    degraded: { dotClass: 'bg-yellow-500', label: t.server.degraded },
+    offline: { dotClass: 'bg-red-500', label: t.server.offline },
+  };
 
   useEffect(() => {
     let active = true;
@@ -87,7 +89,7 @@ export function ServerStatusBadge() {
           {statusInfo.health ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">버전</span>
+                <span className="text-muted-foreground">{t.server.version}</span>
                 <span className="font-mono text-xs">
                   {statusInfo.health.version}
                 </span>
@@ -101,7 +103,7 @@ export function ServerStatusBadge() {
                       : 'text-red-500'
                   }
                 >
-                  {statusInfo.health.ollama_connected ? '연결됨' : '연결 안됨'}
+                  {statusInfo.health.ollama_connected ? t.server.connected : t.server.notConnected}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -113,12 +115,12 @@ export function ServerStatusBadge() {
                       : 'text-red-500'
                   }
                 >
-                  {statusInfo.health.milvus_connected ? '연결됨' : '연결 안됨'}
+                  {statusInfo.health.milvus_connected ? t.server.connected : t.server.notConnected}
                 </span>
               </div>
             </div>
           ) : (
-            <p className="text-muted-foreground">서버에 연결할 수 없습니다.</p>
+            <p className="text-muted-foreground">{t.server.cannotConnect}</p>
           )}
         </div>
       )}
