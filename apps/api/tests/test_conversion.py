@@ -43,6 +43,14 @@ def test_convert_rejects_invalid_extension(client: TestClient) -> None:
     assert response.status_code == 400
 
 
+def test_convert_rejects_xls_extension(client: TestClient) -> None:
+    response = client.post(
+        "/convert/xlsx-to-json",
+        files={"file": ("report.xls", b"fake", "application/octet-stream")},
+    )
+    assert response.status_code == 400
+
+
 def test_convert_rejects_empty_file(client: TestClient) -> None:
     response = client.post(
         "/convert/xlsx-to-json",

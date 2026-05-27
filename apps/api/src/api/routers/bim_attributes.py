@@ -1,7 +1,9 @@
 import logging
 import math
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import ValidationError
 from qdrant_client.models import PointStruct
 
 from api.bim.clients.embeddings_vllm import VLLMEmbedError
@@ -62,8 +64,10 @@ def list_bim_attributes(
     items = []
     for point in points:
         payload = point.payload or {}
-        attr_data = {k: payload.get(k, "") for k in BIMAttribute.model_fields}
-        items.append(BIMAttribute(**attr_data))
+        try:
+            items.append(BIMAttribute.model_validate(payload))
+        except ValidationError:
+            logger.warning("Skipping point with invalid payload: stable_id=%s", payload.get("stable_id"))
 
     return BIMAttributeListResponse(
         items=items, total=total, page=page,
@@ -80,20 +84,34 @@ def create_bim_attributes(
     embed = request.app.state.embed
     bim = request.app.state.bim
 
+    # Dedup by stable_id — Qdrant upsert is idempotent but `added` should reflect distinct points
+    seen: dict[str, BIMAttribute] = {}
+    for attr in body.items:
+        seen[attr.stable_id] = attr
+    deduped = list(seen.values())
+
     try:
-        vectors = embed.embed([attr.embed_text() for attr in body.items])
+        vectors = embed.embed([attr.embed_text() for attr in deduped])
     except VLLMEmbedError as e:
         raise HTTPException(status_code=503, detail=f"Embedding service unavailable: {e}")
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=f"Embedding service returned unexpected result: {e}")
 
+    ingested_at = datetime.now(timezone.utc).isoformat()
     points = [
         PointStruct(
             id=attr.stable_id,
             vector=vec,
-            payload={**attr.model_dump(), "stable_id": attr.stable_id},
+            payload={
+                **attr.model_dump(),
+                "stable_id": attr.stable_id,
+                "source_file": "",
+                "ingested_at": ingested_at,
+            },
         )
-        for attr, vec in zip(body.items, vectors, strict=True)
+        for attr, vec in zip(deduped, vectors, strict=True)
     ]
     qdrant.upsert(collection_name=bim.collection_name, points=points, wait=True)
 
     count_result = qdrant.count(collection_name=bim.collection_name, exact=True)
-    return BIMAttributeCreateResponse(added=len(body.items), total=count_result.count)
+    return BIMAttributeCreateResponse(added=len(deduped), total=count_result.count)

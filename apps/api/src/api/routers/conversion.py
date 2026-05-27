@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["conversion"])
 
 MAX_FILE_SIZE = 50 * 1024 * 1024
-ALLOWED_EXTENSIONS = {".xlsx", ".xls"}
+ALLOWED_EXTENSIONS = {".xlsx"}  # openpyxl does not support legacy .xls format
 
 
 @router.post("/convert/xlsx-to-json", response_model=XLSXConversionResult)

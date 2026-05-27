@@ -1,5 +1,4 @@
-import contextlib
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, closing
 
 from fastapi import FastAPI
 from qdrant_client import QdrantClient
@@ -19,17 +18,26 @@ async def lifespan(app: FastAPI):
     qdrant = QdrantClient(url=bim.qdrant_url, api_key=bim.qdrant_api_key)
     vllm = VLLMClient(url=bim.llm_url, model=bim.llm_model, timeout=bim.llm_timeout_seconds)
 
-    app.state.kbims = build_kbims_predictor(
-        settings=bim, embed_client=embed, qdrant_client=qdrant, vllm_client=vllm
-    )
-    app.state.pps = build_pps_predictor(
-        settings=bim, embed_client=embed, qdrant_client=qdrant, vllm_client=vllm
-    )
-    app.state.qdrant = qdrant
-    app.state.embed = embed
-    app.state.bim = bim
+    try:
+        app.state.kbims = build_kbims_predictor(
+            settings=bim, embed_client=embed, qdrant_client=qdrant, vllm_client=vllm
+        )
+        app.state.pps = build_pps_predictor(
+            settings=bim, embed_client=embed, qdrant_client=qdrant, vllm_client=vllm
+        )
+        app.state.qdrant = qdrant
+        app.state.embed = embed
+        app.state.vllm = vllm
+        app.state.bim = bim
+    except Exception:
+        # Close clients that were already constructed before re-raising
+        with closing(qdrant), closing(embed), closing(vllm):
+            pass
+        raise
+
     yield
-    with contextlib.closing(qdrant):
+
+    with closing(qdrant), closing(embed), closing(vllm):
         pass
 
 
