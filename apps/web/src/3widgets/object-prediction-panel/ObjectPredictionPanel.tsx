@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 import type { BIMObjectInput } from '@/5entities/bim-object';
 import type { PredictionResult, PredictionSession } from '@/5entities/prediction';
+import { useLocale } from '@/6shared/i18n';
 import { Badge } from '@/6shared/ui/primitive/badge';
 import { Button } from '@/6shared/ui/primitive/button';
 import { Input } from '@/6shared/ui/primitive/input';
@@ -54,21 +55,22 @@ function confidenceBadgeClass(confidence: number): string {
 }
 
 function ObjectInfo({ object }: { object: BIMObjectInput }) {
+  const { t } = useLocale();
   return (
     <div className="space-y-2 rounded-lg border p-4">
-      <h3 className="text-muted-foreground text-sm font-medium">객체 정보</h3>
+      <h3 className="text-muted-foreground text-sm font-medium">{t.object.info}</h3>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-muted-foreground">이름</dt>
+        <dt className="text-muted-foreground">{t.object.name}</dt>
         <dd>{object.name || '-'}</dd>
-        <dt className="text-muted-foreground">유형</dt>
+        <dt className="text-muted-foreground">{t.object.type}</dt>
         <dd>{object.object_type || '-'}</dd>
-        <dt className="text-muted-foreground">카테고리</dt>
+        <dt className="text-muted-foreground">{t.object.category}</dt>
         <dd>{object.category || '-'}</dd>
-        <dt className="text-muted-foreground">패밀리</dt>
+        <dt className="text-muted-foreground">{t.object.family}</dt>
         <dd>{object.family_name || '-'}</dd>
-        <dt className="text-muted-foreground">부위코드</dt>
+        <dt className="text-muted-foreground">{t.object.partCode}</dt>
         <dd>{object.kbims_code || '-'}</dd>
-        <dt className="text-muted-foreground">PPS 코드</dt>
+        <dt className="text-muted-foreground">{t.object.ppsCode}</dt>
         <dd>{object.pps_code || '-'}</dd>
       </dl>
     </div>
@@ -85,6 +87,7 @@ export function ObjectPredictionPanel({
 }: ObjectPredictionPanelProps) {
   const [sessionPage, setSessionPage] = useState(0);
   const [previousSessionCount, setPreviousSessionCount] = useState(sessions.length);
+  const { t } = useLocale();
 
   if (sessions.length !== previousSessionCount) {
     setPreviousSessionCount(sessions.length);
@@ -96,12 +99,12 @@ export function ObjectPredictionPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>예측 결과</CardTitle>
+          <CardTitle>{t.predict.results}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-12">
             <p className="text-muted-foreground text-center">
-              객체를 선택하면 예측 결과가 표시됩니다.
+              {t.predict.selectObjectPrompt}
             </p>
           </div>
         </CardContent>
@@ -114,7 +117,7 @@ export function ObjectPredictionPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>예측 결과</CardTitle>
+          <CardTitle>{t.predict.results}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -124,7 +127,7 @@ export function ObjectPredictionPanel({
                 {isPredicting && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                예측하기
+                {t.predict.predict}
               </Button>
             </div>
           </div>
@@ -141,7 +144,7 @@ export function ObjectPredictionPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>예측 결과</CardTitle>
+        <CardTitle>{t.predict.results}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -156,7 +159,7 @@ export function ObjectPredictionPanel({
                       e.preventDefault();
                       if (sessionPage > 0) setSessionPage((p) => p - 1);
                     }}
-                    aria-label="이전 예측"
+                    aria-label={t.predict.prevSession}
                     className={cn(
                       'h-8 w-8 cursor-pointer p-0',
                       sessionPage === 0 && 'pointer-events-none opacity-50',
@@ -167,7 +170,7 @@ export function ObjectPredictionPanel({
                 </PaginationItem>
                 <PaginationItem>
                   <span className="flex h-8 items-center px-2 text-sm text-muted-foreground">
-                    예측 #{currentSessionOriginalIndex + 1} / {sessions.length}
+                    {t.predict.session(currentSessionOriginalIndex + 1, sessions.length)}
                   </span>
                 </PaginationItem>
                 <PaginationItem>
@@ -176,7 +179,7 @@ export function ObjectPredictionPanel({
                       e.preventDefault();
                       if (sessionPage < sessions.length - 1) setSessionPage((p) => p + 1);
                     }}
-                    aria-label="다음 예측"
+                    aria-label={t.predict.nextSession}
                     className={cn(
                       'h-8 w-8 cursor-pointer p-0',
                       sessionPage === sessions.length - 1 && 'pointer-events-none opacity-50',
@@ -193,7 +196,7 @@ export function ObjectPredictionPanel({
             <div className="space-y-3 rounded-lg border p-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-muted-foreground text-sm font-medium">
-                  예측 #{currentSessionOriginalIndex + 1}
+                  {t.predict.sessionLabel(currentSessionOriginalIndex + 1)}
                 </h3>
                 <span className="text-muted-foreground text-xs">
                   {new Date(currentSession.predicted_at).toLocaleString('ko-KR')}
@@ -215,7 +218,7 @@ export function ObjectPredictionPanel({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <span className="text-muted-foreground text-xs font-medium">
-                          {candidateIdx + 1}순위
+                          {t.predict.rank(candidateIdx + 1)}
                         </span>
                         <Badge
                           className={confidenceBadgeClass(candidate.confidence)}
@@ -225,19 +228,19 @@ export function ObjectPredictionPanel({
                       </div>
                       {currentSession.selectedIndex === candidateIdx && (
                         <span className="text-primary text-xs font-medium">
-                          선택됨
+                          {t.predict.selected}
                         </span>
                       )}
                     </div>
                     <div className="mt-2 space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground text-xs w-14">부위코드</span>
+                        <span className="text-muted-foreground text-xs w-14">{t.object.partCode}</span>
                         <span className="text-sm font-semibold">
                           {candidate.predicted_code || '-'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground text-xs w-14">PPS 코드</span>
+                        <span className="text-muted-foreground text-xs w-14">{t.object.ppsCode}</span>
                         <span className="text-sm font-semibold">
                           {candidate.predicted_pps_code || '-'}
                         </span>
@@ -264,21 +267,21 @@ export function ObjectPredictionPanel({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-muted-foreground text-xs font-medium">
-                        사용자 입력
+                        {t.input.userInput}
                       </span>
                       <Badge className="bg-gray-100 text-gray-800">
-                        직접 입력
+                        {t.input.manualInput}
                       </Badge>
                     </div>
                     {currentSession.selectedIndex === currentSession.candidates.length && (
                       <span className="text-primary text-xs font-medium">
-                        선택됨
+                        {t.predict.selected}
                       </span>
                     )}
                   </div>
                   <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-xs w-14 shrink-0">부위코드</span>
+                      <span className="text-muted-foreground text-xs w-14 shrink-0">{t.object.partCode}</span>
                       <Input
                         value={currentSession.userCandidate?.predicted_code ?? ''}
                         onChange={(e) => {
@@ -287,12 +290,12 @@ export function ObjectPredictionPanel({
                             buildUserCandidate(currentSession.userCandidate, { predicted_code: e.target.value }),
                           );
                         }}
-                        placeholder="부위코드 입력"
+                        placeholder={t.input.partCodePlaceholder}
                         className="h-7 text-sm"
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-xs w-14 shrink-0">PPS 코드</span>
+                      <span className="text-muted-foreground text-xs w-14 shrink-0">{t.object.ppsCode}</span>
                       <Input
                         value={currentSession.userCandidate?.predicted_pps_code ?? ''}
                         onChange={(e) => {
@@ -301,12 +304,12 @@ export function ObjectPredictionPanel({
                             buildUserCandidate(currentSession.userCandidate, { predicted_pps_code: e.target.value }),
                           );
                         }}
-                        placeholder="PPS 코드 입력"
+                        placeholder={t.input.ppsCodePlaceholder}
                         className="h-7 text-sm"
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-xs w-14 shrink-0">설명</span>
+                      <span className="text-muted-foreground text-xs w-14 shrink-0">{t.input.description}</span>
                       <Input
                         value={currentSession.userCandidate?.reasoning ?? ''}
                         onChange={(e) => {
@@ -315,7 +318,7 @@ export function ObjectPredictionPanel({
                             buildUserCandidate(currentSession.userCandidate, { reasoning: e.target.value }),
                           );
                         }}
-                        placeholder="설명 입력"
+                        placeholder={t.input.descriptionPlaceholder}
                         className="h-7 text-sm"
                       />
                     </div>
@@ -330,7 +333,7 @@ export function ObjectPredictionPanel({
               {isPredicting && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              다시 예측하기
+              {t.predict.rePredict}
             </Button>
           </div>
         </div>
