@@ -1,6 +1,9 @@
+export interface ServiceStatus {
+  status: 'ok' | 'error';
+  detail: string | null;
+}
+
 export interface HealthStatus {
-  status: 'healthy' | 'degraded';
-  version: string;
-  ollama_connected: boolean;
-  milvus_connected: boolean;
+  status: 'ok' | 'degraded';
+  services: Record<string, ServiceStatus>;
 }

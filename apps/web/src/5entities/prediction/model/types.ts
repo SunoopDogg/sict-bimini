@@ -1,30 +1,45 @@
-import type { BIMObjectInput } from '@/5entities/bim-object';
+import type { BIMObject } from '@/5entities/bim-object';
 
-export interface PredictionResult {
-  predicted_code: string | null;
-  predicted_pps_code: string | null;
-  reasoning: string;
-  confidence: number;
-  predicted_at: string;
+export type PredictionMode = 'strong' | 'weak';
+
+export interface PredictionCandidate {
+  code: string;
+  llm_confidence: number;          // 0–1
+  retrieval_score: number | null;
+  source: 'neighbor' | 'generated';
+  reasoning: string | null;
 }
 
-export interface PredictionCandidates {
-  predictions: PredictionResult[];
+export interface PredictionResponse {
+  target: 'kbims_code' | 'pps_code';
+  mode: PredictionMode;
+  candidates: PredictionCandidate[];
+  low_confidence_context: boolean;
+  pool_size: number;
+  retrieved_k: number;
+}
+
+export interface CombinedPredictionResponse {
+  kbims: PredictionResponse;
+  pps: PredictionResponse;
 }
 
 export interface PredictionSession {
-  candidates: PredictionResult[];
-  userCandidate?: PredictionResult;
-  selectedIndex: number;
-  predicted_at: string;
+  prediction: CombinedPredictionResponse;
+  selectedIndex: number;    // index into kbims/pps candidate pairs; equals pairCount when user card selected
+  userCandidate?: { kbims_code: string; pps_code: string; reasoning?: string };
+  predicted_at: string;     // client-stamped ISO string
 }
 
 export interface UserSelection {
   objectIndex: number;
-  objectName: string;
+  objectName?: string;
   sessionIndex: number;
-  candidate: PredictionResult;
-  object: BIMObjectInput;
+  kbims_code: string;
+  pps_code: string;
+  kbims_confidence: number;
+  pps_confidence: number;
+  object: BIMObject;
   selectedAt: string;
 }
 
@@ -41,9 +56,9 @@ export interface SelectionFileData {
   modifiedAt: string;
 }
 
-interface BatchItemResult {
-  input: BIMObjectInput;
-  prediction: PredictionCandidates | null;
+export interface BatchItemResult {
+  input: BIMObject;
+  prediction: CombinedPredictionResponse | null;
   error: string | null;
 }
 

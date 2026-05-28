@@ -1,1 +1,1 @@
-export type { HealthStatus } from './model/types';
+export type { HealthStatus, ServiceStatus } from './model/types';
