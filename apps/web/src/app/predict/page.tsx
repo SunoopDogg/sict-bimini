@@ -23,6 +23,7 @@ import type { BIMObjectInput } from '@/5entities/bim-object';
 import type { PredictionSession } from '@/5entities/prediction';
 import type { XlsxFileInfo } from '@/5entities/xlsx-file';
 import { batchPredictCode, predictSingleCode } from '@/6shared/api';
+import { useLocale } from '@/6shared/i18n';
 import { LocaleToggle } from '@/6shared/ui/LocaleToggle';
 import { ThemeToggle } from '@/6shared/ui/ThemeToggle';
 import { Alert, AlertDescription } from '@/6shared/ui/primitive/alert';
@@ -49,6 +50,7 @@ export default function PredictPage() {
   const [isLoadingObjects, setIsLoadingObjects] = useState(false);
   const [error, setError] = useState<string>();
   const [isPredicting, startPrediction] = useTransition();
+  const { t } = useLocale();
   const [predictingIndex, setPredictingIndex] = useState<number | null>(null);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
     new Set(),
@@ -92,7 +94,7 @@ export default function PredictPage() {
     if (response.success && response.data) {
       setFiles(response.data);
     } else {
-      setError(response.error || '파일 목록을 불러올 수 없습니다.');
+      setError(response.error || t.errors.loadFilesFailed);
     }
   };
 
@@ -114,7 +116,7 @@ export default function PredictPage() {
       setTimeout(() => setUploadStatus('idle'), 2000);
     } else {
       setUploadStatus('idle');
-      setError(response.error || '파일 업로드에 실패했습니다.');
+      setError(response.error || t.errors.uploadFailed);
     }
   };
 
@@ -150,7 +152,7 @@ export default function PredictPage() {
         appendSessions(entries);
         setSelectedIndices(new Set());
       } else {
-        setError(response.error || '예측에 실패했습니다.');
+        setError(response.error || t.predict.failed);
       }
     });
   };
@@ -164,7 +166,7 @@ export default function PredictPage() {
       if (response.success && response.data) {
         appendSessions([{ index, session: toSession(response.data) }]);
       } else {
-        setError(response.error || '예측에 실패했습니다.');
+        setError(response.error || t.predict.failed);
       }
       setPredictingIndex(null);
     });
@@ -198,7 +200,7 @@ export default function PredictPage() {
         setObjects(response.data);
       } else {
         setObjects([]);
-        setError(response.error || '객체 데이터를 불러올 수 없습니다.');
+        setError(response.error || t.errors.loadObjectsFailed);
       }
 
       let loadedMap: Record<string, PredictionSession[]> = {};
@@ -250,7 +252,7 @@ export default function PredictPage() {
         setSelectionsFromData([]);
         setObjects([]);
         setPredictionMap({});
-        setError(response.error || '사용자 선택을 불러올 수 없습니다.');
+        setError(response.error || t.errors.loadSelectionsFailed);
       }
 
       setIsLoadingObjects(false);
@@ -265,7 +267,7 @@ export default function PredictPage() {
         <div className="absolute left-0">
           <BimAttributeTableModal />
         </div>
-        <h1 className="text-3xl font-bold">KBIMS 코드 예측</h1>
+        <h1 className="text-3xl font-bold">{t.pageTitle}</h1>
         <div className="absolute right-0 flex items-center gap-2">
           <ServerStatusBadge />
           <LocaleToggle />

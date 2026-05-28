@@ -3,6 +3,7 @@
 import { Check, FileText } from 'lucide-react';
 
 import type { SelectionFileInfo } from '@/5entities/prediction';
+import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 import { formatDateTime } from '@/6shared/lib/format';
 import {
@@ -23,15 +24,17 @@ export function UserSelectionPanel({
   selectedFile,
   onSelect,
 }: UserSelectionPanelProps) {
+  const { t } = useLocale();
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">사용자 선택</CardTitle>
+        <CardTitle className="text-sm">{t.userSel.title}</CardTitle>
       </CardHeader>
       <CardContent>
         {files.length === 0 ? (
           <p className="text-muted-foreground text-center text-xs py-4">
-            사용자 선택 파일이 없습니다.
+            {t.userSel.noFiles}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -51,7 +54,7 @@ export function UserSelectionPanel({
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-sm">{file.name}</p>
                     <p className="text-muted-foreground text-xs">
-                      {file.itemCount}개 항목 · {formatDateTime(file.modifiedAt)}
+                      {t.userSel.items(file.itemCount)} · {formatDateTime(file.modifiedAt)}
                     </p>
                   </div>
                   {selectedFile === file.name && (
