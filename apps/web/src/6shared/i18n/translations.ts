@@ -103,6 +103,11 @@ const ko = {
     loadObjectsFailed: '객체 데이터를 불러올 수 없습니다.',
     loadSelectionsFailed: '사용자 선택을 불러올 수 없습니다.',
   },
+
+  settings: {
+    language: '언어',
+    theme: '테마',
+  },
 };
 
 const en: typeof ko = {
@@ -207,6 +212,11 @@ const en: typeof ko = {
     uploadFailed: 'File upload failed.',
     loadObjectsFailed: 'Failed to load object data.',
     loadSelectionsFailed: 'Failed to load user selections.',
+  },
+
+  settings: {
+    language: 'Language',
+    theme: 'Theme',
   },
 };
 
