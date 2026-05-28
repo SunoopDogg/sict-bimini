@@ -1,13 +1,12 @@
 import type { BIMAttributeListResponse } from '@/5entities/bim-attribute';
-import type { BIMObjectInput } from '@/5entities/bim-object';
+import type { BIMObject } from '@/5entities/bim-object';
 import type { HealthStatus } from '@/5entities/health';
-import type { BatchPredictResult, PredictionCandidates } from '@/5entities/prediction';
+import type { BatchPredictResult, CombinedPredictionResponse } from '@/5entities/prediction';
 import type { XLSXConversionResult } from '@/5entities/xlsx-file';
 
 import type { APIResponse } from './types';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-const API_VERSION = '/api/v1';
 
 async function apiRequest<T>(
   url: string,
@@ -18,14 +17,18 @@ async function apiRequest<T>(
     const response = await fetch(url, options);
 
     if (!response.ok) {
-      return {
-        success: false,
-        data: null,
-        error: `${errorContext}: ${response.statusText}`,
-      };
+      let detail = response.statusText;
+      try {
+        const err = await response.json();
+        detail = (err as { detail?: string }).detail ?? detail;
+      } catch {
+        // ignore parse error on error body
+      }
+      return { success: false, data: null, error: `${errorContext}: ${detail}` };
     }
 
-    return response.json();
+    const data = await response.json() as T;
+    return { success: true, data, error: null };
   } catch (error) {
     return {
       success: false,
@@ -36,11 +39,7 @@ async function apiRequest<T>(
 }
 
 export async function checkHealth(): Promise<APIResponse<HealthStatus>> {
-  return apiRequest(
-    `${BACKEND_URL}${API_VERSION}/health`,
-    { method: 'GET' },
-    '서버 상태 확인 실패',
-  );
+  return apiRequest(`${BACKEND_URL}/health`, { method: 'GET' }, '서버 상태 확인 실패');
 }
 
 export async function convertXlsxToJson(
@@ -48,41 +47,42 @@ export async function convertXlsxToJson(
 ): Promise<APIResponse<XLSXConversionResult>> {
   const formData = new FormData();
   formData.append('file', file);
-
   return apiRequest(
-    `${BACKEND_URL}${API_VERSION}/convert/xlsx-to-json`,
+    `${BACKEND_URL}/convert/xlsx-to-json`,
     { method: 'POST', body: formData },
     'XLSX 변환 실패',
   );
 }
 
-export async function batchPredictCode(
-  inputs: BIMObjectInput[],
-  topK = 3,
-): Promise<APIResponse<BatchPredictResult>> {
+export async function predictSingleCode(
+  input: BIMObject,
+  n = 5,
+): Promise<APIResponse<CombinedPredictionResponse>> {
+  const { name: _name, ...attribute } = input;
   return apiRequest(
-    `${BACKEND_URL}${API_VERSION}/batch-predict`,
+    `${BACKEND_URL}/predict`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ objects: inputs, top_k: topK }),
+      body: JSON.stringify({ attribute, n }),
     },
-    '배치 예측 실패',
+    '예측 실패',
   );
 }
 
-export async function predictSingleCode(
-  input: BIMObjectInput,
-  topK = 3,
-): Promise<APIResponse<PredictionCandidates>> {
+export async function batchPredictCode(
+  inputs: BIMObject[],
+  n = 5,
+): Promise<APIResponse<BatchPredictResult>> {
+  const objects = inputs.map(({ name: _name, ...attr }) => attr);
   return apiRequest(
-    `${BACKEND_URL}${API_VERSION}/predict?top_k=${topK}`,
+    `${BACKEND_URL}/batch-predict`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify({ objects, n }),
     },
-    '예측 실패',
+    '배치 예측 실패',
   );
 }
 
@@ -91,7 +91,7 @@ export async function fetchBimAttributes(
   pageSize = 20,
 ): Promise<APIResponse<BIMAttributeListResponse>> {
   return apiRequest(
-    `${BACKEND_URL}${API_VERSION}/bim-attributes?page=${page}&page_size=${pageSize}`,
+    `${BACKEND_URL}/bim-attributes?page=${page}&page_size=${pageSize}`,
     { method: 'GET' },
     'BIM 속성 목록 조회 실패',
   );
