@@ -6,7 +6,6 @@ import { usePredictionSessions } from '@/2pages/predict/hooks/usePredictionSessi
 import { useUserSelections } from '@/2pages/predict/hooks/useUserSelections';
 import { ObjectPredictionPanel } from '@/3widgets/object-prediction-panel';
 import { UserSelectionPanel } from '@/3widgets/user-selection-panel';
-import { BimAttributeTableModal } from '@/4features/bim-attribute-viewer';
 import { ServerStatusBadge } from '@/4features/server-status';
 import {
   FileListSelect,
@@ -24,8 +23,7 @@ import type { PredictionSession } from '@/5entities/prediction';
 import type { XlsxFileInfo } from '@/5entities/xlsx-file';
 import { batchPredictCode, predictSingleCode } from '@/6shared/api';
 import { useLocale } from '@/6shared/i18n';
-import { LocaleToggle } from '@/6shared/ui/LocaleToggle';
-import { ThemeToggle } from '@/6shared/ui/ThemeToggle';
+import { SettingsDropdown } from '@/6shared/ui/SettingsDropdown';
 import { Alert, AlertDescription } from '@/6shared/ui/primitive/alert';
 import {
   Card,
@@ -265,13 +263,11 @@ export default function PredictPage() {
     <main className="container mx-auto px-4 py-8">
       <div className="relative mb-8 flex items-center justify-center">
         <div className="absolute left-0">
-          <BimAttributeTableModal />
+          <ServerStatusBadge />
         </div>
         <h1 className="text-3xl font-bold">{t.pageTitle}</h1>
-        <div className="absolute right-0 flex items-center gap-2">
-          <ServerStatusBadge />
-          <LocaleToggle />
-          <ThemeToggle />
+        <div className="absolute right-0">
+          <SettingsDropdown />
         </div>
       </div>
 
