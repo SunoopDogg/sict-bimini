@@ -12,6 +12,7 @@ interface LocaleContextValue {
 
 export const LocaleContext = createContext<LocaleContextValue>({
   locale: 'ko',
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
   setLocale: () => {},
   t: translations.ko,
 });
