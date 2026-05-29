@@ -11,8 +11,8 @@ import {
 
 import { useState } from 'react';
 
-import type { BIMObjectInput } from '@/5entities/bim-object';
-import type { PredictionResult, PredictionSession } from '@/5entities/prediction';
+import type { BIMObject } from '@/5entities/bim-object';
+import type { PredictionSession } from '@/5entities/prediction';
 import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 import { Button } from '@/6shared/ui/primitive/button';
@@ -41,14 +41,14 @@ import {
 
 interface ObjectListPanelProps {
   selectedFile?: string;
-  objects: BIMObjectInput[];
+  objects: BIMObject[];
   isLoading?: boolean;
   isPredicting?: boolean;
   predictingIndex?: number | null;
   selectedIndices: Set<number>;
   onSelectionChange: (indices: Set<number>) => void;
   onPredict: () => void;
-  onRowClick: (obj: BIMObjectInput, index: number) => void;
+  onRowClick: (obj: BIMObject, index: number) => void;
   predictionMap: Record<string, PredictionSession[]>;
   focusedIndex: number | null;
 }
@@ -59,18 +59,17 @@ function PredictionMatchIcon({
   predictionMap,
   index,
   actualCode,
-  getPredictedCode,
+  target,
 }: {
   predictionMap: Record<string, PredictionSession[]>;
   index: number;
   actualCode: string;
-  getPredictedCode: (prediction: PredictionResult) => string | null;
+  target: 'kbims' | 'pps';
 }) {
   const sessions = predictionMap[index];
   const latestSession = sessions?.[sessions.length - 1];
-  const prediction = latestSession?.candidates?.[latestSession.selectedIndex];
 
-  if (!prediction) {
+  if (!latestSession) {
     return (
       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900">
         <Minus className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
@@ -78,7 +77,33 @@ function PredictionMatchIcon({
     );
   }
 
-  if (getPredictedCode(prediction) === actualCode) {
+  const pairCount = Math.min(
+    latestSession.prediction.kbims.candidates.length,
+    latestSession.prediction.pps.candidates.length,
+  );
+  const isUserCard = latestSession.selectedIndex === pairCount;
+
+  let predictedCode: string | null = null;
+  if (isUserCard && latestSession.userCandidate) {
+    predictedCode = target === 'kbims'
+      ? latestSession.userCandidate.kbims_code
+      : latestSession.userCandidate.pps_code;
+  } else if (latestSession.selectedIndex < pairCount) {
+    const cand = target === 'kbims'
+      ? latestSession.prediction.kbims.candidates[latestSession.selectedIndex]
+      : latestSession.prediction.pps.candidates[latestSession.selectedIndex];
+    predictedCode = cand?.code ?? null;
+  }
+
+  if (!predictedCode) {
+    return (
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900">
+        <Minus className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
+      </span>
+    );
+  }
+
+  if (predictedCode === actualCode) {
     return (
       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
         <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
@@ -239,7 +264,7 @@ export function ObjectListPanel({
                           predictionMap={predictionMap}
                           index={globalIndex}
                           actualCode={obj.kbims_code}
-                          getPredictedCode={(p) => p.predicted_code}
+                          target="kbims"
                         />
                       </div>
                     </TableCell>
@@ -250,7 +275,7 @@ export function ObjectListPanel({
                           predictionMap={predictionMap}
                           index={globalIndex}
                           actualCode={obj.pps_code}
-                          getPredictedCode={(p) => p.predicted_pps_code}
+                          target="pps"
                         />
                       </div>
                     </TableCell>
