@@ -18,8 +18,8 @@ import {
   loadUserSelectionsAction,
 } from '@/4features/manage-file';
 import { loadPredictionsAction } from '@/4features/predict-code';
-import type { BIMObjectInput } from '@/5entities/bim-object';
-import type { PredictionSession } from '@/5entities/prediction';
+import type { BIMObject } from '@/5entities/bim-object';
+import type { CombinedPredictionResponse, PredictionSession } from '@/5entities/prediction';
 import type { XlsxFileInfo } from '@/5entities/xlsx-file';
 import { batchPredictCode, predictSingleCode } from '@/6shared/api';
 import { useLocale } from '@/6shared/i18n';
@@ -40,7 +40,7 @@ type DataSource =
 export default function PredictPage() {
   const [files, setFiles] = useState<XlsxFileInfo[]>([]);
   const [activeSource, setDataSource] = useState<DataSource>(null);
-  const [objects, setObjects] = useState<BIMObjectInput[]>([]);
+  const [objects, setObjects] = useState<BIMObject[]>([]);
   const [selectedObjectIndex, setSelectedObjectIndex] = useState<number | null>(
     null,
   );
@@ -190,7 +190,7 @@ export default function PredictPage() {
       setSelectedIndices(new Set());
       setIsLoadingObjects(true);
 
-      let loadedObjects: BIMObjectInput[] = [];
+      let loadedObjects: BIMObject[] = [];
       const response = await readJsonFileAction(fileName);
 
       if (response.success && response.data) {
@@ -234,13 +234,17 @@ export default function PredictPage() {
         const selObjects = response.data.map((sel) => sel.object);
         setObjects(selObjects);
         const map: Record<string, PredictionSession[]> = {};
+        const emptyCombined: CombinedPredictionResponse = {
+          kbims: { target: 'kbims_code', mode: 'strong', candidates: [], low_confidence_context: false, pool_size: 0, retrieved_k: 0 },
+          pps: { target: 'pps_code', mode: 'strong', candidates: [], low_confidence_context: false, pool_size: 0, retrieved_k: 0 },
+        };
         for (let i = 0; i < response.data.length; i++) {
           const sel = response.data[i];
           map[i] = [
             {
-              candidates: [],
-              userCandidate: sel.candidate,
-              selectedIndex: 0,
+              prediction: emptyCombined,
+              userCandidate: { kbims_code: sel.kbims_code, pps_code: sel.pps_code },
+              selectedIndex: 0,  // pairCount=0 so selectedIndex=0 means user card
               predicted_at: sel.selectedAt,
             },
           ];
@@ -318,7 +322,7 @@ export default function PredictPage() {
             predictionMap={predictionMap}
             focusedIndex={selectedObjectIndex}
             onPredict={handleBatchPredict}
-            onRowClick={(_obj: BIMObjectInput, index: number) => {
+            onRowClick={(_obj: BIMObject, index: number) => {
               setSelectedObjectIndex(index);
             }}
           />
