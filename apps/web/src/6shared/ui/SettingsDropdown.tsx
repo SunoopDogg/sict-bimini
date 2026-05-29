@@ -1,8 +1,9 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import { Moon, Settings, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
 
 import { useLocale } from '@/6shared/i18n';
 import { Button } from '@/6shared/ui/primitive/button';
@@ -13,12 +14,33 @@ import {
   DropdownMenuTrigger,
 } from '@/6shared/ui/primitive/dropdown-menu';
 
+function SettingItem({
+  label,
+  onSelect,
+  indicator,
+}: {
+  label: string;
+  onSelect: () => void;
+  indicator: ReactNode;
+}) {
+  return (
+    <DropdownMenuItem
+      onSelect={(e) => {
+        e.preventDefault();
+        onSelect();
+      }}
+      className="flex justify-between gap-4"
+    >
+      <span>{label}</span>
+      {indicator}
+    </DropdownMenuItem>
+  );
+}
+
 export function SettingsDropdown() {
   const { locale, setLocale, t } = useLocale();
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const ThemeIcon = resolvedTheme === 'dark' ? Moon : Sun;
 
   return (
     <DropdownMenu>
@@ -28,33 +50,20 @@ export function SettingsDropdown() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onSelect={(e) => {
-            e.preventDefault();
-            setLocale(locale === 'ko' ? 'en' : 'ko');
-          }}
-          className="flex justify-between gap-4"
-        >
-          <span>{t.settings.language}</span>
-          <span className="text-muted-foreground font-mono text-xs">
-            {locale === 'ko' ? 'KO' : 'EN'}
-          </span>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={(e) => {
-            e.preventDefault();
-            if (mounted) setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
-          }}
-          className="flex justify-between gap-4"
-        >
-          <span>{t.settings.theme}</span>
-          {mounted &&
-            (resolvedTheme === 'dark' ? (
-              <Moon className="h-3.5 w-3.5" />
-            ) : (
-              <Sun className="h-3.5 w-3.5" />
-            ))}
-        </DropdownMenuItem>
+        <SettingItem
+          label={t.settings.language}
+          onSelect={() => setLocale(locale === 'ko' ? 'en' : 'ko')}
+          indicator={
+            <span className="text-muted-foreground font-mono text-xs">
+              {locale === 'ko' ? 'KO' : 'EN'}
+            </span>
+          }
+        />
+        <SettingItem
+          label={t.settings.theme}
+          onSelect={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          indicator={<ThemeIcon className="h-3.5 w-3.5" />}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );
