@@ -3,18 +3,13 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
-import type { BIMObjectInput } from '@/5entities/bim-object';
-import type { PredictionResult, PredictionSession } from '@/5entities/prediction';
+import type { BIMObject } from '@/5entities/bim-object';
+import type { PredictionSession } from '@/5entities/prediction';
 import { useLocale } from '@/6shared/i18n';
 import { Badge } from '@/6shared/ui/primitive/badge';
 import { Button } from '@/6shared/ui/primitive/button';
 import { Input } from '@/6shared/ui/primitive/input';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/6shared/ui/primitive/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/6shared/ui/primitive/card';
 import {
   Pagination,
   PaginationContent,
@@ -24,26 +19,15 @@ import {
 import { cn } from '@/6shared/lib/cn';
 
 interface ObjectPredictionPanelProps {
-  object: BIMObjectInput | null;
+  object: BIMObject | null;
   sessions: PredictionSession[];
   isPredicting: boolean;
   onPredict: () => void;
   onSelectCandidate: (sessionIndex: number, candidateIndex: number) => void;
-  onUserCandidateChange: (sessionIndex: number, candidate: PredictionResult) => void;
-}
-
-function buildUserCandidate(
-  existing: PredictionResult | undefined,
-  override: Partial<PredictionResult>,
-): PredictionResult {
-  return {
-    predicted_code: existing?.predicted_code ?? null,
-    predicted_pps_code: existing?.predicted_pps_code ?? null,
-    reasoning: existing?.reasoning ?? '',
-    confidence: 0,
-    predicted_at: existing?.predicted_at ?? new Date().toISOString(),
-    ...override,
-  };
+  onUserCandidateChange: (
+    sessionIndex: number,
+    candidate: { kbims_code: string; pps_code: string; reasoning?: string },
+  ) => void;
 }
 
 function confidenceBadgeClass(confidence: number): string {
@@ -54,7 +38,7 @@ function confidenceBadgeClass(confidence: number): string {
   return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
 }
 
-function ObjectInfo({ object }: { object: BIMObjectInput }) {
+function ObjectInfo({ object }: { object: BIMObject }) {
   const { t } = useLocale();
   return (
     <div className="space-y-2 rounded-lg border p-4">
@@ -63,7 +47,7 @@ function ObjectInfo({ object }: { object: BIMObjectInput }) {
         <dt className="text-muted-foreground">{t.object.name}</dt>
         <dd>{object.name || '-'}</dd>
         <dt className="text-muted-foreground">{t.object.type}</dt>
-        <dd>{object.object_type || '-'}</dd>
+        <dd>{object.ifc_type || '-'}</dd>
         <dt className="text-muted-foreground">{t.object.category}</dt>
         <dd>{object.category || '-'}</dd>
         <dt className="text-muted-foreground">{t.object.family}</dt>
@@ -94,39 +78,29 @@ export function ObjectPredictionPanel({
     setSessionPage(0);
   }
 
-  // State 1: No object selected
   if (object === null) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>{t.predict.results}</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>{t.predict.results}</CardTitle></CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-12">
-            <p className="text-muted-foreground text-center">
-              {t.predict.selectObjectPrompt}
-            </p>
+            <p className="text-muted-foreground text-center">{t.predict.selectObjectPrompt}</p>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  // State 2: Object selected, no predictions yet
   if (sessions.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>{t.predict.results}</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>{t.predict.results}</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-4">
             <ObjectInfo object={object} />
             <div className="flex justify-center">
               <Button onClick={onPredict} disabled={isPredicting}>
-                {isPredicting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
+                {isPredicting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {t.predict.predict}
               </Button>
             </div>
@@ -136,16 +110,20 @@ export function ObjectPredictionPanel({
     );
   }
 
-  // State 3: Object selected with prediction results
   const reversedSessions = [...sessions].reverse();
   const currentSession = reversedSessions[sessionPage];
   const currentSessionOriginalIndex = sessions.length - 1 - sessionPage;
 
+  const { kbims, pps } = currentSession.prediction;
+  const pairCount = Math.min(kbims.candidates.length, pps.candidates.length);
+  const pairs = Array.from({ length: pairCount }, (_, i) => ({
+    kbims: kbims.candidates[i],
+    pps: pps.candidates[i],
+  }));
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{t.predict.results}</CardTitle>
-      </CardHeader>
+      <CardHeader><CardTitle>{t.predict.results}</CardTitle></CardHeader>
       <CardContent>
         <div className="space-y-4">
           <ObjectInfo object={object} />
@@ -202,94 +180,86 @@ export function ObjectPredictionPanel({
                   {new Date(currentSession.predicted_at).toLocaleString('ko-KR')}
                 </span>
               </div>
+
               <div className="space-y-2">
-                {currentSession.candidates.map((candidate, candidateIdx) => (
+                {pairs.map((pair, pairIdx) => (
                   <button
-                    key={candidateIdx}
+                    key={pairIdx}
                     type="button"
-                    onClick={() => onSelectCandidate(currentSessionOriginalIndex, candidateIdx)}
+                    onClick={() => onSelectCandidate(currentSessionOriginalIndex, pairIdx)}
                     className={cn(
                       'w-full rounded-lg border p-3 text-left transition-colors',
-                      currentSession.selectedIndex === candidateIdx
+                      currentSession.selectedIndex === pairIdx
                         ? 'border-primary bg-primary/5'
                         : 'hover:bg-muted/50',
                     )}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <span className="text-muted-foreground text-xs font-medium">
-                          {t.predict.rank(candidateIdx + 1)}
+                          {t.predict.rank(pairIdx + 1)}
                         </span>
-                        <Badge
-                          className={confidenceBadgeClass(candidate.confidence)}
-                        >
-                          {(candidate.confidence * 100).toFixed(0)}%
+                        <Badge className={confidenceBadgeClass(pair.kbims.llm_confidence)}>
+                          KBIMS {(pair.kbims.llm_confidence * 100).toFixed(0)}%
+                        </Badge>
+                        <Badge className={confidenceBadgeClass(pair.pps.llm_confidence)}>
+                          PPS {(pair.pps.llm_confidence * 100).toFixed(0)}%
                         </Badge>
                       </div>
-                      {currentSession.selectedIndex === candidateIdx && (
-                        <span className="text-primary text-xs font-medium">
-                          {t.predict.selected}
-                        </span>
+                      {currentSession.selectedIndex === pairIdx && (
+                        <span className="text-primary text-xs font-medium">{t.predict.selected}</span>
                       )}
                     </div>
                     <div className="mt-2 space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground text-xs w-14">{t.object.partCode}</span>
-                        <span className="text-sm font-semibold">
-                          {candidate.predicted_code || '-'}
-                        </span>
+                        <span className="text-sm font-semibold">{pair.kbims.code || '-'}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground text-xs w-14">{t.object.ppsCode}</span>
-                        <span className="text-sm font-semibold">
-                          {candidate.predicted_pps_code || '-'}
-                        </span>
+                        <span className="text-sm font-semibold">{pair.pps.code || '-'}</span>
                       </div>
                     </div>
-                    {candidate.reasoning && (
+                    {(pair.kbims.reasoning || pair.pps.reasoning) && (
                       <p className="text-muted-foreground mt-2 text-xs line-clamp-2">
-                        {candidate.reasoning}
+                        {pair.kbims.reasoning ?? pair.pps.reasoning}
                       </p>
                     )}
                   </button>
                 ))}
+
                 {/* User input card */}
                 <button
                   type="button"
-                  onClick={() => onSelectCandidate(currentSessionOriginalIndex, currentSession.candidates.length)}
+                  onClick={() => onSelectCandidate(currentSessionOriginalIndex, pairCount)}
                   className={cn(
                     'w-full rounded-lg border p-3 text-left transition-colors',
-                    currentSession.selectedIndex === currentSession.candidates.length
+                    currentSession.selectedIndex === pairCount
                       ? 'border-primary bg-primary/5'
                       : 'hover:bg-muted/50',
                   )}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="text-muted-foreground text-xs font-medium">
-                        {t.input.userInput}
-                      </span>
-                      <Badge className="bg-gray-100 text-gray-800">
-                        {t.input.manualInput}
-                      </Badge>
+                      <span className="text-muted-foreground text-xs font-medium">{t.input.userInput}</span>
+                      <Badge className="bg-gray-100 text-gray-800">{t.input.manualInput}</Badge>
                     </div>
-                    {currentSession.selectedIndex === currentSession.candidates.length && (
-                      <span className="text-primary text-xs font-medium">
-                        {t.predict.selected}
-                      </span>
+                    {currentSession.selectedIndex === pairCount && (
+                      <span className="text-primary text-xs font-medium">{t.predict.selected}</span>
                     )}
                   </div>
                   <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground text-xs w-14 shrink-0">{t.object.partCode}</span>
                       <Input
-                        value={currentSession.userCandidate?.predicted_code ?? ''}
-                        onChange={(e) => {
-                          onUserCandidateChange(
-                            currentSessionOriginalIndex,
-                            buildUserCandidate(currentSession.userCandidate, { predicted_code: e.target.value }),
-                          );
-                        }}
+                        value={currentSession.userCandidate?.kbims_code ?? ''}
+                        onChange={(e) =>
+                          onUserCandidateChange(currentSessionOriginalIndex, {
+                            kbims_code: e.target.value,
+                            pps_code: currentSession.userCandidate?.pps_code ?? '',
+                            reasoning: currentSession.userCandidate?.reasoning,
+                          })
+                        }
                         placeholder={t.input.partCodePlaceholder}
                         className="h-7 text-sm"
                       />
@@ -297,13 +267,14 @@ export function ObjectPredictionPanel({
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground text-xs w-14 shrink-0">{t.object.ppsCode}</span>
                       <Input
-                        value={currentSession.userCandidate?.predicted_pps_code ?? ''}
-                        onChange={(e) => {
-                          onUserCandidateChange(
-                            currentSessionOriginalIndex,
-                            buildUserCandidate(currentSession.userCandidate, { predicted_pps_code: e.target.value }),
-                          );
-                        }}
+                        value={currentSession.userCandidate?.pps_code ?? ''}
+                        onChange={(e) =>
+                          onUserCandidateChange(currentSessionOriginalIndex, {
+                            kbims_code: currentSession.userCandidate?.kbims_code ?? '',
+                            pps_code: e.target.value,
+                            reasoning: currentSession.userCandidate?.reasoning,
+                          })
+                        }
                         placeholder={t.input.ppsCodePlaceholder}
                         className="h-7 text-sm"
                       />
@@ -312,12 +283,13 @@ export function ObjectPredictionPanel({
                       <span className="text-muted-foreground text-xs w-14 shrink-0">{t.input.description}</span>
                       <Input
                         value={currentSession.userCandidate?.reasoning ?? ''}
-                        onChange={(e) => {
-                          onUserCandidateChange(
-                            currentSessionOriginalIndex,
-                            buildUserCandidate(currentSession.userCandidate, { reasoning: e.target.value }),
-                          );
-                        }}
+                        onChange={(e) =>
+                          onUserCandidateChange(currentSessionOriginalIndex, {
+                            kbims_code: currentSession.userCandidate?.kbims_code ?? '',
+                            pps_code: currentSession.userCandidate?.pps_code ?? '',
+                            reasoning: e.target.value,
+                          })
+                        }
                         placeholder={t.input.descriptionPlaceholder}
                         className="h-7 text-sm"
                       />
@@ -330,9 +302,7 @@ export function ObjectPredictionPanel({
 
           <div className="flex justify-center">
             <Button onClick={onPredict} disabled={isPredicting}>
-              {isPredicting && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
+              {isPredicting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t.predict.rePredict}
             </Button>
           </div>
