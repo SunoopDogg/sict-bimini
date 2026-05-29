@@ -114,11 +114,12 @@ export function ObjectPredictionPanel({
   const currentSession = reversedSessions[sessionPage];
   const currentSessionOriginalIndex = sessions.length - 1 - sessionPage;
 
-  const { kbims, pps } = currentSession.prediction;
-  const pairCount = Math.min(kbims.candidates.length, pps.candidates.length);
+  const kbims = currentSession.prediction?.kbims;
+  const pps = currentSession.prediction?.pps;
+  const pairCount = kbims && pps ? Math.min(kbims.candidates.length, pps.candidates.length) : 0;
   const pairs = Array.from({ length: pairCount }, (_, i) => ({
-    kbims: kbims.candidates[i],
-    pps: pps.candidates[i],
+    kbims: kbims!.candidates[i],
+    pps: pps!.candidates[i],
   }));
 
   return (
