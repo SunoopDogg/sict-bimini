@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { basename } from 'path';
 
-import type { BIMObjectInput } from '@/5entities/bim-object';
+import type { BIMObject } from '@/5entities/bim-object';
 import {
   JSON_DIR,
   deriveJsonPath,
@@ -36,11 +36,11 @@ interface RawBIMJsonEntry {
   기타?: RawBIMJsonProperties;
 }
 
-function mapRawToBIMObject(obj: RawBIMJsonEntry): BIMObjectInput {
+function mapRawToBIMObject(obj: RawBIMJsonEntry): BIMObject {
   const properties = obj.Other ?? obj.기타;
   return {
     name: obj.Name ?? '',
-    object_type: obj.IFCType ?? '',
+    ifc_type: obj.IFCType ?? '',
     category: properties?.Category ?? properties?.카테고리 ?? '',
     family_name: properties?.['Family Name'] ?? properties?.['패밀리 이름'] ?? '',
     family: properties?.Family ?? properties?.패밀리 ?? '',
@@ -51,9 +51,7 @@ function mapRawToBIMObject(obj: RawBIMJsonEntry): BIMObjectInput {
   };
 }
 
-export async function readJsonFileAction(
-  xlsxFileName: string,
-): Promise<JsonReadResult> {
+export async function readJsonFileAction(xlsxFileName: string): Promise<JsonReadResult> {
   try {
     if (!isValidXlsxFileName(xlsxFileName)) {
       return { success: false, data: null, error: '유효하지 않은 파일명입니다.' };
@@ -82,9 +80,7 @@ export async function readJsonFileAction(
       };
     }
 
-    const bimObjects = rawObjects.map(mapRawToBIMObject);
-
-    return { success: true, data: bimObjects, error: null };
+    return { success: true, data: rawObjects.map(mapRawToBIMObject), error: null };
   } catch (error) {
     return toErrorResponse(error, 'JSON 파일 읽기에 실패했습니다.');
   }
