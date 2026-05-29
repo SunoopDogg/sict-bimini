@@ -10,6 +10,7 @@ import {
 } from '@/4features/manage-file';
 
 function getPairCount(session: PredictionSession): number {
+  if (!session.prediction) return 0;
   return Math.min(
     session.prediction.kbims.candidates.length,
     session.prediction.pps.candidates.length,
@@ -100,6 +101,7 @@ export function useUserSelections(objects: BIMObject[]) {
       const objectIndex = Number(key);
       for (let sessionIndex = 0; sessionIndex < sessions.length; sessionIndex++) {
         const session = sessions[sessionIndex];
+        if (!session.prediction) continue; // skip old-format sessions from disk
         const pairCount = getPairCount(session);
         if (session.selectedIndex === pairCount && session.userCandidate) {
           const sel = buildUserSelection(objectIndex, sessionIndex, session, loadedObjects);

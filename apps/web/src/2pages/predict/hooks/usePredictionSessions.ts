@@ -12,6 +12,7 @@ function toSession(prediction: CombinedPredictionResponse): PredictionSession {
 }
 
 function getPairCount(session: PredictionSession): number {
+  if (!session.prediction) return 0;
   return Math.min(
     session.prediction.kbims.candidates.length,
     session.prediction.pps.candidates.length,
