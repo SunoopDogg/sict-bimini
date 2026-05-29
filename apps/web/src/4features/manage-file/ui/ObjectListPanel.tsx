@@ -69,7 +69,7 @@ function PredictionMatchIcon({
   const sessions = predictionMap[index];
   const latestSession = sessions?.[sessions.length - 1];
 
-  if (!latestSession) {
+  if (!latestSession || !latestSession.prediction) {
     return (
       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900">
         <Minus className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
