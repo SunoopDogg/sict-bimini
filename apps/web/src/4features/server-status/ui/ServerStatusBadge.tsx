@@ -39,14 +39,8 @@ export function ServerStatusBadge() {
       const response = await checkHealth();
       if (!active) return;
       if (response.success && response.data) {
-        const data = response.data;
-        const state: ServerState =
-          data.status === 'healthy' &&
-          data.ollama_connected &&
-          data.milvus_connected
-            ? 'healthy'
-            : 'degraded';
-        setStatusInfo({ health: data, state });
+        const state: ServerState = response.data.status === 'ok' ? 'healthy' : 'degraded';
+        setStatusInfo({ health: response.data, state });
       } else {
         setStatusInfo({ health: null, state: 'offline' });
       }
@@ -88,36 +82,16 @@ export function ServerStatusBadge() {
         <div className="bg-popover text-popover-foreground absolute top-full left-0 z-50 mt-2 w-56 rounded-md border p-3 text-sm shadow-md">
           {statusInfo.health ? (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">{t.server.version}</span>
-                <span className="font-mono text-xs">
-                  {statusInfo.health.version}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Ollama</span>
-                <span
-                  className={
-                    statusInfo.health.ollama_connected
-                      ? 'text-green-500'
-                      : 'text-red-500'
-                  }
-                >
-                  {statusInfo.health.ollama_connected ? t.server.connected : t.server.notConnected}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Milvus</span>
-                <span
-                  className={
-                    statusInfo.health.milvus_connected
-                      ? 'text-green-500'
-                      : 'text-red-500'
-                  }
-                >
-                  {statusInfo.health.milvus_connected ? t.server.connected : t.server.notConnected}
-                </span>
-              </div>
+              {Object.entries(statusInfo.health.services).map(([name, svc]) => (
+                <div key={name} className="flex items-center justify-between">
+                  <span className="text-muted-foreground capitalize">{name}</span>
+                  <span className={svc.status === 'ok' ? 'text-green-500' : 'text-red-500'}>
+                    {svc.status === 'ok'
+                      ? t.server.connected
+                      : svc.detail ?? t.server.notConnected}
+                  </span>
+                </div>
+              ))}
             </div>
           ) : (
             <p className="text-muted-foreground">{t.server.cannotConnect}</p>
