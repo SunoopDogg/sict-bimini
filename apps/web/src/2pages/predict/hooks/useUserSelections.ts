@@ -1,16 +1,50 @@
 import { useRef, useState } from 'react';
 
-import type { BIMObjectInput } from '@/5entities/bim-object';
+import type { BIMObject } from '@/5entities/bim-object';
 import { EMPTY_BIM_OBJECT } from '@/5entities/bim-object';
-import type { PredictionSession, UserSelection } from '@/5entities/prediction';
+import type { PredictionSession, SelectionFileInfo, UserSelection } from '@/5entities/prediction';
 import {
   saveUserSelectionsAction,
   loadUserSelectionsAction,
   listSelectionFilesAction,
 } from '@/4features/manage-file';
-import type { SelectionFileInfo } from '@/5entities/prediction';
 
-export function useUserSelections(objects: BIMObjectInput[]) {
+function getPairCount(session: PredictionSession): number {
+  return Math.min(
+    session.prediction.kbims.candidates.length,
+    session.prediction.pps.candidates.length,
+  );
+}
+
+function buildUserSelection(
+  objectIndex: number,
+  sessionIndex: number,
+  session: PredictionSession,
+  objects: BIMObject[],
+): UserSelection | null {
+  if (!session.userCandidate) return null;
+  const obj = objects[objectIndex];
+  const pairCount = getPairCount(session);
+  const kbimsConf = session.selectedIndex < pairCount
+    ? (session.prediction.kbims.candidates[session.selectedIndex]?.llm_confidence ?? 0)
+    : 0;
+  const ppsConf = session.selectedIndex < pairCount
+    ? (session.prediction.pps.candidates[session.selectedIndex]?.llm_confidence ?? 0)
+    : 0;
+  return {
+    objectIndex,
+    objectName: obj?.name,
+    sessionIndex,
+    kbims_code: session.userCandidate.kbims_code,
+    pps_code: session.userCandidate.pps_code,
+    kbims_confidence: kbimsConf,
+    pps_confidence: ppsConf,
+    object: obj ?? EMPTY_BIM_OBJECT,
+    selectedAt: new Date().toISOString(),
+  };
+}
+
+export function useUserSelections(objects: BIMObject[]) {
   const [selectionFiles, setSelectionFiles] = useState<SelectionFileInfo[]>([]);
   const savedSelectionsRef = useRef<UserSelection[]>([]);
 
@@ -31,30 +65,18 @@ export function useUserSelections(objects: BIMObjectInput[]) {
     sessionIndex: number,
     session: PredictionSession,
   ) => {
-    if (!session.userCandidate) return;
-    const obj = objects[objectIndex];
-    const newSel: UserSelection = {
-      objectIndex,
-      objectName: obj?.name ?? '',
-      sessionIndex,
-      candidate: session.userCandidate,
-      object: obj ?? EMPTY_BIM_OBJECT,
-      selectedAt: new Date().toISOString(),
-    };
+    const newSel = buildUserSelection(objectIndex, sessionIndex, session, objects);
+    if (!newSel) return;
     const next = [
-      ...savedSelectionsRef.current.filter(
-        (s) => s.objectName !== newSel.objectName,
-      ),
+      ...savedSelectionsRef.current.filter((s) => s.objectName !== newSel.objectName),
       newSel,
     ];
     updateSelections(next);
   };
 
   const removeFromSelections = (objectIndex: number) => {
-    const objectName = objects[objectIndex]?.name ?? '';
-    const next = savedSelectionsRef.current.filter(
-      (s) => s.objectName !== objectName,
-    );
+    const objectName = objects[objectIndex]?.name;
+    const next = savedSelectionsRef.current.filter((s) => s.objectName !== objectName);
     updateSelections(next);
   };
 
@@ -71,39 +93,25 @@ export function useUserSelections(objects: BIMObjectInput[]) {
 
   const syncSelectionsFromMap = (
     loadedMap: Record<string, PredictionSession[]>,
-    loadedObjects: BIMObjectInput[],
+    loadedObjects: BIMObject[],
   ) => {
     const newSelections: UserSelection[] = [];
     for (const [key, sessions] of Object.entries(loadedMap)) {
       const objectIndex = Number(key);
-      for (
-        let sessionIndex = 0;
-        sessionIndex < sessions.length;
-        sessionIndex++
-      ) {
+      for (let sessionIndex = 0; sessionIndex < sessions.length; sessionIndex++) {
         const session = sessions[sessionIndex];
-        if (
-          session.selectedIndex === session.candidates.length &&
-          session.userCandidate
-        ) {
-          newSelections.push({
-            objectIndex,
-            objectName: loadedObjects[objectIndex]?.name ?? '',
-            sessionIndex,
-            candidate: session.userCandidate,
-            object: loadedObjects[objectIndex] ?? EMPTY_BIM_OBJECT,
-            selectedAt: new Date().toISOString(),
-          });
+        const pairCount = getPairCount(session);
+        if (session.selectedIndex === pairCount && session.userCandidate) {
+          const sel = buildUserSelection(objectIndex, sessionIndex, session, loadedObjects);
+          if (sel) newSelections.push(sel);
         }
       }
     }
-
     if (newSelections.length > 0) {
-      const otherSelections = savedSelectionsRef.current.filter(
+      const others = savedSelectionsRef.current.filter(
         (s) => !newSelections.some((ns) => ns.objectName === s.objectName),
       );
-      const merged = [...otherSelections, ...newSelections];
-      updateSelections(merged);
+      updateSelections([...others, ...newSelections]);
     }
   };
 

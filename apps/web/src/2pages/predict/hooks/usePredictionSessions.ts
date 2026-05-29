@@ -1,18 +1,21 @@
 import { useState } from 'react';
 
-import type {
-  PredictionCandidates,
-  PredictionResult,
-  PredictionSession,
-} from '@/5entities/prediction';
+import type { CombinedPredictionResponse, PredictionSession } from '@/5entities/prediction';
 import { savePredictionsAction } from '@/4features/predict-code';
 
-function toSession(candidates: PredictionCandidates): PredictionSession {
+function toSession(prediction: CombinedPredictionResponse): PredictionSession {
   return {
-    candidates: candidates.predictions,
+    prediction,
     selectedIndex: 0,
     predicted_at: new Date().toISOString(),
   };
+}
+
+function getPairCount(session: PredictionSession): number {
+  return Math.min(
+    session.prediction.kbims.candidates.length,
+    session.prediction.pps.candidates.length,
+  );
 }
 
 interface UsePredictionSessionsOptions {
@@ -29,9 +32,7 @@ export function usePredictionSessions({
   selectedFile,
   onSelectionSync,
 }: UsePredictionSessionsOptions) {
-  const [predictionMap, setPredictionMap] = useState<
-    Record<string, PredictionSession[]>
-  >({});
+  const [predictionMap, setPredictionMap] = useState<Record<string, PredictionSession[]>>({});
 
   const saveToDisk = (nextMap: Record<string, PredictionSession[]>) => {
     if (selectedFile) {
@@ -39,9 +40,7 @@ export function usePredictionSessions({
     }
   };
 
-  const appendSessions = (
-    entries: { index: number; session: PredictionSession }[],
-  ) => {
+  const appendSessions = (entries: { index: number; session: PredictionSession }[]) => {
     const nextMap = { ...predictionMap };
     for (const { index, session } of entries) {
       const existing = nextMap[index] ?? [];
@@ -60,28 +59,19 @@ export function usePredictionSessions({
     if (!sessions || !sessions[sessionIndex]) return;
 
     const prevSession = sessions[sessionIndex];
-    const wasUserCard =
-      prevSession.selectedIndex === prevSession.candidates.length;
-    const isUserCard = candidateIndex === prevSession.candidates.length;
+    const pairCount = getPairCount(prevSession);
+    const wasUserCard = prevSession.selectedIndex === pairCount;
+    const isUserCard = candidateIndex === pairCount;
 
     const nextMap = { ...predictionMap };
     const updatedSessions = [...sessions];
-    updatedSessions[sessionIndex] = {
-      ...updatedSessions[sessionIndex],
-      selectedIndex: candidateIndex,
-    };
+    updatedSessions[sessionIndex] = { ...updatedSessions[sessionIndex], selectedIndex: candidateIndex };
     nextMap[objectIndex] = updatedSessions;
     setPredictionMap(nextMap);
     saveToDisk(nextMap);
 
-    // Sync selections file
     if (isUserCard && prevSession.userCandidate) {
-      onSelectionSync(
-        objectIndex,
-        sessionIndex,
-        { ...prevSession, selectedIndex: candidateIndex },
-        'add',
-      );
+      onSelectionSync(objectIndex, sessionIndex, { ...prevSession, selectedIndex: candidateIndex }, 'add');
     } else if (wasUserCard && !isUserCard) {
       onSelectionSync(objectIndex, sessionIndex, prevSession, 'remove');
     }
@@ -90,32 +80,21 @@ export function usePredictionSessions({
   const handleUserCandidateChange = (
     objectIndex: number,
     sessionIndex: number,
-    candidate: PredictionResult,
+    candidate: { kbims_code: string; pps_code: string; reasoning?: string },
   ) => {
     const sessions = predictionMap[objectIndex];
     if (!sessions || !sessions[sessionIndex]) return;
 
     const nextMap = { ...predictionMap };
     const updatedSessions = [...sessions];
-    updatedSessions[sessionIndex] = {
-      ...updatedSessions[sessionIndex],
-      userCandidate: candidate,
-    };
+    updatedSessions[sessionIndex] = { ...updatedSessions[sessionIndex], userCandidate: candidate };
     nextMap[objectIndex] = updatedSessions;
     setPredictionMap(nextMap);
     saveToDisk(nextMap);
 
-    // If user card is currently selected, update the saved selection too
-    if (
-      updatedSessions[sessionIndex].selectedIndex ===
-      updatedSessions[sessionIndex].candidates.length
-    ) {
-      onSelectionSync(
-        objectIndex,
-        sessionIndex,
-        updatedSessions[sessionIndex],
-        'add',
-      );
+    const pairCount = getPairCount(updatedSessions[sessionIndex]);
+    if (updatedSessions[sessionIndex].selectedIndex === pairCount) {
+      onSelectionSync(objectIndex, sessionIndex, updatedSessions[sessionIndex], 'add');
     }
   };
 
