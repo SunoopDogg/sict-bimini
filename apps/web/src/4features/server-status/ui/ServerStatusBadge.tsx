@@ -13,6 +13,7 @@ type ServerState = 'healthy' | 'degraded' | 'offline';
 interface StatusInfo {
   health: HealthStatus | null;
   state: ServerState;
+  errorMessage?: string;
 }
 
 const POLL_INTERVAL = 30_000;
@@ -42,7 +43,7 @@ export function ServerStatusBadge() {
         const state: ServerState = response.data.status === 'ok' ? 'healthy' : 'degraded';
         setStatusInfo({ health: response.data, state });
       } else {
-        setStatusInfo({ health: null, state: 'offline' });
+        setStatusInfo({ health: null, state: 'offline', errorMessage: response.error ?? undefined });
       }
     };
 
@@ -94,7 +95,9 @@ export function ServerStatusBadge() {
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground">{t.server.cannotConnect}</p>
+            <p className="text-muted-foreground text-xs">
+              {statusInfo.errorMessage ?? t.server.cannotConnect}
+            </p>
           )}
         </div>
       )}

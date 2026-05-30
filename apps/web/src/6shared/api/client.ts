@@ -39,7 +39,18 @@ async function apiRequest<T>(
 }
 
 export async function checkHealth(): Promise<APIResponse<HealthStatus>> {
-  return apiRequest(`${BACKEND_URL}/health`, { method: 'GET' }, '서버 상태 확인 실패');
+  // Health endpoint always returns a JSON body (even on 503), so parse regardless of status.
+  try {
+    const response = await fetch(`${BACKEND_URL}/health`, { method: 'GET' });
+    const data = await response.json() as HealthStatus;
+    return { success: true, data, error: null };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      error: error instanceof Error ? error.message : '서버에 연결할 수 없습니다.',
+    };
+  }
 }
 
 export async function convertXlsxToJson(
