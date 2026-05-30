@@ -2,14 +2,14 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
 
 from api.bim.clients.embeddings_vllm import VLLMEmbedClient
 from api.bim.clients.vllm import VLLMClient
 from api.bim.predict import build_kbims_predictor, build_pps_predictor
 from api.core.config import BIMSettings, settings
-from api.routers import health
-from api.routers import bim_attributes, conversion, predict, search
+from api.routers import bim_attributes, conversion, health, predict, search
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(health.router)
 app.include_router(predict.router)
