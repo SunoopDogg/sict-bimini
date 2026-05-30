@@ -1,7 +1,7 @@
 export type Locale = 'ko' | 'en';
 
 const ko = {
-  pageTitle: 'KBIMS 코드 예측',
+  pageTitle: 'KBIMS · PPS 코드 예측',
   themeToggle: '테마 전환',
   localeToggle: '언어 전환',
 
@@ -111,7 +111,7 @@ const ko = {
 };
 
 const en: typeof ko = {
-  pageTitle: 'KBIMS Code Prediction',
+  pageTitle: 'KBIMS · PPS Code Prediction',
   themeToggle: 'Toggle theme',
   localeToggle: 'Toggle language',
 
