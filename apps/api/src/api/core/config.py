@@ -19,8 +19,8 @@ class BIMSettings(BaseSettings):
     experiment_id: str = "qwen4b_d2048"
 
     # 임베딩 (vLLM /v1/embeddings)
-    embedding_url: str = "http://192.168.0.76:8080"
-    embedding_model: str = "Qwen/Qwen3-Embedding-4B"
+    embedding_url: str = "http://192.168.0.152:8080"
+    embedding_model: str = "qwen3-embedding-4b"
     embedding_dim: int = 2048  # MRL 절단 (native 2560 → 2048)
 
     # Qdrant
@@ -31,7 +31,7 @@ class BIMSettings(BaseSettings):
     data_root: Path = Path("data")
 
     # vLLM (외부 독립 운영 서버)
-    llm_url: str = "http://localhost:8000"
+    llm_url: str = "http://192.168.0.151:8000"
     llm_model: str = "gemma-4"
     # llm_model: str = "gpt-oss-20b"
     llm_timeout_seconds: float = 60.0

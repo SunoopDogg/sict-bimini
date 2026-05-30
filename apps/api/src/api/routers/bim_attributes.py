@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from qdrant_client.models import PointStruct
 
 from api.bim.clients.embeddings_vllm import VLLMEmbedError
-from api.bim.schemas import BIMAttribute
 from api.routers.schemas import (
     BIMAttributeCreateRequest,
     BIMAttributeCreateResponse,
@@ -117,7 +116,7 @@ def create_bim_attributes(
                 "ingested_at": ingested_at,
             },
         )
-        for attr, vec, sid in zip(deduped, vectors, stable_ids)
+        for attr, vec, sid in zip(deduped, vectors, stable_ids, strict=False)
     ]
     qdrant.upsert(collection_name=bim.collection_name, points=points, wait=True)
 

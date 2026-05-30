@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 from api.bim.schemas import BIMObjectRaw
@@ -23,7 +24,8 @@ def _raw_object() -> BIMObjectRaw:
 
 
 def test_convert_xlsx_happy_path(client: TestClient) -> None:
-    with patch("api.routers.conversion.parse_xlsx_to_raw", return_value=[_raw_object()]):
+    mock_parse = "api.routers.conversion.parse_xlsx_to_raw"
+    with patch(mock_parse, return_value=[_raw_object()]):
         response = client.post(
             "/convert/xlsx-to-json",
             files={"file": ("test.xlsx", b"fake", "application/octet-stream")},

@@ -1,14 +1,15 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 from fastapi.testclient import TestClient
 
 from api.bim.predict import (
     EmptyRetrievalError,
     LLMGenerationError,
-    Predictor,
     PredictionCandidate,
     PredictionMode,
     PredictionResponse,
+    Predictor,
 )
 from api.main import app
 
