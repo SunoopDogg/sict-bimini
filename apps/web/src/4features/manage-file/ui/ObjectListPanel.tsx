@@ -13,6 +13,7 @@ import { useState } from 'react';
 
 import type { BIMObject } from '@/5entities/bim-object';
 import type { PredictionSession } from '@/5entities/prediction';
+import { getPairCount } from '@/5entities/prediction';
 import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 import { Button } from '@/6shared/ui/primitive/button';
@@ -77,10 +78,7 @@ function PredictionMatchIcon({
     );
   }
 
-  const pairCount = Math.min(
-    latestSession.prediction.kbims.candidates.length,
-    latestSession.prediction.pps.candidates.length,
-  );
+  const pairCount = getPairCount(latestSession.prediction);
   const isUserCard = latestSession.selectedIndex === pairCount;
 
   let predictedCode: string | null = null;

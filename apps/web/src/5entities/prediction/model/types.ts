@@ -24,10 +24,16 @@ export interface CombinedPredictionResponse {
   pps: PredictionResponse;
 }
 
+export interface UserCandidate {
+  kbims_code: string;
+  pps_code: string;
+  reasoning?: string;
+}
+
 export interface PredictionSession {
   prediction: CombinedPredictionResponse;
   selectedIndex: number;    // index into kbims/pps candidate pairs; equals pairCount when user card selected
-  userCandidate?: { kbims_code: string; pps_code: string; reasoning?: string };
+  userCandidate?: UserCandidate;
   predicted_at: string;     // client-stamped ISO string
 }
 

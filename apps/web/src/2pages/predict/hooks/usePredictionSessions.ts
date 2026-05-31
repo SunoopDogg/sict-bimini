@@ -1,6 +1,11 @@
 import { useState } from 'react';
 
-import type { CombinedPredictionResponse, PredictionSession } from '@/5entities/prediction';
+import type {
+  CombinedPredictionResponse,
+  PredictionSession,
+  UserCandidate,
+} from '@/5entities/prediction';
+import { getPairCount } from '@/5entities/prediction';
 import { savePredictionsAction } from '@/4features/predict-code';
 
 function toSession(prediction: CombinedPredictionResponse): PredictionSession {
@@ -9,14 +14,6 @@ function toSession(prediction: CombinedPredictionResponse): PredictionSession {
     selectedIndex: 0,
     predicted_at: new Date().toISOString(),
   };
-}
-
-function getPairCount(session: PredictionSession): number {
-  if (!session.prediction) return 0;
-  return Math.min(
-    session.prediction.kbims.candidates.length,
-    session.prediction.pps.candidates.length,
-  );
 }
 
 interface UsePredictionSessionsOptions {
@@ -60,7 +57,7 @@ export function usePredictionSessions({
     if (!sessions || !sessions[sessionIndex]) return;
 
     const prevSession = sessions[sessionIndex];
-    const pairCount = getPairCount(prevSession);
+    const pairCount = getPairCount(prevSession.prediction);
     const wasUserCard = prevSession.selectedIndex === pairCount;
     const isUserCard = candidateIndex === pairCount;
 
@@ -81,7 +78,7 @@ export function usePredictionSessions({
   const handleUserCandidateChange = (
     objectIndex: number,
     sessionIndex: number,
-    candidate: { kbims_code: string; pps_code: string; reasoning?: string },
+    candidate: UserCandidate,
   ) => {
     const sessions = predictionMap[objectIndex];
     if (!sessions || !sessions[sessionIndex]) return;
@@ -93,7 +90,7 @@ export function usePredictionSessions({
     setPredictionMap(nextMap);
     saveToDisk(nextMap);
 
-    const pairCount = getPairCount(updatedSessions[sessionIndex]);
+    const pairCount = getPairCount(updatedSessions[sessionIndex].prediction);
     if (updatedSessions[sessionIndex].selectedIndex === pairCount) {
       onSelectionSync(objectIndex, sessionIndex, updatedSessions[sessionIndex], 'add');
     }
