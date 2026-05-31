@@ -1,14 +1,11 @@
-import logging
 from typing import NoReturn
 
 from fastapi import HTTPException
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 from api.bim.clients.embeddings_vllm import VLLMEmbedError
 from api.bim.predict.schemas import PredictionResponse
 from api.bim.schemas import BIMAttribute
-
-_logger = logging.getLogger(__name__)
 
 
 def raise_embedding_unavailable(exc: Exception) -> NoReturn:
@@ -22,18 +19,6 @@ def raise_embedding_unavailable(exc: Exception) -> NoReturn:
     else:
         detail = f"Embedding service returned unexpected result: {exc}"
     raise HTTPException(status_code=503, detail=detail) from exc
-
-
-def bim_attr_from_payload(payload: dict) -> BIMAttribute | None:
-    """Parse BIMAttribute from a Qdrant point payload; returns None on invalid data."""
-    try:
-        return BIMAttribute.model_validate(payload)
-    except ValidationError:
-        _logger.warning(
-            "Skipping point with invalid payload: stable_id=%s",
-            payload.get("stable_id"),
-        )
-        return None
 
 
 class CombinedPredictionResponse(BaseModel):

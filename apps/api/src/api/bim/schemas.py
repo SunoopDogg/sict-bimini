@@ -1,6 +1,9 @@
+import logging
 from hashlib import blake2b
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class BIMObjectRaw(BaseModel):
@@ -53,3 +56,15 @@ class BIMAttribute(BaseModel):
 
     def is_valid(self) -> bool:
         return bool(self.kbims_code or self.pps_code)
+
+
+def bim_attr_from_payload(payload: dict) -> BIMAttribute | None:
+    """Parse a BIMAttribute from a Qdrant point payload; None on invalid data."""
+    try:
+        return BIMAttribute.model_validate(payload)
+    except ValidationError:
+        _logger.warning(
+            "Skipping point with invalid payload: stable_id=%s",
+            payload.get("stable_id"),
+        )
+        return None

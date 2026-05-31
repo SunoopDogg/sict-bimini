@@ -3,10 +3,10 @@ import logging
 from fastapi import APIRouter, Query, Request
 
 from api.bim.clients.embeddings_vllm import VLLMEmbedError
+from api.bim.schemas import bim_attr_from_payload
 from api.routers.schemas import (
     SearchResponse,
     SearchResult,
-    bim_attr_from_payload,
     raise_embedding_unavailable,
 )
 
