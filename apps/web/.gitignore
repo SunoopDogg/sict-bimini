@@ -2,6 +2,11 @@
 # Next.js build output
 /.next/
 
+# FSD `lib` segments under src/ are source code, not build output.
+# Re-include them despite the root-level `lib/` ignore rule.
+!src/**/lib/
+!src/**/lib/**
+
 # Data files — keep directory structure, not content
 /data/json/*.json
 /data/xlsx/*.xlsx
