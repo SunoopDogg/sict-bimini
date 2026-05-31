@@ -12,4 +12,4 @@ export type {
   BatchPredictResult,
 } from './model/types';
 
-export { getPairCount } from './model/getPairCount';
+export { getPairCount } from './lib/getPairCount';

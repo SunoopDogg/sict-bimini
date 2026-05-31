@@ -1,4 +1,4 @@
-import type { CombinedPredictionResponse } from './types';
+import type { CombinedPredictionResponse } from '../model/types';
 
 /**
  * Number of aligned kbims/pps candidate pairs in a prediction.
