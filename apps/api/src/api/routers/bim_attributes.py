@@ -11,6 +11,7 @@ from api.routers.schemas import (
     BIMAttributeCreateResponse,
     BIMAttributeListResponse,
     bim_attr_from_payload,
+    raise_embedding_unavailable,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,15 +94,8 @@ def create_bim_attributes(
                     f" for {len(deduped)} inputs"
                 ),
             )
-    except VLLMEmbedError as e:
-        raise HTTPException(
-            status_code=503, detail=f"Embedding service unavailable: {e}"
-        ) from e
-    except ValueError as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Embedding service returned unexpected result: {e}",
-        ) from e
+    except (VLLMEmbedError, ValueError) as e:
+        raise_embedding_unavailable(e)
 
     ingested_at = datetime.now(UTC).isoformat(timespec="seconds")
     stable_ids = [attr.stable_id for attr in deduped]

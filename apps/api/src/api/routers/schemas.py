@@ -1,11 +1,27 @@
 import logging
+from typing import NoReturn
 
+from fastapi import HTTPException
 from pydantic import BaseModel, Field, ValidationError
 
+from api.bim.clients.embeddings_vllm import VLLMEmbedError
 from api.bim.predict.schemas import PredictionResponse
 from api.bim.schemas import BIMAttribute
 
 _logger = logging.getLogger(__name__)
+
+
+def raise_embedding_unavailable(exc: Exception) -> NoReturn:
+    """Map an embedding-client failure to a 503 HTTPException.
+
+    Shared by routers that call ``embed.embed(...)``; keeps the
+    VLLMEmbedError / ValueError → 503 mapping in one place.
+    """
+    if isinstance(exc, VLLMEmbedError):
+        detail = f"Embedding service unavailable: {exc}"
+    else:
+        detail = f"Embedding service returned unexpected result: {exc}"
+    raise HTTPException(status_code=503, detail=detail) from exc
 
 
 def bim_attr_from_payload(payload: dict) -> BIMAttribute | None:

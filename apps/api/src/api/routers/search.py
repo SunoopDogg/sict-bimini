@@ -1,9 +1,14 @@
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Query, Request
 
 from api.bim.clients.embeddings_vllm import VLLMEmbedError
-from api.routers.schemas import SearchResponse, SearchResult, bim_attr_from_payload
+from api.routers.schemas import (
+    SearchResponse,
+    SearchResult,
+    bim_attr_from_payload,
+    raise_embedding_unavailable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,22 +23,15 @@ def search_similar_objects(
 ) -> SearchResponse:
     embed = request.app.state.embed
     qdrant = request.app.state.qdrant
-    bim = request.app.state.bim
+    bim_settings = request.app.state.bim
 
     try:
         [vector] = embed.embed([query])
-    except VLLMEmbedError as e:
-        raise HTTPException(
-            status_code=503, detail=f"Embedding service unavailable: {e}"
-        ) from e
-    except ValueError as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Embedding service returned unexpected result: {e}",
-        ) from e
+    except (VLLMEmbedError, ValueError) as e:
+        raise_embedding_unavailable(e)
 
     response = qdrant.query_points(
-        collection_name=bim.collection_name,
+        collection_name=bim_settings.collection_name,
         query=vector,
         limit=top_k,
         with_payload=True,
