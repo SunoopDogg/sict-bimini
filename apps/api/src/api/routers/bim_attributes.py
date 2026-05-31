@@ -26,9 +26,11 @@ def list_bim_attributes(
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> BIMAttributeListResponse:
     qdrant = request.app.state.qdrant
-    bim = request.app.state.bim
+    bim_settings = request.app.state.bim
 
-    count_result = qdrant.count(collection_name=bim.collection_name, exact=True)
+    count_result = qdrant.count(
+        collection_name=bim_settings.collection_name, exact=True
+    )
     total = count_result.count
     total_pages = math.ceil(total / page_size) if total > 0 else 0
 
@@ -39,7 +41,7 @@ def list_bim_attributes(
     while skip > 0:
         batch_size = min(skip, 250)
         points, offset = qdrant.scroll(
-            collection_name=bim.collection_name,
+            collection_name=bim_settings.collection_name,
             limit=batch_size,
             offset=offset,
             with_payload=False,
@@ -54,7 +56,7 @@ def list_bim_attributes(
 
     # Fetch the requested page
     points, _ = qdrant.scroll(
-        collection_name=bim.collection_name,
+        collection_name=bim_settings.collection_name,
         limit=page_size,
         offset=offset,
         with_payload=True,
@@ -79,7 +81,7 @@ def create_bim_attributes(
 ) -> BIMAttributeCreateResponse:
     qdrant = request.app.state.qdrant
     embed = request.app.state.embed
-    bim = request.app.state.bim
+    bim_settings = request.app.state.bim
 
     # Dedup by stable_id (last wins) — matches pipeline normalizer semantics
     deduped = list({attr.stable_id: attr for attr in body.items}.values())
@@ -110,9 +112,13 @@ def create_bim_attributes(
                 "ingested_at": ingested_at,
             },
         )
-        for attr, vec, sid in zip(deduped, vectors, stable_ids, strict=False)
+        for attr, vec, sid in zip(deduped, vectors, stable_ids, strict=True)
     ]
-    qdrant.upsert(collection_name=bim.collection_name, points=points, wait=True)
+    qdrant.upsert(
+        collection_name=bim_settings.collection_name, points=points, wait=True
+    )
 
-    count_result = qdrant.count(collection_name=bim.collection_name, exact=True)
+    count_result = qdrant.count(
+        collection_name=bim_settings.collection_name, exact=True
+    )
     return BIMAttributeCreateResponse(added=len(deduped), total=count_result.count)

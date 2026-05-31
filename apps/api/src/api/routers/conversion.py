@@ -48,7 +48,7 @@ async def convert_xlsx_to_json(file: UploadFile) -> XLSXConversionResult:
             logger.error("xlsx conversion error: %s", e)
             raise HTTPException(
                 status_code=500, detail="Internal error during conversion"
-            ) from None
+            ) from e
 
     return XLSXConversionResult(
         objects=[obj.model_dump() for obj in objects],
