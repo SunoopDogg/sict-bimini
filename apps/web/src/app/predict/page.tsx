@@ -55,7 +55,11 @@ export default function PredictPage() {
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
     new Set(),
   );
-  const { versions } = useVersions();
+  const {
+    versions,
+    isLoading: versionsLoading,
+    error: versionsError,
+  } = useVersions();
   const [selectedVersion, setSelectedVersion] = useState<string>();
 
   useEffect(() => {
@@ -259,13 +263,8 @@ export default function PredictPage() {
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="relative mb-8 flex items-center justify-center">
-        <div className="absolute left-0 flex items-center gap-2">
+        <div className="absolute left-0">
           <ServerStatusBadge />
-          <VersionSelect
-            versions={versions}
-            value={selectedVersion}
-            onChange={setSelectedVersion}
-          />
         </div>
         <h1 className="text-3xl font-bold">{t.pageTitle}</h1>
         <div className="absolute right-0">
@@ -280,8 +279,24 @@ export default function PredictPage() {
       )}
 
       <div className="grid grid-cols-[280px_1.2fr_1fr] gap-4">
-        {/* Panel 1: File List + User Selections */}
+        {/* Panel 1: DB Version + File List + User Selections */}
         <div className="flex flex-col gap-4 min-h-0">
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle>DB 버전</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-48 overflow-y-auto">
+                <VersionSelect
+                  versions={versions}
+                  value={selectedVersion}
+                  onChange={setSelectedVersion}
+                  isLoading={versionsLoading}
+                  error={versionsError}
+                />
+              </div>
+            </CardContent>
+          </Card>
           <Card className="flex flex-col">
             <CardHeader>
               <CardTitle>파일</CardTitle>
