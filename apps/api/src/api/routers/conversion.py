@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
 
+from api.bim.family_dedup import dedup_raw_by_family
 from api.bim.xlsx_parser import MissingColumnsError, parse_xlsx_to_raw
 from api.routers.schemas import XLSXConversionResult
 
@@ -49,6 +50,8 @@ async def convert_xlsx_to_json(file: UploadFile) -> XLSXConversionResult:
             raise HTTPException(
                 status_code=500, detail="Internal error during conversion"
             ) from e
+
+    objects = dedup_raw_by_family(objects)
 
     return XLSXConversionResult(
         objects=[obj.model_dump() for obj in objects],
