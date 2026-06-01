@@ -9,6 +9,12 @@ import type { APIResponse } from './types';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
+// Server-side callers (Server Actions) run on the Next server, which has no
+// origin to resolve the relative `/api` proxy against — a relative URL throws
+// "Invalid URL". They must hit the backend directly via BACKEND_ORIGIN (the
+// same env next.config proxies `/api/*` to).
+const SERVER_BACKEND_URL = process.env.BACKEND_ORIGIN || 'http://localhost:8000';
+
 async function apiRequest<T>(
   url: string,
   options: RequestInit,
@@ -63,7 +69,7 @@ export async function convertXlsxToJson(
   const formData = new FormData();
   formData.append('file', file);
   return apiRequest(
-    `${BACKEND_URL}/convert/xlsx-to-json`,
+    `${SERVER_BACKEND_URL}/convert/xlsx-to-json`,
     { method: 'POST', body: formData },
     'XLSX 변환 실패',
   );
