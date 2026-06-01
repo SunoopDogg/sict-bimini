@@ -69,6 +69,7 @@ class Predictor:
         request: PredictionRequest,
         *,
         extra_filter: QdrantFilter | None = None,
+        collection: str | None = None,
     ) -> PredictionResponse:
         cfg = self._config
         attr = request.attribute
@@ -83,6 +84,7 @@ class Predictor:
             code_field=cfg.target,
             k=top_k,
             extra_filter=extra_filter,
+            collection=collection,
         )
         if not neighbors:
             raise EmptyRetrievalError(

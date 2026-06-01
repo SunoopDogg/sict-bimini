@@ -26,6 +26,28 @@ class TestNeighborRetriever:
         assert kwargs["query"] == [0.1, 0.2, 0.3]
         assert kwargs["limit"] == 10
 
+    def test_search_collection_override(self):
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[])
+
+        retriever = NeighborRetriever(mock_client, collection="bim__default")
+        retriever.search(
+            [0.1, 0.2], code_field="kbims_code", k=5, collection="bim__expA"
+        )
+
+        kwargs = mock_client.query_points.call_args.kwargs
+        assert kwargs["collection_name"] == "bim__expA"
+
+    def test_search_defaults_to_constructed_collection(self):
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[])
+
+        retriever = NeighborRetriever(mock_client, collection="bim__default")
+        retriever.search([0.1, 0.2], code_field="kbims_code", k=5)
+
+        kwargs = mock_client.query_points.call_args.kwargs
+        assert kwargs["collection_name"] == "bim__default"
+
     def test_search_applies_code_field_filter(self):
         mock_client = MagicMock()
         mock_client.query_points.return_value = MagicMock(points=[])
