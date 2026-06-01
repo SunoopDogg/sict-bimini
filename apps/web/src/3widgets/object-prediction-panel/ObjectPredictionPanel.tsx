@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 import type { BIMObject } from '@/5entities/bim-object';
-import type { PredictionSession } from '@/5entities/prediction';
+import type { PredictionSession, UserCandidate } from '@/5entities/prediction';
+import { getPairCount } from '@/5entities/prediction';
 import { useLocale } from '@/6shared/i18n';
 import { Badge } from '@/6shared/ui/primitive/badge';
 import { Button } from '@/6shared/ui/primitive/button';
@@ -26,7 +27,7 @@ interface ObjectPredictionPanelProps {
   onSelectCandidate: (sessionIndex: number, candidateIndex: number) => void;
   onUserCandidateChange: (
     sessionIndex: number,
-    candidate: { kbims_code: string; pps_code: string; reasoning?: string },
+    candidate: UserCandidate,
   ) => void;
 }
 
@@ -116,7 +117,7 @@ export function ObjectPredictionPanel({
 
   const kbims = currentSession.prediction?.kbims;
   const pps = currentSession.prediction?.pps;
-  const pairCount = kbims && pps ? Math.min(kbims.candidates.length, pps.candidates.length) : 0;
+  const pairCount = getPairCount(currentSession.prediction);
   const pairs = Array.from({ length: pairCount }, (_, i) => ({
     kbims: kbims!.candidates[i],
     pps: pps!.candidates[i],

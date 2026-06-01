@@ -5,18 +5,12 @@ import { Check, FileSpreadsheet } from 'lucide-react';
 import type { XlsxFileInfo } from '@/5entities/xlsx-file';
 import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
-import { formatDateTime } from '@/6shared/lib/format';
+import { formatDateTime, formatFileSize } from '@/6shared/lib/format';
 
 interface FileListSelectProps {
   files: XlsxFileInfo[];
   selectedFile?: string;
   onSelect: (fileName: string) => void;
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function FileListSelect({

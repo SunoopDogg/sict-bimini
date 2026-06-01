@@ -37,7 +37,13 @@ import {
 
 const PAGE_SIZE = 20;
 
-export function BimAttributeTableModal() {
+interface BimAttributeTableModalProps {
+  version?: string;
+}
+
+export function BimAttributeTableModal({
+  version,
+}: BimAttributeTableModalProps = {}) {
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<BIMAttributeListResponse | null>(null);
@@ -49,7 +55,7 @@ export function BimAttributeTableModal() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchBimAttributes(pageNum, PAGE_SIZE);
+      const response = await fetchBimAttributes(pageNum, PAGE_SIZE, version);
       if (response.success && response.data) {
         setData(response.data);
       } else {
@@ -66,7 +72,7 @@ export function BimAttributeTableModal() {
     if (open) {
       fetchData(page);
     }
-  }, [open, page]);
+  }, [open, page, version]);
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);

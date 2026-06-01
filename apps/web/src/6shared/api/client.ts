@@ -1,5 +1,6 @@
 import type { BIMAttributeListResponse } from '@/5entities/bim-attribute';
 import type { BIMObject } from '@/5entities/bim-object';
+import type { DbVersionListResponse } from '@/5entities/db-version';
 import type { HealthStatus } from '@/5entities/health';
 import type { BatchPredictResult, CombinedPredictionResponse } from '@/5entities/prediction';
 import type { XLSXConversionResult } from '@/5entities/xlsx-file';
@@ -71,10 +72,12 @@ export async function convertXlsxToJson(
 export async function predictSingleCode(
   input: BIMObject,
   n = 5,
+  version?: string,
 ): Promise<APIResponse<CombinedPredictionResponse>> {
   const { name: _name, ...attribute } = input;
+  const qs = version ? `?version=${encodeURIComponent(version)}` : '';
   return apiRequest(
-    `${BACKEND_URL}/predict`,
+    `${BACKEND_URL}/predict${qs}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -87,10 +90,12 @@ export async function predictSingleCode(
 export async function batchPredictCode(
   inputs: BIMObject[],
   n = 5,
+  version?: string,
 ): Promise<APIResponse<BatchPredictResult>> {
   const objects = inputs.map(({ name: _name, ...attr }) => attr);
+  const qs = version ? `?version=${encodeURIComponent(version)}` : '';
   return apiRequest(
-    `${BACKEND_URL}/batch-predict`,
+    `${BACKEND_URL}/batch-predict${qs}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -103,10 +108,22 @@ export async function batchPredictCode(
 export async function fetchBimAttributes(
   page = 1,
   pageSize = 20,
+  version?: string,
 ): Promise<APIResponse<BIMAttributeListResponse>> {
+  const vq = version ? `&version=${encodeURIComponent(version)}` : '';
   return apiRequest(
-    `${BACKEND_URL}/bim-attributes?page=${page}&page_size=${pageSize}`,
+    `${BACKEND_URL}/bim-attributes?page=${page}&page_size=${pageSize}${vq}`,
     { method: 'GET' },
     'BIM 속성 목록 조회 실패',
+  );
+}
+
+export async function fetchVersions(): Promise<
+  APIResponse<DbVersionListResponse>
+> {
+  return apiRequest(
+    `${BACKEND_URL}/versions`,
+    { method: 'GET' },
+    '버전 목록 조회 실패',
   );
 }

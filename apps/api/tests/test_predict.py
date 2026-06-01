@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+from qdrant_client import QdrantClient
 
 from api.bim.predict import (
     EmptyRetrievalError,
@@ -11,6 +12,7 @@ from api.bim.predict import (
     PredictionResponse,
     Predictor,
 )
+from api.core.config import BIMSettings
 from api.main import app
 
 
@@ -56,10 +58,21 @@ def client() -> TestClient:
     mock_pps = MagicMock(spec=Predictor)
     mock_pps.predict.return_value = _make_response("pps_code")
 
+    qdrant = MagicMock(spec=QdrantClient)
+    qdrant.collection_exists.return_value = True
+
     app.state.kbims = mock_kbims
     app.state.pps = mock_pps
+    app.state.qdrant = qdrant
+    app.state.bim = BIMSettings()
 
     return TestClient(app)
+
+
+def test_predict_forwards_selected_collection(client: TestClient) -> None:
+    client.post("/predict?version=expA", json=_predict_body())
+    _, kwargs = app.state.kbims.predict.call_args
+    assert kwargs["collection"] == "bim__expA"
 
 
 def test_predict_happy_path(client: TestClient) -> None:

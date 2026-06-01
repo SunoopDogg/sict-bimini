@@ -37,12 +37,13 @@ class NeighborRetriever:
         code_field: TargetCode,
         k: int,
         extra_filter: Filter | None = None,
+        collection: str | None = None,
     ) -> list[Neighbor]:
         must: list = [non_empty_code_condition(code_field)]
         if extra_filter is not None:
             must.append(extra_filter)
         response = self._client.query_points(
-            collection_name=self._collection,
+            collection_name=collection or self._collection,
             query=query_vector,
             query_filter=Filter(must=must),
             limit=k,

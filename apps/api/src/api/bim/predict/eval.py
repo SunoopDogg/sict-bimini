@@ -39,6 +39,11 @@ class NoSamplesError(ValueError):
     """
 
 
+# Paradigm convention for this module: frozen dataclasses model internal,
+# in-process value objects (config + per-sample results) that never cross a
+# (de)serialization boundary — no validation or JSON shape to enforce, and
+# immutability is the point. Pydantic is reserved for boundary types: only
+# ``AggregatedMetrics`` below is Pydantic, because it is dumped to summary.json.
 @dataclass(frozen=True)
 class EvalConfig:
     target: TargetCode

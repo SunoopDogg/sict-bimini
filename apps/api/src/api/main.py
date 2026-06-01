@@ -9,7 +9,7 @@ from api.bim.clients.embeddings_vllm import VLLMEmbedClient
 from api.bim.clients.vllm import VLLMClient
 from api.bim.predict import build_kbims_predictor, build_pps_predictor
 from api.core.config import BIMSettings, settings
-from api.routers import bim_attributes, conversion, health, predict, search
+from api.routers import bim_attributes, conversion, health, predict, search, versions
 
 logger = logging.getLogger(__name__)
 
@@ -25,23 +25,37 @@ def _close_clients(*clients) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    bim = BIMSettings()
-    embed = VLLMEmbedClient(bim.embedding_url, bim.embedding_model, bim.embedding_dim)
-    qdrant = QdrantClient(url=bim.qdrant_url, api_key=bim.qdrant_api_key)
+    bim_settings = BIMSettings()
+    embed = VLLMEmbedClient(
+        bim_settings.embedding_url,
+        bim_settings.embedding_model,
+        bim_settings.embedding_dim,
+    )
+    qdrant = QdrantClient(
+        url=bim_settings.qdrant_url, api_key=bim_settings.qdrant_api_key
+    )
     vllm = VLLMClient(
-        url=bim.llm_url, model=bim.llm_model, timeout=bim.llm_timeout_seconds
+        url=bim_settings.llm_url,
+        model=bim_settings.llm_model,
+        timeout=bim_settings.llm_timeout_seconds,
     )
 
     try:
         app.state.kbims = build_kbims_predictor(
-            settings=bim, embed_client=embed, qdrant_client=qdrant, vllm_client=vllm
+            settings=bim_settings,
+            embed_client=embed,
+            qdrant_client=qdrant,
+            vllm_client=vllm,
         )
         app.state.pps = build_pps_predictor(
-            settings=bim, embed_client=embed, qdrant_client=qdrant, vllm_client=vllm
+            settings=bim_settings,
+            embed_client=embed,
+            qdrant_client=qdrant,
+            vllm_client=vllm,
         )
         app.state.qdrant = qdrant
         app.state.embed = embed
-        app.state.bim = bim
+        app.state.bim = bim_settings
     except Exception:
         _close_clients(qdrant, embed, vllm)
         raise
@@ -65,6 +79,7 @@ app.include_router(predict.router)
 app.include_router(search.router)
 app.include_router(conversion.router)
 app.include_router(bim_attributes.router)
+app.include_router(versions.router)
 
 
 @app.get("/")

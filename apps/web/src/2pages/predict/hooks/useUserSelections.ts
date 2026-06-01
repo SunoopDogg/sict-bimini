@@ -3,19 +3,12 @@ import { useRef, useState } from 'react';
 import type { BIMObject } from '@/5entities/bim-object';
 import { EMPTY_BIM_OBJECT } from '@/5entities/bim-object';
 import type { PredictionSession, SelectionFileInfo, UserSelection } from '@/5entities/prediction';
+import { getPairCount } from '@/5entities/prediction';
 import {
   saveUserSelectionsAction,
   loadUserSelectionsAction,
   listSelectionFilesAction,
 } from '@/4features/manage-file';
-
-function getPairCount(session: PredictionSession): number {
-  if (!session.prediction) return 0;
-  return Math.min(
-    session.prediction.kbims.candidates.length,
-    session.prediction.pps.candidates.length,
-  );
-}
 
 function buildUserSelection(
   objectIndex: number,
@@ -25,7 +18,7 @@ function buildUserSelection(
 ): UserSelection | null {
   if (!session.userCandidate) return null;
   const obj = objects[objectIndex];
-  const pairCount = getPairCount(session);
+  const pairCount = getPairCount(session.prediction);
   const kbimsConf = session.selectedIndex < pairCount
     ? (session.prediction.kbims.candidates[session.selectedIndex]?.llm_confidence ?? 0)
     : 0;
@@ -102,7 +95,7 @@ export function useUserSelections(objects: BIMObject[]) {
       for (let sessionIndex = 0; sessionIndex < sessions.length; sessionIndex++) {
         const session = sessions[sessionIndex];
         if (!session.prediction) continue; // skip old-format sessions from disk
-        const pairCount = getPairCount(session);
+        const pairCount = getPairCount(session.prediction);
         if (session.selectedIndex === pairCount && session.userCandidate) {
           const sel = buildUserSelection(objectIndex, sessionIndex, session, loadedObjects);
           if (sel) newSelections.push(sel);

@@ -6,6 +6,7 @@ import { usePredictionSessions } from '@/2pages/predict/hooks/usePredictionSessi
 import { useUserSelections } from '@/2pages/predict/hooks/useUserSelections';
 import { ObjectPredictionPanel } from '@/3widgets/object-prediction-panel';
 import { UserSelectionPanel } from '@/3widgets/user-selection-panel';
+import { useVersions, VersionSelect } from '@/4features/select-db-version';
 import { ServerStatusBadge } from '@/4features/server-status';
 import {
   FileListSelect,
@@ -19,7 +20,8 @@ import {
 } from '@/4features/manage-file';
 import { loadPredictionsAction } from '@/4features/predict-code';
 import type { BIMObject } from '@/5entities/bim-object';
-import type { CombinedPredictionResponse, PredictionSession } from '@/5entities/prediction';
+import type { PredictionSession } from '@/5entities/prediction';
+import { buildSelectionSessionMap } from '@/5entities/prediction';
 import type { XlsxFileInfo } from '@/5entities/xlsx-file';
 import { batchPredictCode, predictSingleCode } from '@/6shared/api';
 import { useLocale } from '@/6shared/i18n';
@@ -53,6 +55,14 @@ export default function PredictPage() {
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
     new Set(),
   );
+  const { versions } = useVersions();
+  const [selectedVersion, setSelectedVersion] = useState<string>();
+
+  useEffect(() => {
+    if (selectedVersion === undefined && versions.length > 0) {
+      setSelectedVersion(versions[0].name);
+    }
+  }, [versions, selectedVersion]);
 
   const selectedFile =
     activeSource?.type === 'xlsx' ? activeSource.fileName : undefined;
@@ -131,7 +141,7 @@ export default function PredictPage() {
     const selectedObjects = objects.filter((_, i) => selectedIndices.has(i));
     const selectedIndicesArray = Array.from(selectedIndices);
     startPrediction(async () => {
-      const response = await batchPredictCode(selectedObjects);
+      const response = await batchPredictCode(selectedObjects, 5, selectedVersion);
 
       if (response.success && response.data) {
         const entries = response.data.results
@@ -159,7 +169,7 @@ export default function PredictPage() {
     setError(undefined);
     setPredictingIndex(index);
     startPrediction(async () => {
-      const response = await predictSingleCode(objects[index]);
+      const response = await predictSingleCode(objects[index], 5, selectedVersion);
 
       if (response.success && response.data) {
         appendSessions([{ index, session: toSession(response.data) }]);
@@ -231,25 +241,8 @@ export default function PredictPage() {
 
       if (response.success && response.data) {
         setSelectionsFromData(response.data);
-        const selObjects = response.data.map((sel) => sel.object);
-        setObjects(selObjects);
-        const map: Record<string, PredictionSession[]> = {};
-        const emptyCombined: CombinedPredictionResponse = {
-          kbims: { target: 'kbims_code', mode: 'strong', candidates: [], low_confidence_context: false, pool_size: 0, retrieved_k: 0 },
-          pps: { target: 'pps_code', mode: 'strong', candidates: [], low_confidence_context: false, pool_size: 0, retrieved_k: 0 },
-        };
-        for (let i = 0; i < response.data.length; i++) {
-          const sel = response.data[i];
-          map[i] = [
-            {
-              prediction: emptyCombined,
-              userCandidate: { kbims_code: sel.kbims_code, pps_code: sel.pps_code },
-              selectedIndex: 0,  // pairCount=0 so selectedIndex=0 means user card
-              predicted_at: sel.selectedAt,
-            },
-          ];
-        }
-        setPredictionMap(map);
+        setObjects(response.data.map((sel) => sel.object));
+        setPredictionMap(buildSelectionSessionMap(response.data));
       } else {
         setSelectionsFromData([]);
         setObjects([]);
@@ -266,8 +259,13 @@ export default function PredictPage() {
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="relative mb-8 flex items-center justify-center">
-        <div className="absolute left-0">
+        <div className="absolute left-0 flex items-center gap-2">
           <ServerStatusBadge />
+          <VersionSelect
+            versions={versions}
+            value={selectedVersion}
+            onChange={setSelectedVersion}
+          />
         </div>
         <h1 className="text-3xl font-bold">{t.pageTitle}</h1>
         <div className="absolute right-0">

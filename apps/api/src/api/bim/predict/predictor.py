@@ -35,6 +35,9 @@ from api.bim.predict.schemas import (
 logger = logging.getLogger(__name__)
 
 
+# Internal, in-process config — a frozen dataclass (not Pydantic) by design:
+# it carries no (de)serialization boundary, so immutability is all that's
+# needed. Pydantic is reserved for boundary types (PredictionRequest/Response).
 @dataclass(frozen=True)
 class PredictorConfig:
     target: TargetCode
@@ -66,6 +69,7 @@ class Predictor:
         request: PredictionRequest,
         *,
         extra_filter: QdrantFilter | None = None,
+        collection: str | None = None,
     ) -> PredictionResponse:
         cfg = self._config
         attr = request.attribute
@@ -80,6 +84,7 @@ class Predictor:
             code_field=cfg.target,
             k=top_k,
             extra_filter=extra_filter,
+            collection=collection,
         )
         if not neighbors:
             raise EmptyRetrievalError(
