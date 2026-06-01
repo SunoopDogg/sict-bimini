@@ -6,6 +6,7 @@ import { usePredictionSessions } from '@/2pages/predict/hooks/usePredictionSessi
 import { useUserSelections } from '@/2pages/predict/hooks/useUserSelections';
 import { ObjectPredictionPanel } from '@/3widgets/object-prediction-panel';
 import { UserSelectionPanel } from '@/3widgets/user-selection-panel';
+import { useVersions, VersionSelect } from '@/4features/select-db-version';
 import { ServerStatusBadge } from '@/4features/server-status';
 import {
   FileListSelect,
@@ -54,6 +55,14 @@ export default function PredictPage() {
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
     new Set(),
   );
+  const { versions } = useVersions();
+  const [selectedVersion, setSelectedVersion] = useState<string>();
+
+  useEffect(() => {
+    if (selectedVersion === undefined && versions.length > 0) {
+      setSelectedVersion(versions[0].name);
+    }
+  }, [versions, selectedVersion]);
 
   const selectedFile =
     activeSource?.type === 'xlsx' ? activeSource.fileName : undefined;
@@ -132,7 +141,7 @@ export default function PredictPage() {
     const selectedObjects = objects.filter((_, i) => selectedIndices.has(i));
     const selectedIndicesArray = Array.from(selectedIndices);
     startPrediction(async () => {
-      const response = await batchPredictCode(selectedObjects);
+      const response = await batchPredictCode(selectedObjects, 5, selectedVersion);
 
       if (response.success && response.data) {
         const entries = response.data.results
@@ -160,7 +169,7 @@ export default function PredictPage() {
     setError(undefined);
     setPredictingIndex(index);
     startPrediction(async () => {
-      const response = await predictSingleCode(objects[index]);
+      const response = await predictSingleCode(objects[index], 5, selectedVersion);
 
       if (response.success && response.data) {
         appendSessions([{ index, session: toSession(response.data) }]);
@@ -250,8 +259,13 @@ export default function PredictPage() {
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="relative mb-8 flex items-center justify-center">
-        <div className="absolute left-0">
+        <div className="absolute left-0 flex items-center gap-2">
           <ServerStatusBadge />
+          <VersionSelect
+            versions={versions}
+            value={selectedVersion}
+            onChange={setSelectedVersion}
+          />
         </div>
         <h1 className="text-3xl font-bold">{t.pageTitle}</h1>
         <div className="absolute right-0">
