@@ -1,9 +1,10 @@
 import logging
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from api.bim.clients.embeddings_vllm import VLLMEmbedError
 from api.bim.schemas import bim_attr_from_payload
+from api.routers.deps import resolve_collection
 from api.routers.schemas import (
     SearchResponse,
     SearchResult,
@@ -20,10 +21,10 @@ def search_similar_objects(
     request: Request,
     query: str = Query(..., min_length=1),
     top_k: int = Query(default=5, ge=1, le=20),
+    collection: str = Depends(resolve_collection),
 ) -> SearchResponse:
     embed = request.app.state.embed
     qdrant = request.app.state.qdrant
-    bim_settings = request.app.state.bim
 
     try:
         [vector] = embed.embed([query])
@@ -31,7 +32,7 @@ def search_similar_objects(
         raise_embedding_unavailable(e)
 
     response = qdrant.query_points(
-        collection_name=bim_settings.collection_name,
+        collection_name=collection,
         query=vector,
         limit=top_k,
         with_payload=True,

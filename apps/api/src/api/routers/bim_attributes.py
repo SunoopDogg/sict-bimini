@@ -1,9 +1,10 @@
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from api.bim.attribute_service import BIMAttributeService
 from api.bim.clients.embeddings_vllm import VLLMEmbedError
+from api.routers.deps import resolve_collection
 from api.routers.schemas import (
     BIMAttributeCreateRequest,
     BIMAttributeCreateResponse,
@@ -21,10 +22,9 @@ def list_bim_attributes(
     request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    collection: str = Depends(resolve_collection),
 ) -> BIMAttributeListResponse:
-    service = BIMAttributeService(
-        request.app.state.qdrant, request.app.state.bim.collection_name
-    )
+    service = BIMAttributeService(request.app.state.qdrant, collection)
     items, total, total_pages = service.get_page(page, page_size)
     return BIMAttributeListResponse(
         items=items,
@@ -39,11 +39,10 @@ def list_bim_attributes(
 def create_bim_attributes(
     request: Request,
     body: BIMAttributeCreateRequest,
+    collection: str = Depends(resolve_collection),
 ) -> BIMAttributeCreateResponse:
     embed = request.app.state.embed
-    service = BIMAttributeService(
-        request.app.state.qdrant, request.app.state.bim.collection_name
-    )
+    service = BIMAttributeService(request.app.state.qdrant, collection)
 
     deduped = service.dedup(body.items)
 
