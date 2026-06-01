@@ -9,7 +9,7 @@ from api.bim.clients.embeddings_vllm import VLLMEmbedClient
 from api.bim.clients.vllm import VLLMClient
 from api.bim.predict import build_kbims_predictor, build_pps_predictor
 from api.core.config import BIMSettings, settings
-from api.routers import bim_attributes, conversion, health, predict, search
+from api.routers import bim_attributes, conversion, health, predict, search, versions
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,7 @@ app.include_router(predict.router)
 app.include_router(search.router)
 app.include_router(conversion.router)
 app.include_router(bim_attributes.router)
+app.include_router(versions.router)
 
 
 @app.get("/")
