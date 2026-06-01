@@ -7,13 +7,25 @@ class Settings(BaseSettings):
     app_name: str = "SICT Bimini API"
     debug: bool = False
 
-    model_config = SettingsConfigDict(env_prefix="API_", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_prefix="API_",
+        case_sensitive=False,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 class BIMSettings(BaseSettings):
     """BIM converter pipeline settings (env prefix: BIM_)."""
 
-    model_config = SettingsConfigDict(env_prefix="BIM_", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_prefix="BIM_",
+        case_sensitive=False,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # 실험 식별자 → Qdrant 컬렉션 네이밍
     experiment_id: str = "qwen4b_d2048"
