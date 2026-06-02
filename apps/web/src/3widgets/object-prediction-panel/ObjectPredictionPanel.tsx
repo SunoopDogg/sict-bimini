@@ -179,14 +179,14 @@ export function ObjectPredictionPanel({
                   <h3 className="text-muted-foreground text-sm font-medium">
                     {t.predict.sessionLabel(currentSessionOriginalIndex + 1)}
                   </h3>
-                  {currentSession.dbVersion && (
+                  {currentSession.prediction?.version && (
                     <Badge
                       variant="outline"
                       className="max-w-[160px] truncate font-normal"
-                      title={currentSession.dbVersion}
+                      title={currentSession.prediction.version}
                     >
                       <Database className="mr-1 h-3 w-3 shrink-0" />
-                      {currentSession.dbVersion}
+                      {currentSession.prediction.version}
                     </Badge>
                   )}
                 </div>

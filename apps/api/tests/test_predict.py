@@ -75,6 +75,11 @@ def test_predict_forwards_selected_collection(client: TestClient) -> None:
     assert kwargs["collection"] == "bim__expA"
 
 
+def test_predict_response_echoes_version(client: TestClient) -> None:
+    response = client.post("/predict?version=expA", json=_predict_body())
+    assert response.json()["version"] == "expA"
+
+
 def test_predict_happy_path(client: TestClient) -> None:
     response = client.post("/predict", json=_predict_body())
     assert response.status_code == 200

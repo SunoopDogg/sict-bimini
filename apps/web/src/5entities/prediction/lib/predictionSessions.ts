@@ -9,6 +9,7 @@ import type {
  * from saved user selections, where only the user's chosen codes are known.
  */
 export const EMPTY_COMBINED_PREDICTION_RESPONSE: CombinedPredictionResponse = {
+  version: '',
   kbims: {
     target: 'kbims_code',
     mode: 'strong',

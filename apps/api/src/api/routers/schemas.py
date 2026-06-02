@@ -31,6 +31,7 @@ class VersionListResponse(BaseModel):
 
 
 class CombinedPredictionResponse(BaseModel):
+    version: str  # DB version (Qdrant collection) this prediction was run against
     kbims: PredictionResponse
     pps: PredictionResponse
 

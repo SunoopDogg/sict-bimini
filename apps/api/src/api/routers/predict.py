@@ -9,6 +9,7 @@ from api.bim.predict import (
     PredictionRequest,
     PredictionResponse,
 )
+from api.bim.versions import version_from_collection
 from api.routers.deps import resolve_collection
 from api.routers.schemas import (
     BatchItemResult,
@@ -39,6 +40,7 @@ def _predict_both(
     request: Request, pred_req: PredictionRequest, collection: str
 ) -> CombinedPredictionResponse:
     return CombinedPredictionResponse(
+        version=version_from_collection(collection) or collection,
         kbims=_call_predictor(request.app.state.kbims, pred_req, collection),
         pps=_call_predictor(request.app.state.pps, pred_req, collection),
     )

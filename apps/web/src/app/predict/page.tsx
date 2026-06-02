@@ -149,7 +149,7 @@ export default function PredictPage() {
             item.prediction
               ? {
                   index: selectedIndicesArray[i],
-                  session: toSession(item.prediction, selectedVersion),
+                  session: toSession(item.prediction),
                 }
               : null,
           )
@@ -172,9 +172,7 @@ export default function PredictPage() {
       const response = await predictSingleCode(objects[index], 5, selectedVersion);
 
       if (response.success && response.data) {
-        appendSessions([
-          { index, session: toSession(response.data, selectedVersion) },
-        ]);
+        appendSessions([{ index, session: toSession(response.data) }]);
       } else {
         setError(response.error || t.predict.failed);
       }
