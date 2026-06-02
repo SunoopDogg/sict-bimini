@@ -1,10 +1,10 @@
 'use client';
 
-import { Check, Database, Loader2 } from 'lucide-react';
+import { Database, Loader2 } from 'lucide-react';
 
 import type { DbVersion } from '@/5entities/db-version';
 import { useLocale } from '@/6shared/i18n';
-import { cn } from '@/6shared/lib/cn';
+import { SelectableCardList } from '@/6shared/ui/SelectableCardList';
 
 interface VersionSelectProps {
   versions: DbVersion[];
@@ -46,32 +46,16 @@ export function VersionSelect({
   }
 
   return (
-    <ul className="space-y-2">
-      {versions.map((version) => (
-        <li key={version.name}>
-          <button
-            type="button"
-            onClick={() => onChange(version.name)}
-            className={cn(
-              'hover:bg-accent flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors',
-              value === version.name
-                ? 'border-primary bg-primary/5'
-                : 'border-border',
-            )}
-          >
-            <Database className="h-7 w-7 shrink-0 text-blue-600" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{version.name}</p>
-              <p className="text-muted-foreground text-xs">
-                {t.version.items(version.points)}
-              </p>
-            </div>
-            {value === version.name && (
-              <Check className="text-primary h-5 w-5 shrink-0" />
-            )}
-          </button>
-        </li>
-      ))}
-    </ul>
+    <SelectableCardList
+      items={versions}
+      getKey={(v) => v.name}
+      selectedKey={value}
+      onSelect={onChange}
+      renderIcon={() => (
+        <Database className="h-7 w-7 shrink-0 text-blue-600" />
+      )}
+      renderTitle={(v) => v.name}
+      renderSubtitle={(v) => t.version.items(v.points)}
+    />
   );
 }
