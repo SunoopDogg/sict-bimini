@@ -15,23 +15,28 @@ from api.bim.schemas import BIMAttribute, BIMObjectRaw
 logger = logging.getLogger(__name__)
 
 
-def _get_bilingual(data: dict[str, str], en: str, ko: str) -> str:
+def attr_group(raw: BIMObjectRaw) -> dict[str, str]:
+    """The bilingual attribute group (``Other``/``기타``) of a raw object."""
+    return raw.properties.get("Other") or raw.properties.get("기타") or {}
+
+
+def get_bilingual(data: dict[str, str], en: str, ko: str) -> str:
     value = data.get(en) or data.get(ko) or ""
     return str(value).strip()
 
 
 def _extract_attribute(raw: BIMObjectRaw) -> BIMAttribute | None:
-    other = raw.properties.get("Other") or raw.properties.get("기타") or {}
+    other = attr_group(raw)
     if not other:
         return None
 
     attr = BIMAttribute(
         ifc_type=(raw.ifc_type or "").strip(),
-        category=_get_bilingual(other, "Category", "카테고리"),
-        family_name=_get_bilingual(other, "Family Name", "패밀리 이름"),
-        family=_get_bilingual(other, "Family", "패밀리"),
-        type=_get_bilingual(other, "Type", "유형"),
-        type_id=_get_bilingual(other, "Type Id", "유형 ID"),
+        category=get_bilingual(other, "Category", "카테고리"),
+        family_name=get_bilingual(other, "Family Name", "패밀리 이름"),
+        family=get_bilingual(other, "Family", "패밀리"),
+        type=get_bilingual(other, "Type", "유형"),
+        type_id=get_bilingual(other, "Type Id", "유형 ID"),
         kbims_code=str(other.get("KBIMS-부위코드") or "").strip(),
         pps_code=str(other.get("조달청표준공사코드") or "").strip(),
     )

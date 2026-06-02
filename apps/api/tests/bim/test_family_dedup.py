@@ -24,15 +24,6 @@ def test_collapses_same_family_first_wins():
     assert [r.object_name for r in out] == ["A", "C"]
 
 
-def test_empty_family_name_kept_individually():
-    raws = [
-        _raw(family="", name="D"),
-        _raw(family="", name="E"),
-    ]
-    out = dedup_raw_by_family(raws)
-    assert [r.object_name for r in out] == ["D", "E"]
-
-
 def test_keeps_codeless_rows():
     # 코드(kbims/pps) 전혀 없는 행도 유지 (validity 게이트 없음)
     raws = [_raw(family="문-외부", name="C")]
@@ -71,21 +62,12 @@ def test_family_name_stripped():
     assert [r.object_name for r in out] == ["A"]
 
 
-def _raw_other(other: dict, name: str) -> BIMObjectRaw:
-    return BIMObjectRaw(
-        source_file="test.xlsx",
-        object_name=name,
-        ifc_type="IfcCurtainWall",
-        properties={"Other": other},
-    )
-
-
 def test_falls_back_to_family_when_no_family_name():
     # 커튼월/문/창 등: Family Name 키 없음 → Family로 dedup
     raws = [
-        _raw_other({"Family": "커튼월-CW110"}, "A"),
-        _raw_other({"Family": "커튼월-CW110"}, "B"),
-        _raw_other({"Family": "커튼월-CW200"}, "C"),
+        _raw(family=None, name="A", extra={"Family": "커튼월-CW110"}),
+        _raw(family=None, name="B", extra={"Family": "커튼월-CW110"}),
+        _raw(family=None, name="C", extra={"Family": "커튼월-CW200"}),
     ]
     out = dedup_raw_by_family(raws)
     assert [r.object_name for r in out] == ["A", "C"]
@@ -94,8 +76,8 @@ def test_falls_back_to_family_when_no_family_name():
 def test_family_name_preferred_over_family():
     # Family Name 있으면 그게 키 (Family는 무시)
     raws = [
-        _raw_other({"Family Name": "벽-기본", "Family": "X"}, "A"),
-        _raw_other({"Family Name": "벽-기본", "Family": "Y"}, "B"),
+        _raw(family="벽-기본", name="A", extra={"Family": "X"}),
+        _raw(family="벽-기본", name="B", extra={"Family": "Y"}),
     ]
     out = dedup_raw_by_family(raws)
     assert [r.object_name for r in out] == ["A"]
@@ -103,8 +85,8 @@ def test_family_name_preferred_over_family():
 
 def test_neither_family_name_nor_family_kept_individually():
     raws = [
-        _raw_other({}, "A"),
-        _raw_other({}, "B"),
+        _raw(family=None, name="A"),
+        _raw(family=None, name="B"),
     ]
     out = dedup_raw_by_family(raws)
     assert [r.object_name for r in out] == ["A", "B"]

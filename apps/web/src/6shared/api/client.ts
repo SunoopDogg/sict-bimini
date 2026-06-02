@@ -7,21 +7,28 @@ import type { XLSXConversionResult } from '@/5entities/xlsx-file';
 
 import type { APIResponse } from './types';
 
+// Client components hit the relative `/api` proxy (same-origin — works for
+// external access; next.config rewrites it to the backend).
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-
-// Server-side callers (Server Actions) run on the Next server, which has no
-// origin to resolve the relative `/api` proxy against — a relative URL throws
-// "Invalid URL". They must hit the backend directly via BACKEND_ORIGIN (the
-// same env next.config proxies `/api/*` to).
+// Server Actions run on the Next server, which has no origin to resolve the
+// relative `/api` proxy against (a relative URL throws "Invalid URL"). They hit
+// the backend directly via BACKEND_ORIGIN (the same env next.config proxies to).
 const SERVER_BACKEND_URL = process.env.BACKEND_ORIGIN || 'http://localhost:8000';
 
+// Pick the base by execution context so callers pass a relative path only and
+// no function has to opt into server-vs-client by hand (which silently breaks
+// the next server-side caller). `window` is undefined on the Next server.
+function backendBase(): string {
+  return typeof window === 'undefined' ? SERVER_BACKEND_URL : BACKEND_URL;
+}
+
 async function apiRequest<T>(
-  url: string,
+  path: string,
   options: RequestInit,
   errorContext: string,
 ): Promise<APIResponse<T>> {
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(`${backendBase()}${path}`, options);
 
     if (!response.ok) {
       let detail = response.statusText;
@@ -46,11 +53,12 @@ async function apiRequest<T>(
 }
 
 export async function checkHealth(): Promise<APIResponse<HealthStatus>> {
+  const base = backendBase();
   try {
-    const response = await fetch(`${BACKEND_URL}/health`, { method: 'GET' });
+    const response = await fetch(`${base}/health`, { method: 'GET' });
     const text = await response.text();
     if (!text) {
-      return { success: false, data: null, error: `빈 응답 HTTP ${response.status} (${BACKEND_URL})` };
+      return { success: false, data: null, error: `빈 응답 HTTP ${response.status} (${base})` };
     }
     const data = JSON.parse(text) as HealthStatus;
     return { success: true, data, error: null };
@@ -58,7 +66,7 @@ export async function checkHealth(): Promise<APIResponse<HealthStatus>> {
     return {
       success: false,
       data: null,
-      error: `${error instanceof Error ? error.message : '알 수 없는 오류'} (${BACKEND_URL})`,
+      error: `${error instanceof Error ? error.message : '알 수 없는 오류'} (${base})`,
     };
   }
 }
@@ -69,7 +77,7 @@ export async function convertXlsxToJson(
   const formData = new FormData();
   formData.append('file', file);
   return apiRequest(
-    `${SERVER_BACKEND_URL}/convert/xlsx-to-json`,
+    '/convert/xlsx-to-json',
     { method: 'POST', body: formData },
     'XLSX 변환 실패',
   );
@@ -83,7 +91,7 @@ export async function predictSingleCode(
   const { name: _name, ...attribute } = input;
   const qs = version ? `?version=${encodeURIComponent(version)}` : '';
   return apiRequest(
-    `${BACKEND_URL}/predict${qs}`,
+    `/predict${qs}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,7 +109,7 @@ export async function batchPredictCode(
   const objects = inputs.map(({ name: _name, ...attr }) => attr);
   const qs = version ? `?version=${encodeURIComponent(version)}` : '';
   return apiRequest(
-    `${BACKEND_URL}/batch-predict${qs}`,
+    `/batch-predict${qs}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -118,7 +126,7 @@ export async function fetchBimAttributes(
 ): Promise<APIResponse<BIMAttributeListResponse>> {
   const vq = version ? `&version=${encodeURIComponent(version)}` : '';
   return apiRequest(
-    `${BACKEND_URL}/bim-attributes?page=${page}&page_size=${pageSize}${vq}`,
+    `/bim-attributes?page=${page}&page_size=${pageSize}${vq}`,
     { method: 'GET' },
     'BIM 속성 목록 조회 실패',
   );
@@ -128,7 +136,7 @@ export async function fetchVersions(): Promise<
   APIResponse<DbVersionListResponse>
 > {
   return apiRequest(
-    `${BACKEND_URL}/versions`,
+    '/versions',
     { method: 'GET' },
     '버전 목록 조회 실패',
   );

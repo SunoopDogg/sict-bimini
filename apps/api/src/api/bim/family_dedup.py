@@ -8,6 +8,7 @@ representative (object_name + all fields) rather than flattening to
 
 from __future__ import annotations
 
+from api.bim.normalizer import attr_group, get_bilingual
 from api.bim.schemas import BIMObjectRaw
 
 
@@ -19,11 +20,10 @@ def _dedup_key(raw: BIMObjectRaw) -> str:
     ``Family`` instead. Prefer the finer ``Family Name`` where present, else
     ``Family``. Empty string when neither is set.
     """
-    other = raw.properties.get("Other") or raw.properties.get("기타") or {}
-    name = str(other.get("Family Name") or other.get("패밀리 이름") or "").strip()
-    if name:
-        return name
-    return str(other.get("Family") or other.get("패밀리") or "").strip()
+    other = attr_group(raw)
+    return get_bilingual(other, "Family Name", "패밀리 이름") or get_bilingual(
+        other, "Family", "패밀리"
+    )
 
 
 def dedup_raw_by_family(raws: list[BIMObjectRaw]) -> list[BIMObjectRaw]:
@@ -37,10 +37,7 @@ def dedup_raw_by_family(raws: list[BIMObjectRaw]) -> list[BIMObjectRaw]:
     out: list[BIMObjectRaw] = []
     for raw in raws:
         key = _dedup_key(raw)
-        if key == "":
-            out.append(raw)
-            continue
-        if key in seen:
+        if key and key in seen:
             continue
         seen.add(key)
         out.append(raw)
