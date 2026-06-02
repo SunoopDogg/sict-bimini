@@ -74,9 +74,15 @@ export function ObjectPredictionPanel({
   const [previousSessionCount, setPreviousSessionCount] = useState(sessions.length);
   const { t } = useLocale();
 
+  // Reset paging when the session list changes (e.g. switching objects).
+  // setState during render does NOT update sessionPage for the rest of THIS
+  // render pass, so use the reset value locally too — otherwise a stale
+  // sessionPage can index past a now-shorter sessions array (undefined crash).
+  let activePage = sessionPage;
   if (sessions.length !== previousSessionCount) {
     setPreviousSessionCount(sessions.length);
     setSessionPage(0);
+    activePage = 0;
   }
 
   if (object === null) {
@@ -112,8 +118,8 @@ export function ObjectPredictionPanel({
   }
 
   const reversedSessions = [...sessions].reverse();
-  const currentSession = reversedSessions[sessionPage];
-  const currentSessionOriginalIndex = sessions.length - 1 - sessionPage;
+  const currentSession = reversedSessions[activePage];
+  const currentSessionOriginalIndex = sessions.length - 1 - activePage;
 
   const kbims = currentSession.prediction?.kbims;
   const pps = currentSession.prediction?.pps;
