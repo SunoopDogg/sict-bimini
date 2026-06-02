@@ -30,17 +30,22 @@ interface RawBIMJsonProperties {
 }
 
 interface RawBIMJsonEntry {
-  IFCType?: string;
-  Name?: string;
-  Other?: RawBIMJsonProperties;
-  기타?: RawBIMJsonProperties;
+  // Shape matches the API's BIMObjectRaw dump from /convert/xlsx-to-json:
+  // identity fields are snake_case and the attribute group is nested under
+  // properties.Other / properties.기타 (not top-level).
+  object_name?: string;
+  ifc_type?: string;
+  properties?: {
+    Other?: RawBIMJsonProperties;
+    기타?: RawBIMJsonProperties;
+  };
 }
 
 function mapRawToBIMObject(obj: RawBIMJsonEntry): BIMObject {
-  const properties = obj.Other ?? obj.기타;
+  const properties = obj.properties?.Other ?? obj.properties?.기타;
   return {
-    name: obj.Name ?? '',
-    ifc_type: obj.IFCType ?? '',
+    name: obj.object_name ?? '',
+    ifc_type: obj.ifc_type ?? '',
     category: properties?.Category ?? properties?.카테고리 ?? '',
     family_name: properties?.['Family Name'] ?? properties?.['패밀리 이름'] ?? '',
     family: properties?.Family ?? properties?.패밀리 ?? '',
