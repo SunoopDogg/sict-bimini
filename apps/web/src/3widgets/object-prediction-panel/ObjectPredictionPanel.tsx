@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, Loader2 } from 'lucide-react';
 
 import type { BIMObject } from '@/5entities/bim-object';
 import type { PredictionSession, UserCandidate } from '@/5entities/prediction';
@@ -174,11 +174,23 @@ export function ObjectPredictionPanel({
 
           {currentSession && (
             <div className="space-y-3 rounded-lg border p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-muted-foreground text-sm font-medium">
-                  {t.predict.sessionLabel(currentSessionOriginalIndex + 1)}
-                </h3>
-                <span className="text-muted-foreground text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <h3 className="text-muted-foreground text-sm font-medium">
+                    {t.predict.sessionLabel(currentSessionOriginalIndex + 1)}
+                  </h3>
+                  {currentSession.dbVersion && (
+                    <Badge
+                      variant="outline"
+                      className="max-w-[160px] truncate font-normal"
+                      title={currentSession.dbVersion}
+                    >
+                      <Database className="mr-1 h-3 w-3 shrink-0" />
+                      {currentSession.dbVersion}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-muted-foreground shrink-0 text-xs">
                   {new Date(currentSession.predicted_at).toLocaleString('ko-KR')}
                 </span>
               </div>

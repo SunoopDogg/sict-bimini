@@ -8,11 +8,15 @@ import type {
 import { getPairCount } from '@/5entities/prediction';
 import { savePredictionsAction } from '@/4features/predict-code';
 
-function toSession(prediction: CombinedPredictionResponse): PredictionSession {
+function toSession(
+  prediction: CombinedPredictionResponse,
+  dbVersion?: string,
+): PredictionSession {
   return {
     prediction,
     selectedIndex: 0,
     predicted_at: new Date().toISOString(),
+    dbVersion,
   };
 }
 

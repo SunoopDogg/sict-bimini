@@ -35,6 +35,7 @@ export interface PredictionSession {
   selectedIndex: number;    // index into kbims/pps candidate pairs; equals pairCount when user card selected
   userCandidate?: UserCandidate;
   predicted_at: string;     // client-stamped ISO string
+  dbVersion?: string;       // DB version (Qdrant collection) this prediction was run against
 }
 
 export interface UserSelection {
