@@ -12,9 +12,11 @@ def resolve_collection(
     Omitted → the env default ``experiment_id``. Unknown collection → 404.
     """
     settings = request.app.state.bim
-    qdrant = request.app.state.qdrant
-    name = version or settings.experiment_id
-    collection = collection_for_version(name)
-    if not qdrant.collection_exists(collection):
-        raise HTTPException(status_code=404, detail=f"Unknown DB version: {name}")
+    if version is None:
+        # Default collection is built at startup → guaranteed to exist;
+        # reuse the single naming source on BIMSettings, skip the probe.
+        return settings.collection_name
+    collection = collection_for_version(version)
+    if not request.app.state.qdrant.collection_exists(collection):
+        raise HTTPException(status_code=404, detail=f"Unknown DB version: {version}")
     return collection

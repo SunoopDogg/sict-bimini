@@ -45,4 +45,4 @@ def test_list_versions_filters_non_bim_counts_and_sorts() -> None:
         VersionInfo(name="v1", points=42),
         VersionInfo(name="v2", points=42),
     ]
-    qdrant.count.assert_any_call(collection_name="bim__v1", exact=True)
+    qdrant.count.assert_any_call(collection_name="bim__v1", exact=False)

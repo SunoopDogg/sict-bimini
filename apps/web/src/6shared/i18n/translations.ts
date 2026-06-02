@@ -36,6 +36,11 @@ const ko = {
     xlsxOnly: '.xlsx 형식만 지원됩니다',
   },
 
+  version: {
+    none: '버전 없음',
+    items: (n: number) => `${n}개`,
+  },
+
   predict: {
     results: '예측 결과',
     predict: '예측하기',
@@ -144,6 +149,11 @@ const en: typeof ko = {
     dragOrClick: 'Drag an xlsx file or',
     selectFile: 'Select file',
     xlsxOnly: 'Only .xlsx format supported',
+  },
+
+  version: {
+    none: 'No versions',
+    items: (n: number) => `${n}`,
   },
 
   predict: {

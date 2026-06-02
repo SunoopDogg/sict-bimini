@@ -3,6 +3,7 @@
 import { Check, Database, Loader2 } from 'lucide-react';
 
 import type { DbVersion } from '@/5entities/db-version';
+import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 
 interface VersionSelectProps {
@@ -20,6 +21,8 @@ export function VersionSelect({
   isLoading,
   error,
 }: VersionSelectProps) {
+  const { t } = useLocale();
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-6">
@@ -37,7 +40,7 @@ export function VersionSelect({
   if (versions.length === 0) {
     return (
       <div className="text-muted-foreground py-6 text-center text-sm">
-        버전 없음
+        {t.version.none}
       </div>
     );
   }
@@ -60,7 +63,7 @@ export function VersionSelect({
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{version.name}</p>
               <p className="text-muted-foreground text-xs">
-                {version.points.toLocaleString()}개
+                {t.version.items(version.points)}
               </p>
             </div>
             {value === version.name && (

@@ -40,8 +40,9 @@ class VersionService:
             version = version_from_collection(collection.name)
             if version is None:
                 continue
+            # Approximate is fine — this only feeds a "N개" dropdown label.
             count = self._qdrant.count(
-                collection_name=collection.name, exact=True
+                collection_name=collection.name, exact=False
             ).count
             versions.append(VersionInfo(name=version, points=count))
         return sorted(versions, key=lambda v: v.name)

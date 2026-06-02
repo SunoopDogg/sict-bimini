@@ -60,13 +60,9 @@ export default function PredictPage() {
     isLoading: versionsLoading,
     error: versionsError,
   } = useVersions();
-  const [selectedVersion, setSelectedVersion] = useState<string>();
-
-  useEffect(() => {
-    if (selectedVersion === undefined && versions.length > 0) {
-      setSelectedVersion(versions[0].name);
-    }
-  }, [versions, selectedVersion]);
+  const [pickedVersion, setPickedVersion] = useState<string>();
+  // Effective version: user's pick, else default to the first available.
+  const selectedVersion = pickedVersion ?? versions[0]?.name;
 
   const selectedFile =
     activeSource?.type === 'xlsx' ? activeSource.fileName : undefined;
@@ -292,7 +288,7 @@ export default function PredictPage() {
                 <VersionSelect
                   versions={versions}
                   value={selectedVersion}
-                  onChange={setSelectedVersion}
+                  onChange={setPickedVersion}
                   isLoading={versionsLoading}
                   error={versionsError}
                 />
