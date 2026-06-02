@@ -3,9 +3,9 @@ from unittest.mock import MagicMock
 from qdrant_client import QdrantClient
 
 from api.bim.versions import (
-    VersionInfo,
-    VersionService,
+    DbVersion,
     collection_for_version,
+    list_versions,
     version_from_collection,
 )
 
@@ -39,10 +39,10 @@ def test_list_versions_filters_non_bim_counts_and_sorts() -> None:
     )
     qdrant.count.return_value = MagicMock(count=42)
 
-    versions = VersionService(qdrant).list_versions()
+    versions = list_versions(qdrant)
 
     assert versions == [
-        VersionInfo(name="v1", points=42),
-        VersionInfo(name="v2", points=42),
+        DbVersion(name="v1", points=42),
+        DbVersion(name="v2", points=42),
     ]
     qdrant.count.assert_any_call(collection_name="bim__v1", exact=False)
