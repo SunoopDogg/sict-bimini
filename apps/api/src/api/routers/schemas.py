@@ -21,6 +21,11 @@ def raise_embedding_unavailable(exc: Exception) -> NoReturn:
     raise HTTPException(status_code=503, detail=detail) from exc
 
 
+class MetaResponse(BaseModel):
+    llm_model: str
+    embedding_model: str
+
+
 class CombinedPredictionResponse(BaseModel):
     version: str  # DB version (Qdrant collection) this prediction was run against
     kbims: PredictionResponse
