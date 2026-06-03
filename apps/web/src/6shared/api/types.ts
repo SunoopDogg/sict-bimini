@@ -3,3 +3,8 @@ export interface APIResponse<T> {
   data: T | null;
   error: string | null;
 }
+
+export interface MetaResponse {
+  llm_model: string;
+  embedding_model: string;
+}

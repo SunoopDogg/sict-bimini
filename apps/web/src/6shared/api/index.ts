@@ -1,2 +1,2 @@
-export { batchPredictCode, checkHealth, convertXlsxToJson, fetchBimAttributes, fetchVersions, predictSingleCode } from './client';
-export type { APIResponse } from './types';
+export { batchPredictCode, checkHealth, convertXlsxToJson, fetchBimAttributes, fetchMeta, fetchVersions, predictSingleCode } from './client';
+export type { APIResponse, MetaResponse } from './types';

@@ -5,7 +5,7 @@ import type { HealthStatus } from '@/5entities/health';
 import type { BatchPredictResult, CombinedPredictionResponse } from '@/5entities/prediction';
 import type { XLSXConversionResult } from '@/5entities/xlsx-file';
 
-import type { APIResponse } from './types';
+import type { APIResponse, MetaResponse } from './types';
 
 // Client components hit the relative `/api` proxy (same-origin — works for
 // external access; next.config rewrites it to the backend).
@@ -139,5 +139,13 @@ export async function fetchVersions(): Promise<
     '/versions',
     { method: 'GET' },
     '버전 목록 조회 실패',
+  );
+}
+
+export async function fetchMeta(): Promise<APIResponse<MetaResponse>> {
+  return apiRequest(
+    '/meta',
+    { method: 'GET' },
+    '메타 조회 실패',
   );
 }
