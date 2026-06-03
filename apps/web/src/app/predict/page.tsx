@@ -138,8 +138,14 @@ export default function PredictPage() {
 
   const handleBatchPredict = () => {
     setError(undefined);
-    const selectedObjects = objects.filter((_, i) => selectedIndices.has(i));
-    const selectedIndicesArray = Array.from(selectedIndices);
+    // Ascending order so this lines up with `objects.filter` (and thus the
+    // backend's per-object result order). `Set` iterates in insertion order,
+    // which differs when the user checks boxes out of order — zipping that
+    // against the filtered objects would attach predictions to wrong rows.
+    const selectedIndicesArray = objects
+      .map((_, i) => i)
+      .filter((i) => selectedIndices.has(i));
+    const selectedObjects = selectedIndicesArray.map((i) => objects[i]);
     startPrediction(async () => {
       const response = await batchPredictCode(selectedObjects, 5, selectedVersion);
 
