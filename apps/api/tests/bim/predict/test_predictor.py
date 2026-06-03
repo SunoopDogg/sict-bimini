@@ -98,6 +98,23 @@ class TestPredictorRetrievalParams:
 
         assert w["retriever"].search.call_args.kwargs["extra_filter"] is f
 
+    def test_provided_vector_skips_embed_and_is_used_for_retrieval(
+        self, wired_predictor, sample_attribute
+    ):
+        w = wired_predictor
+        w["retriever"].search.return_value = [_n(0.9, f"KM{i:03d}") for i in range(6)]
+        w["vllm"].generate_json.return_value = _valid_strong_json_str(
+            pool_codes=[f"KM{i:03d}" for i in range(6)], n=5
+        )
+
+        w["predictor"].predict(
+            PredictionRequest(attribute=sample_attribute, n=5),
+            vector=[0.5, 0.6, 0.7],
+        )
+
+        w["embed"].embed.assert_not_called()
+        assert w["retriever"].search.call_args.args[0] == [0.5, 0.6, 0.7]
+
     def test_top_k_floor_is_k_min(self, wired_predictor, sample_attribute):
         """If n=1 and K_MULTIPLIER=3, top_k = max(10, 3) = 10."""
         w = wired_predictor

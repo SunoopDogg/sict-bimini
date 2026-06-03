@@ -70,13 +70,21 @@ class Predictor:
         *,
         extra_filter: QdrantFilter | None = None,
         collection: str | None = None,
+        vector: list[float] | None = None,
     ) -> PredictionResponse:
         cfg = self._config
         attr = request.attribute
         n = request.n
         tag = f"predict[{cfg.target}] stable_id={attr.stable_id}"
 
-        [vec] = self._embed.embed([attr.embed_text()])
+        # Shared-vector fast path: the router embeds once and injects the same
+        # vector into both predictors. Fall back to self-embed when absent
+        # (eval/CLI path), so this stays backward-compatible.
+        vec = (
+            vector
+            if vector is not None
+            else self._embed.embed([attr.embed_text()])[0]
+        )
 
         top_k = max(cfg.k_min, n * cfg.k_multiplier)
         neighbors = self._retriever.search(
