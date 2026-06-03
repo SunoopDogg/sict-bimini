@@ -61,9 +61,13 @@ def client() -> TestClient:
     qdrant = MagicMock(spec=QdrantClient)
     qdrant.collection_exists.return_value = True
 
+    embed = MagicMock()
+    embed.embed.return_value = [[0.1, 0.2, 0.3]]
+
     app.state.kbims = mock_kbims
     app.state.pps = mock_pps
     app.state.qdrant = qdrant
+    app.state.embed = embed
     app.state.bim = BIMSettings()
 
     return TestClient(app)
@@ -147,3 +151,32 @@ def test_batch_predict_partial_failure(client: TestClient) -> None:
     assert body["successful"] == 1
     assert body["failed"] == 1
     assert body["results"][1]["error"] is not None
+
+
+def test_predict_embeds_once_and_shares_vector(client: TestClient) -> None:
+    client.post("/predict", json=_predict_body())
+    app.state.embed.embed.assert_called_once()
+    kbims_vec = app.state.kbims.predict.call_args.kwargs["vector"]
+    pps_vec = app.state.pps.predict.call_args.kwargs["vector"]
+    assert kbims_vec == pps_vec == [0.1, 0.2, 0.3]
+
+
+def test_predict_runs_kbims_and_pps_concurrently(client: TestClient) -> None:
+    import threading
+
+    barrier = threading.Barrier(2, timeout=5)
+
+    def blocking(resp):
+        def _predict(*args, **kwargs):
+            barrier.wait()  # completes only if the other predictor also arrives
+            return resp
+        return _predict
+
+    app.state.kbims.predict.side_effect = blocking(_make_response("kbims_code"))
+    app.state.pps.predict.side_effect = blocking(_make_response("pps_code"))
+    try:
+        response = client.post("/predict", json=_predict_body())
+    finally:
+        app.state.kbims.predict.side_effect = None
+        app.state.pps.predict.side_effect = None
+    assert response.status_code == 200

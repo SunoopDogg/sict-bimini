@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -24,10 +25,10 @@ router = APIRouter(tags=["prediction"])
 
 
 def _call_predictor(
-    pred, req: PredictionRequest, collection: str
+    pred, req: PredictionRequest, collection: str, vector: list[float]
 ) -> PredictionResponse:
     try:
-        return pred.predict(req, collection=collection)
+        return pred.predict(req, collection=collection, vector=vector)
     except EmptyRetrievalError as e:
         raise HTTPException(status_code=422, detail="No similar objects found") from e
     except LLMGenerationError as e:
@@ -36,27 +37,45 @@ def _call_predictor(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-def _predict_both(
+async def _predict_both(
     request: Request, pred_req: PredictionRequest, collection: str
 ) -> CombinedPredictionResponse:
+    attr = pred_req.attribute
+    # Embed once, then fan out: both predictors retrieve with the same vector.
+    [vec] = await asyncio.to_thread(
+        request.app.state.embed.embed, [attr.embed_text()]
+    )
+    kbims_res, pps_res = await asyncio.gather(
+        asyncio.to_thread(
+            _call_predictor, request.app.state.kbims, pred_req, collection, vec
+        ),
+        asyncio.to_thread(
+            _call_predictor, request.app.state.pps, pred_req, collection, vec
+        ),
+        return_exceptions=True,
+    )
+    # Reraise in positional order so kbims's error wins (matches prior behavior).
+    for res in (kbims_res, pps_res):
+        if isinstance(res, BaseException):
+            raise res
     return CombinedPredictionResponse(
         version=version_from_collection(collection) or collection,
-        kbims=_call_predictor(request.app.state.kbims, pred_req, collection),
-        pps=_call_predictor(request.app.state.pps, pred_req, collection),
+        kbims=kbims_res,
+        pps=pps_res,
     )
 
 
 @router.post("/predict", response_model=CombinedPredictionResponse)
-def predict(
+async def predict(
     request: Request,
     body: PredictionRequest,
     collection: str = Depends(resolve_collection),
 ) -> CombinedPredictionResponse:
-    return _predict_both(request, body, collection)
+    return await _predict_both(request, body, collection)
 
 
 @router.post("/batch-predict", response_model=BatchPredictResult)
-def batch_predict(
+async def batch_predict(
     request: Request,
     body: BatchPredictRequest,
     collection: str = Depends(resolve_collection),
@@ -68,7 +87,7 @@ def batch_predict(
     for attr in body.objects:
         pred_req = PredictionRequest(attribute=attr, n=body.n)
         try:
-            prediction = _predict_both(request, pred_req, collection)
+            prediction = await _predict_both(request, pred_req, collection)
             results.append(BatchItemResult(input=attr, prediction=prediction))
             successful += 1
         except HTTPException as e:
