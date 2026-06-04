@@ -19,6 +19,7 @@ import {
   loadUserSelectionsAction,
 } from '@/4features/manage-file';
 import { loadPredictionsAction } from '@/4features/predict-code';
+import { ExportReportButton } from '@/4features/export-report';
 import type { BIMObject } from '@/5entities/bim-object';
 import type { PredictionSession } from '@/5entities/prediction';
 import { buildSelectionSessionMap } from '@/5entities/prediction';
@@ -269,7 +270,13 @@ export default function PredictPage() {
           <ServerStatusBadge />
         </div>
         <h1 className="text-3xl font-bold">{t.pageTitle}</h1>
-        <div className="absolute right-0">
+        <div className="absolute right-0 flex items-center gap-2">
+          <ExportReportButton
+            objects={objects}
+            predictionMap={predictionMap}
+            version={selectedVersion}
+            fileName={activeSource?.fileName}
+          />
           <SettingsDropdown />
         </div>
       </div>

@@ -56,6 +56,13 @@ const ko = {
     failed: '예측에 실패했습니다.',
   },
 
+  report: {
+    export: '보고서 추출',
+    generating: '생성 중…',
+    noObjects: '객체 없음',
+    failed: '보고서 생성 실패',
+  },
+
   object: {
     info: '객체 정보',
     name: '이름',
@@ -169,6 +176,13 @@ const en: typeof ko = {
     prevSession: 'Previous prediction',
     nextSession: 'Next prediction',
     failed: 'Prediction failed.',
+  },
+
+  report: {
+    export: 'Export report',
+    generating: 'Generating…',
+    noObjects: 'No objects',
+    failed: 'Report generation failed',
   },
 
   object: {
