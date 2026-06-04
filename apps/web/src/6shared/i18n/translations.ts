@@ -37,6 +37,7 @@ const ko = {
   },
 
   version: {
+    title: 'DB 버전',
     none: '버전 없음',
     items: (n: number) => `${n}개`,
   },
@@ -57,8 +58,11 @@ const ko = {
   },
 
   report: {
+    title: '보고서',
+    fileLabel: '파일',
     export: '보고서 추출',
     cancel: '중단',
+    cancelling: '중단 중…',
     generating: '생성 중…',
     noObjects: '객체 없음',
     failed: '보고서 생성 실패',
@@ -160,6 +164,7 @@ const en: typeof ko = {
   },
 
   version: {
+    title: 'DB Version',
     none: 'No versions',
     items: (n: number) => `${n}`,
   },
@@ -180,8 +185,11 @@ const en: typeof ko = {
   },
 
   report: {
+    title: 'Report',
+    fileLabel: 'File',
     export: 'Export report',
     cancel: 'Cancel',
+    cancelling: 'Cancelling…',
     generating: 'Generating…',
     noObjects: 'No objects',
     failed: 'Report generation failed',

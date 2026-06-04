@@ -42,20 +42,25 @@ export function ExportReportButton({
 }: Props) {
   const { t } = useLocale();
   const [busy, setBusy] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number }>();
   const [error, setError] = useState<string>();
   const cancelRef = useRef(false);
 
   const handleClick = async () => {
     // While running, the button acts as a cancel toggle (cooperative — the
-    // predict loop checks cancelRef before each chunk).
+    // predict loop checks cancelRef before each chunk, so it stops at the next
+    // boundary, not instantly; show "중단 중…" so the click is acknowledged).
     if (busy) {
+      if (cancelling) return;
       cancelRef.current = true;
+      setCancelling(true);
       return;
     }
     setError(undefined);
     setProgress(undefined);
     cancelRef.current = false;
+    setCancelling(false);
     setBusy(true);
     onBusyChange?.(true);
     try {
@@ -90,17 +95,20 @@ export function ExportReportButton({
     } finally {
       setBusy(false);
       setProgress(undefined);
+      setCancelling(false);
       onBusyChange?.(false);
     }
   };
 
-  // Predict phase shows a cancellable "중단 (done/total)"; the brief PDF phase
-  // shows "생성 중…" and is not cancellable.
+  // Predict phase shows a cancellable "중단 (done/total)"; after a cancel click
+  // "중단 중…" until the in-flight chunk ends; the brief PDF phase "생성 중…".
   const label = !busy
     ? t.report.export
-    : progress
-      ? `${t.report.cancel} (${progress.done}/${progress.total})`
-      : t.report.generating;
+    : cancelling
+      ? t.report.cancelling
+      : progress
+        ? `${t.report.cancel} (${progress.done}/${progress.total})`
+        : t.report.generating;
 
   return (
     <Button
@@ -108,7 +116,7 @@ export function ExportReportButton({
       size="sm"
       className={className}
       onClick={handleClick}
-      disabled={objects.length === 0 || (busy && !progress)}
+      disabled={objects.length === 0 || (busy && (cancelling || !progress))}
       title={objects.length === 0 ? t.report.noObjects : undefined}
     >
       {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
