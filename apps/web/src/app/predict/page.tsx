@@ -5,7 +5,6 @@ import { useEffect, useState, useTransition } from 'react';
 import { usePredictionSessions } from '@/2pages/predict/hooks/usePredictionSessions';
 import { useUserSelections } from '@/2pages/predict/hooks/useUserSelections';
 import { ObjectPredictionPanel } from '@/3widgets/object-prediction-panel';
-import { UserSelectionPanel } from '@/3widgets/user-selection-panel';
 import { useVersions, VersionSelect } from '@/4features/select-db-version';
 import { ServerStatusBadge } from '@/4features/server-status';
 import {
@@ -67,11 +66,8 @@ export default function PredictPage() {
 
   const selectedFile =
     activeSource?.type === 'xlsx' ? activeSource.fileName : undefined;
-  const selectedSelectionFile =
-    activeSource?.type === 'selection' ? activeSource.fileName : undefined;
 
   const {
-    selectionFiles,
     refreshSelectionFiles,
     addToSelections,
     removeFromSelections,
@@ -131,10 +127,6 @@ export default function PredictPage() {
 
   const handleSelectXlsxFile = (fileName: string) => {
     setDataSource({ type: 'xlsx', fileName });
-  };
-
-  const handleSelectSelectionFile = async (fileName: string) => {
-    setDataSource({ type: 'selection', fileName });
   };
 
   const handleBatchPredict = () => {
@@ -270,13 +262,7 @@ export default function PredictPage() {
           <ServerStatusBadge />
         </div>
         <h1 className="text-3xl font-bold">{t.pageTitle}</h1>
-        <div className="absolute right-0 flex items-center gap-2">
-          <ExportReportButton
-            objects={objects}
-            predictionMap={predictionMap}
-            version={selectedVersion}
-            fileName={activeSource?.fileName}
-          />
+        <div className="absolute right-0">
           <SettingsDropdown />
         </div>
       </div>
@@ -324,11 +310,20 @@ export default function PredictPage() {
               </div>
             </CardContent>
           </Card>
-          <UserSelectionPanel
-            files={selectionFiles}
-            selectedFile={selectedSelectionFile}
-            onSelect={handleSelectSelectionFile}
-          />
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle>보고서</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ExportReportButton
+                className="w-full"
+                objects={objects}
+                predictionMap={predictionMap}
+                version={selectedVersion}
+                fileName={activeSource?.fileName}
+              />
+            </CardContent>
+          </Card>
         </div>
 
         {/* Panel 2: Object List */}

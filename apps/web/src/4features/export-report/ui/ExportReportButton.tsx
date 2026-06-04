@@ -15,6 +15,7 @@ interface Props {
   predictionMap: Record<string, PredictionSession[]>;
   version?: string;
   fileName?: string;
+  className?: string;
 }
 
 export function ExportReportButton({
@@ -22,6 +23,7 @@ export function ExportReportButton({
   predictionMap,
   version,
   fileName,
+  className,
 }: Props) {
   const { t } = useLocale();
   const [busy, setBusy] = useState(false);
@@ -58,6 +60,7 @@ export function ExportReportButton({
     <Button
       variant="outline"
       size="sm"
+      className={className}
       onClick={handleClick}
       disabled={busy || objects.length === 0}
       title={objects.length === 0 ? t.report.noObjects : undefined}
