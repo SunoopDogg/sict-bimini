@@ -38,14 +38,21 @@ export function usePredictionSessions({
     }
   };
 
-  const appendSessions = (entries: { index: number; session: PredictionSession }[]) => {
-    const nextMap = { ...predictionMap };
+  // Returns the merged map so callers can chain appends across awaits without
+  // waiting for a re-render (state closure would be stale). Pass `base` to
+  // thread a running map through a loop; defaults to current state.
+  const appendSessions = (
+    entries: { index: number; session: PredictionSession }[],
+    base: Record<string, PredictionSession[]> = predictionMap,
+  ): Record<string, PredictionSession[]> => {
+    const nextMap = { ...base };
     for (const { index, session } of entries) {
       const existing = nextMap[index] ?? [];
       nextMap[index] = [...existing, session];
     }
     setPredictionMap(nextMap);
     saveToDisk(nextMap);
+    return nextMap;
   };
 
   const handleSelectCandidate = (

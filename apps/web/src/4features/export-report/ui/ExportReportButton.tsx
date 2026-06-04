@@ -13,6 +13,9 @@ import { buildReportData } from '../model/buildReportData';
 interface Props {
   objects: BIMObject[];
   predictionMap: Record<string, PredictionSession[]>;
+  // Predicts any not-yet-predicted objects and resolves to the fresh map.
+  // When omitted, the report is built from `predictionMap` as-is.
+  onEnsureAllPredicted?: () => Promise<Record<string, PredictionSession[]>>;
   version?: string;
   fileName?: string;
   className?: string;
@@ -21,6 +24,7 @@ interface Props {
 export function ExportReportButton({
   objects,
   predictionMap,
+  onEnsureAllPredicted,
   version,
   fileName,
   className,
@@ -33,11 +37,16 @@ export function ExportReportButton({
     setError(undefined);
     setBusy(true);
     try {
+      // Predict any missing objects first (skips already-predicted ones), then
+      // build the report from the fresh map the predict step returns.
+      const map = onEnsureAllPredicted
+        ? await onEnsureAllPredicted()
+        : predictionMap;
       const meta = await fetchMeta();
       const generatedAt = new Date().toLocaleString('ko-KR', {
         timeZone: 'Asia/Seoul',
       });
-      const data = buildReportData(objects, predictionMap, {
+      const data = buildReportData(objects, map, {
         version,
         fileName,
         llmModel: meta.success && meta.data ? meta.data.llm_model : 'N/A',
