@@ -190,10 +190,13 @@ export default function PredictPage() {
 
   // Predict every object that has no result yet, then return the fresh map so
   // the report can be built from it immediately (state would be stale). Chunks
-  // by PREDICT_CHUNK and persists each chunk, so a later failure keeps earlier
-  // work; `onProgress` fires after each chunk for a live "done / total" count.
+  // by PREDICT_CHUNK and persists each chunk, so a later failure (or cancel)
+  // keeps earlier work; `onProgress` fires after each chunk for a live
+  // "done / total" count; `shouldCancel` is polled before each chunk so the
+  // user can stop at a chunk boundary (the returned map is then partial).
   const ensureAllPredicted = async (
     onProgress?: (done: number, total: number) => void,
+    shouldCancel?: () => boolean,
   ): Promise<Record<string, PredictionSession[]>> => {
     const missing = objects
       .map((object, index) => ({ object, index }))
@@ -206,6 +209,7 @@ export default function PredictPage() {
     let map = predictionMap;
     let done = 0;
     for (let i = 0; i < missing.length; i += PREDICT_CHUNK) {
+      if (shouldCancel?.()) break;
       const chunk = missing.slice(i, i + PREDICT_CHUNK);
       const response = await batchPredictCode(
         chunk.map((m) => m.object),

@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import type { BIMObject } from '@/5entities/bim-object';
 import type { PredictionSession } from '@/5entities/prediction';
@@ -17,8 +17,11 @@ interface Props {
   // Predicts any not-yet-predicted objects and resolves to the fresh map.
   // `onProgress` reports live "done / total" while predicting. When omitted,
   // the report is built from `predictionMap` as-is.
+  // `shouldCancel` is polled before each predict chunk; returning true stops
+  // the loop at the next chunk boundary (in-flight chunk still completes).
   onEnsureAllPredicted?: (
     onProgress?: (done: number, total: number) => void,
+    shouldCancel?: () => boolean,
   ) => Promise<Record<string, PredictionSession[]>>;
   // Notifies the parent while the whole export (predict + PDF) runs, so it can
   // lock file/version switching to avoid a mid-flight data-source race.
@@ -41,20 +44,30 @@ export function ExportReportButton({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number }>();
   const [error, setError] = useState<string>();
+  const cancelRef = useRef(false);
 
   const handleClick = async () => {
+    // While running, the button acts as a cancel toggle (cooperative — the
+    // predict loop checks cancelRef before each chunk).
+    if (busy) {
+      cancelRef.current = true;
+      return;
+    }
     setError(undefined);
     setProgress(undefined);
+    cancelRef.current = false;
     setBusy(true);
     onBusyChange?.(true);
     try {
       // Predict any missing objects first (skips already-predicted ones), then
       // build the report from the fresh map the predict step returns.
       const map = onEnsureAllPredicted
-        ? await onEnsureAllPredicted((done, total) =>
-            setProgress({ done, total }),
+        ? await onEnsureAllPredicted(
+            (done, total) => setProgress({ done, total }),
+            () => cancelRef.current,
           )
         : predictionMap;
+      if (cancelRef.current) return; // cancelled mid-predict — skip the PDF
       setProgress(undefined); // predict done — PDF phase shows "generating"
       const meta = await fetchMeta();
       const generatedAt = new Date().toLocaleString('ko-KR', {
@@ -81,10 +94,12 @@ export function ExportReportButton({
     }
   };
 
+  // Predict phase shows a cancellable "중단 (done/total)"; the brief PDF phase
+  // shows "생성 중…" and is not cancellable.
   const label = !busy
     ? t.report.export
     : progress
-      ? t.report.predicting(progress.done, progress.total)
+      ? `${t.report.cancel} (${progress.done}/${progress.total})`
       : t.report.generating;
 
   return (
@@ -93,7 +108,7 @@ export function ExportReportButton({
       size="sm"
       className={className}
       onClick={handleClick}
-      disabled={busy || objects.length === 0}
+      disabled={objects.length === 0 || (busy && !progress)}
       title={objects.length === 0 ? t.report.noObjects : undefined}
     >
       {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

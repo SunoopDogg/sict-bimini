@@ -58,7 +58,7 @@ const ko = {
 
   report: {
     export: '보고서 추출',
-    predicting: (done: number, total: number) => `예측 중… ${done}/${total}`,
+    cancel: '중단',
     generating: '생성 중…',
     noObjects: '객체 없음',
     failed: '보고서 생성 실패',
@@ -181,7 +181,7 @@ const en: typeof ko = {
 
   report: {
     export: 'Export report',
-    predicting: (done: number, total: number) => `Predicting… ${done}/${total}`,
+    cancel: 'Cancel',
     generating: 'Generating…',
     noObjects: 'No objects',
     failed: 'Report generation failed',
