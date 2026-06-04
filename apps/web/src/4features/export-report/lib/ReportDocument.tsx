@@ -30,8 +30,6 @@ const s = StyleSheet.create({
   },
   th: { fontWeight: 'bold', backgroundColor: '#f2f2f2' },
   cell: { paddingHorizontal: 3 },
-  section: { marginBottom: 10 },
-  candRow: { flexDirection: 'row', paddingVertical: 1 },
   muted: { color: '#999' },
 });
 
@@ -97,59 +95,6 @@ function SummaryTable({ rows }: { rows: ReportObjectRow[] }) {
   );
 }
 
-function DetailSection({ row, index }: { row: ReportObjectRow; index: number }) {
-  const o = row.object;
-  const session = row.session;
-  return (
-    <View style={s.section} wrap={false}>
-      <Text style={s.h2}>
-        {index + 1}. {o.family_name || o.name || '객체'} / {o.type}
-      </Text>
-      <Text>
-        ifc_type={o.ifc_type} category={o.category} family={o.family} type_id=
-        {o.type_id}
-      </Text>
-      {!session ? (
-        <Text style={s.muted}>미예측</Text>
-      ) : (
-        (['kbims', 'pps'] as const).map((tgt) => {
-          const resp = session.prediction[tgt];
-          return (
-            <View key={tgt}>
-              <Text style={{ fontWeight: 'bold', marginTop: 4 }}>
-                {tgt.toUpperCase()} [{resp.mode}] pool={resp.pool_size} k=
-                {resp.retrieved_k}
-              </Text>
-              {resp.candidates.map((c, ci) => (
-                <View key={ci} style={s.candRow}>
-                  <Text style={{ width: '14%' }}>{c.code}</Text>
-                  <Text style={{ width: '14%' }}>
-                    conf {c.llm_confidence.toFixed(2)}
-                  </Text>
-                  <Text style={{ width: '14%' }}>
-                    ret{' '}
-                    {c.retrieval_score === null
-                      ? '—'
-                      : c.retrieval_score.toFixed(2)}
-                  </Text>
-                  <Text style={{ width: '14%' }}>{c.source}</Text>
-                  <Text style={{ width: '44%' }}>{c.reasoning ?? ''}</Text>
-                </View>
-              ))}
-            </View>
-          );
-        })
-      )}
-      {session && (
-        <Text style={{ marginTop: 3, color: '#555' }}>
-          최종 선택: KBIMS {row.finalKbims ?? '—'} / PPS {row.finalPps ?? '—'}
-          {'   '}({session.predicted_at})
-        </Text>
-      )}
-    </View>
-  );
-}
-
 export function ReportDocument({ data }: { data: ReportData }) {
   const m = data.meta;
   const metaRows: [string, string][] = [
@@ -175,13 +120,6 @@ export function ReportDocument({ data }: { data: ReportData }) {
 
         <Text style={s.h2}>요약</Text>
         <SummaryTable rows={data.rows} />
-
-        <Text style={[s.h2, { marginTop: 16 }]} break>
-          객체별 상세
-        </Text>
-        {data.rows.map((r, i) => (
-          <DetailSection key={i} row={r} index={i} />
-        ))}
       </Page>
     </Document>
   );
