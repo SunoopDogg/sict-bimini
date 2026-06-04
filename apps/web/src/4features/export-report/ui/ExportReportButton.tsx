@@ -47,16 +47,15 @@ export function ExportReportButton({
   const [error, setError] = useState<string>();
   const cancelRef = useRef(false);
 
-  const handleClick = async () => {
-    // While running, the button acts as a cancel toggle (cooperative — the
-    // predict loop checks cancelRef before each chunk, so it stops at the next
-    // boundary, not instantly; show "중단 중…" so the click is acknowledged).
-    if (busy) {
-      if (cancelling) return;
-      cancelRef.current = true;
-      setCancelling(true);
-      return;
-    }
+  // Cooperative cancel: the predict loop checks cancelRef before each chunk, so
+  // it stops at the next boundary (not instantly) — "중단 중…" acknowledges it.
+  const handleCancel = () => {
+    if (!busy || cancelling) return;
+    cancelRef.current = true;
+    setCancelling(true);
+  };
+
+  const handleExport = async () => {
     setError(undefined);
     setProgress(undefined);
     cancelRef.current = false;
@@ -100,28 +99,40 @@ export function ExportReportButton({
     }
   };
 
-  // Predict phase shows a cancellable "중단 (done/total)"; after a cancel click
-  // "중단 중…" until the in-flight chunk ends; the brief PDF phase "생성 중…".
-  const label = !busy
+  // Main button is pure status while running; the separate red button cancels.
+  const mainLabel = !busy
     ? t.report.export
-    : cancelling
-      ? t.report.cancelling
-      : progress
-        ? `${t.report.cancel} (${progress.done}/${progress.total})`
-        : t.report.generating;
+    : progress
+      ? t.report.predicting(progress.done, progress.total)
+      : t.report.generating;
+
+  // Cancel is only meaningful during the predict phase (progress set).
+  const showCancel = busy && progress !== undefined;
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      className={className}
-      onClick={handleClick}
-      disabled={objects.length === 0 || (busy && (cancelling || !progress))}
-      title={objects.length === 0 ? t.report.noObjects : undefined}
-    >
-      {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-      {label}
-      {error && <span className="ml-2 text-xs text-red-500">!</span>}
-    </Button>
+    <div className={`flex items-center gap-2${className ? ` ${className}` : ''}`}>
+      <Button
+        variant="outline"
+        size="sm"
+        className="flex-1"
+        onClick={handleExport}
+        disabled={objects.length === 0 || busy}
+        title={objects.length === 0 ? t.report.noObjects : undefined}
+      >
+        {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {mainLabel}
+        {error && <span className="ml-2 text-xs text-red-500">!</span>}
+      </Button>
+      {showCancel && (
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={handleCancel}
+          disabled={cancelling}
+        >
+          {cancelling ? t.report.cancelling : t.report.cancel}
+        </Button>
+      )}
+    </div>
   );
 }
