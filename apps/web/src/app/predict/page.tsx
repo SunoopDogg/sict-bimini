@@ -39,8 +39,11 @@ type DataSource =
   | { type: 'selection'; fileName: string }
   | null;
 
-// /batch-predict caps each request at 100 objects (API Field max_length=100).
-const BATCH_LIMIT = 100;
+// Objects predicted per /batch-predict request during "export". Kept small so
+// progress updates often (the report can cover a whole file); the server
+// processes a batch sequentially anyway, so smaller chunks barely change total
+// time. Stays well under the API's 100-object cap (Field max_length=100).
+const PREDICT_CHUNK = 5;
 
 export default function PredictPage() {
   const [files, setFiles] = useState<XlsxFileInfo[]>([]);
@@ -184,18 +187,23 @@ export default function PredictPage() {
 
   // Predict every object that has no result yet, then return the fresh map so
   // the report can be built from it immediately (state would be stale). Chunks
-  // by BATCH_LIMIT and persists each chunk, so a later failure keeps earlier work.
-  const ensureAllPredicted = async (): Promise<
-    Record<string, PredictionSession[]>
-  > => {
+  // by PREDICT_CHUNK and persists each chunk, so a later failure keeps earlier
+  // work; `onProgress` fires after each chunk for a live "done / total" count.
+  const ensureAllPredicted = async (
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<Record<string, PredictionSession[]>> => {
     const missing = objects
       .map((object, index) => ({ object, index }))
       .filter(({ index }) => (predictionMap[index]?.length ?? 0) === 0);
     if (missing.length === 0) return predictionMap;
 
+    const total = missing.length;
+    onProgress?.(0, total);
+
     let map = predictionMap;
-    for (let i = 0; i < missing.length; i += BATCH_LIMIT) {
-      const chunk = missing.slice(i, i + BATCH_LIMIT);
+    let done = 0;
+    for (let i = 0; i < missing.length; i += PREDICT_CHUNK) {
+      const chunk = missing.slice(i, i + PREDICT_CHUNK);
       const response = await batchPredictCode(
         chunk.map((m) => m.object),
         5,
@@ -211,6 +219,8 @@ export default function PredictPage() {
         ),
         map,
       );
+      done += chunk.length;
+      onProgress?.(done, total);
     }
     return map;
   };

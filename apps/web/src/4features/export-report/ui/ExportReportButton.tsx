@@ -14,8 +14,11 @@ interface Props {
   objects: BIMObject[];
   predictionMap: Record<string, PredictionSession[]>;
   // Predicts any not-yet-predicted objects and resolves to the fresh map.
-  // When omitted, the report is built from `predictionMap` as-is.
-  onEnsureAllPredicted?: () => Promise<Record<string, PredictionSession[]>>;
+  // `onProgress` reports live "done / total" while predicting. When omitted,
+  // the report is built from `predictionMap` as-is.
+  onEnsureAllPredicted?: (
+    onProgress?: (done: number, total: number) => void,
+  ) => Promise<Record<string, PredictionSession[]>>;
   version?: string;
   fileName?: string;
   className?: string;
@@ -31,17 +34,22 @@ export function ExportReportButton({
 }: Props) {
   const { t } = useLocale();
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number }>();
   const [error, setError] = useState<string>();
 
   const handleClick = async () => {
     setError(undefined);
+    setProgress(undefined);
     setBusy(true);
     try {
       // Predict any missing objects first (skips already-predicted ones), then
       // build the report from the fresh map the predict step returns.
       const map = onEnsureAllPredicted
-        ? await onEnsureAllPredicted()
+        ? await onEnsureAllPredicted((done, total) =>
+            setProgress({ done, total }),
+          )
         : predictionMap;
+      setProgress(undefined); // predict done — PDF phase shows "generating"
       const meta = await fetchMeta();
       const generatedAt = new Date().toLocaleString('ko-KR', {
         timeZone: 'Asia/Seoul',
@@ -62,8 +70,15 @@ export function ExportReportButton({
       setError(e instanceof Error ? e.message : t.report.failed);
     } finally {
       setBusy(false);
+      setProgress(undefined);
     }
   };
+
+  const label = !busy
+    ? t.report.export
+    : progress
+      ? t.report.predicting(progress.done, progress.total)
+      : t.report.generating;
 
   return (
     <Button
@@ -74,7 +89,7 @@ export function ExportReportButton({
       disabled={busy || objects.length === 0}
       title={objects.length === 0 ? t.report.noObjects : undefined}
     >
-      {busy ? t.report.generating : t.report.export}
+      {label}
       {error && <span className="ml-2 text-xs text-red-500">!</span>}
     </Button>
   );
