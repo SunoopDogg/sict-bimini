@@ -1,5 +1,6 @@
 'use client';
 
+import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 import type { BIMObject } from '@/5entities/bim-object';
@@ -19,6 +20,9 @@ interface Props {
   onEnsureAllPredicted?: (
     onProgress?: (done: number, total: number) => void,
   ) => Promise<Record<string, PredictionSession[]>>;
+  // Notifies the parent while the whole export (predict + PDF) runs, so it can
+  // lock file/version switching to avoid a mid-flight data-source race.
+  onBusyChange?: (busy: boolean) => void;
   version?: string;
   fileName?: string;
   className?: string;
@@ -28,6 +32,7 @@ export function ExportReportButton({
   objects,
   predictionMap,
   onEnsureAllPredicted,
+  onBusyChange,
   version,
   fileName,
   className,
@@ -41,6 +46,7 @@ export function ExportReportButton({
     setError(undefined);
     setProgress(undefined);
     setBusy(true);
+    onBusyChange?.(true);
     try {
       // Predict any missing objects first (skips already-predicted ones), then
       // build the report from the fresh map the predict step returns.
@@ -71,6 +77,7 @@ export function ExportReportButton({
     } finally {
       setBusy(false);
       setProgress(undefined);
+      onBusyChange?.(false);
     }
   };
 
@@ -89,6 +96,7 @@ export function ExportReportButton({
       disabled={busy || objects.length === 0}
       title={objects.length === 0 ? t.report.noObjects : undefined}
     >
+      {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
       {label}
       {error && <span className="ml-2 text-xs text-red-500">!</span>}
     </Button>

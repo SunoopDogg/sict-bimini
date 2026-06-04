@@ -67,6 +67,9 @@ export default function PredictPage() {
     error: versionsError,
   } = useVersions();
   const [pickedVersion, setPickedVersion] = useState<string>();
+  // True while a report export (predict + PDF) runs — locks file/version
+  // switching so an in-flight export can't clobber a freshly loaded file.
+  const [isExporting, setIsExporting] = useState(false);
   // Effective version: user's pick, else default to the first available.
   const selectedVersion = pickedVersion ?? versions[0]?.name;
 
@@ -320,9 +323,11 @@ export default function PredictPage() {
       )}
 
       <div className="grid grid-cols-[280px_1.2fr_1fr] gap-4">
-        {/* Panel 1: DB Version + File List + User Selections */}
+        {/* Panel 1: DB Version + File List + Report */}
         <div className="flex flex-col gap-4 min-h-0">
-          <Card className="flex flex-col">
+          <Card
+            className={`flex flex-col${isExporting ? ' pointer-events-none opacity-50' : ''}`}
+          >
             <CardHeader>
               <CardTitle>DB 버전</CardTitle>
             </CardHeader>
@@ -338,7 +343,9 @@ export default function PredictPage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="flex flex-col">
+          <Card
+            className={`flex flex-col${isExporting ? ' pointer-events-none opacity-50' : ''}`}
+          >
             <CardHeader>
               <CardTitle>파일</CardTitle>
             </CardHeader>
@@ -360,12 +367,19 @@ export default function PredictPage() {
             <CardHeader>
               <CardTitle>보고서</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              <div className="text-muted-foreground space-y-0.5 text-xs">
+                <div className="truncate">DB: {selectedVersion ?? '—'}</div>
+                <div className="truncate">
+                  파일: {activeSource?.fileName ?? '—'}
+                </div>
+              </div>
               <ExportReportButton
                 className="w-full"
                 objects={objects}
                 predictionMap={predictionMap}
                 onEnsureAllPredicted={ensureAllPredicted}
+                onBusyChange={setIsExporting}
                 version={selectedVersion}
                 fileName={activeSource?.fileName}
               />
