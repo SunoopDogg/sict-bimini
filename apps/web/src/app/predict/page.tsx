@@ -198,9 +198,18 @@ export default function PredictPage() {
     onProgress?: (done: number, total: number) => void,
     shouldCancel?: () => boolean,
   ): Promise<Record<string, PredictionSession[]>> => {
+    // "Already predicted" is version-aware: an object counts as done only when
+    // it has a session for the *currently selected* DB. Switching DBs re-predicts
+    // just the objects missing a session for that DB; switching back reuses the
+    // earlier one (sessions accumulate, none are overwritten).
     const missing = objects
       .map((object, index) => ({ object, index }))
-      .filter(({ index }) => (predictionMap[index]?.length ?? 0) === 0);
+      .filter(({ index }) => {
+        const sessions = predictionMap[index] ?? [];
+        return selectedVersion
+          ? !sessions.some((s) => s.prediction.version === selectedVersion)
+          : sessions.length === 0;
+      });
     if (missing.length === 0) return predictionMap;
 
     const total = missing.length;
@@ -333,7 +342,7 @@ export default function PredictPage() {
             className={`flex flex-col${isExporting ? ' pointer-events-none opacity-50' : ''}`}
           >
             <CardHeader>
-              <CardTitle>DB 버전</CardTitle>
+              <CardTitle>{t.version.title}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="max-h-48 overflow-y-auto">
@@ -351,7 +360,7 @@ export default function PredictPage() {
             className={`flex flex-col${isExporting ? ' pointer-events-none opacity-50' : ''}`}
           >
             <CardHeader>
-              <CardTitle>파일</CardTitle>
+              <CardTitle>{t.file.sectionTitle}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col gap-4 overflow-hidden">
               <FileUploadZone
@@ -369,13 +378,13 @@ export default function PredictPage() {
           </Card>
           <Card className="flex flex-col">
             <CardHeader>
-              <CardTitle>보고서</CardTitle>
+              <CardTitle>{t.report.title}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="text-muted-foreground space-y-0.5 text-xs">
                 <div className="truncate">DB: {selectedVersion ?? '—'}</div>
                 <div className="truncate">
-                  파일: {activeSource?.fileName ?? '—'}
+                  {t.report.fileLabel}: {activeSource?.fileName ?? '—'}
                 </div>
               </div>
               <ExportReportButton

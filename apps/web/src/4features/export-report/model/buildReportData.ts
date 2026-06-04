@@ -4,6 +4,21 @@ import { getPairCount } from '@/5entities/prediction';
 
 import type { ReportData, ReportObjectRow } from './types';
 
+// Pick the session to report for an object: the latest one predicted against
+// the report's DB version, so an A-DB report never shows B-DB results (and vice
+// versa). Falls back to the latest session when no version is given.
+function pickSession(
+  sessions: PredictionSession[],
+  version?: string,
+): PredictionSession | null {
+  if (sessions.length === 0) return null;
+  if (!version) return sessions[sessions.length - 1];
+  for (let i = sessions.length - 1; i >= 0; i--) {
+    if (sessions[i].prediction.version === version) return sessions[i];
+  }
+  return null;
+}
+
 function resolveFinal(session: PredictionSession): {
   finalKbims: string | null;
   finalPps: string | null;
@@ -44,7 +59,7 @@ export function buildReportData(
 ): ReportData {
   const rows: ReportObjectRow[] = objects.map((object, i) => {
     const sessions = predictionMap[i] ?? [];
-    const session = sessions.length ? sessions[sessions.length - 1] : null;
+    const session = pickSession(sessions, opts.version);
     if (!session) {
       return {
         object,
