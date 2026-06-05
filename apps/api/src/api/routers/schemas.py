@@ -81,3 +81,16 @@ class XLSXConversionResult(BaseModel):
     total_objects: int
     processing_time_seconds: float
     source_filename: str
+
+
+class VersionCreateRequest(BaseModel):
+    name: str
+    base: str | None = None
+    items: list[BIMAttribute] = Field(default_factory=list, max_length=1000)
+
+
+class VersionCreateResponse(BaseModel):
+    version: str
+    copied: int
+    added: int
+    total: int
