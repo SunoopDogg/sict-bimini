@@ -160,3 +160,15 @@ def test_create_version_embed_down_503_and_cleanup(create_client: TestClient) ->
     assert resp.status_code == 503
     # 생성된 컬렉션 정리 시도
     app.state.qdrant.delete_collection.assert_called_once()
+
+
+def test_create_version_vector_count_mismatch_503(create_client: TestClient) -> None:
+    app.state.embed.embed.return_value = []  # 0 vectors for 1 item → ValueError
+    try:
+        resp = create_client.post(
+            "/versions", json={"name": "v_new", "items": [_attr_payload()]}
+        )
+    finally:
+        app.state.embed.embed.return_value = [[0.1] * 10]
+    assert resp.status_code == 503
+    app.state.qdrant.delete_collection.assert_called_once()

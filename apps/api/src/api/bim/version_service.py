@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from qdrant_client import QdrantClient
 
 from api.bim.attribute_service import BIMAttributeService
+from api.bim.clients.embeddings_vllm import VLLMEmbedClient
 from api.bim.clients.qdrant import QdrantWrapper
 from api.bim.schemas import BIMAttribute
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def create_version(
     qdrant: QdrantClient,
-    embed,
+    embed: VLLMEmbedClient,
     *,
     new_collection: str,
     base_collection: str | None,
