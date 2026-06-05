@@ -1,6 +1,10 @@
 import type { BIMAttributeListResponse } from '@/5entities/bim-attribute';
 import type { BIMObject } from '@/5entities/bim-object';
-import type { DbVersionListResponse } from '@/5entities/db-version';
+import type {
+  CreateVersionInput,
+  CreateVersionResult,
+  DbVersionListResponse,
+} from '@/5entities/db-version';
 import type { HealthStatus } from '@/5entities/health';
 import type { BatchPredictResult, CombinedPredictionResponse } from '@/5entities/prediction';
 import type { XLSXConversionResult } from '@/5entities/xlsx-file';
@@ -139,6 +143,20 @@ export async function fetchVersions(): Promise<
     '/versions',
     { method: 'GET' },
     '버전 목록 조회 실패',
+  );
+}
+
+export async function createVersion(
+  input: CreateVersionInput,
+): Promise<APIResponse<CreateVersionResult>> {
+  return apiRequest(
+    '/versions',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+    'DB 버전 생성 실패',
   );
 }
 

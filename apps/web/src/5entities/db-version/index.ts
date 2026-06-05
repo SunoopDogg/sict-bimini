@@ -1,1 +1,7 @@
-export type { DbVersion, DbVersionListResponse } from './model/types';
+export type {
+  DbVersion,
+  DbVersionListResponse,
+  VersionCreateItem,
+  CreateVersionInput,
+  CreateVersionResult,
+} from './model/types';
