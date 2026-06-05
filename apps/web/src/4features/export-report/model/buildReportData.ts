@@ -1,35 +1,11 @@
 import type { BIMObject } from '@/5entities/bim-object';
 import type { PredictionSession } from '@/5entities/prediction';
-import { findSessionForVersion, getPairCount } from '@/5entities/prediction';
+import {
+  findSessionForVersion,
+  getSelectedPrediction,
+} from '@/5entities/prediction';
 
 import type { ReportData, ReportObjectRow } from './types';
-
-function resolveFinal(session: PredictionSession): {
-  finalKbims: string | null;
-  finalPps: string | null;
-  kbimsConfidence: number | null;
-  ppsConfidence: number | null;
-} {
-  const pred = session.prediction;
-  const pairCount = getPairCount(pred);
-  if (session.selectedIndex < pairCount) {
-    const k = pred.kbims.candidates[session.selectedIndex];
-    const p = pred.pps.candidates[session.selectedIndex];
-    return {
-      finalKbims: k?.code ?? null,
-      finalPps: p?.code ?? null,
-      kbimsConfidence: k?.llm_confidence ?? null,
-      ppsConfidence: p?.llm_confidence ?? null,
-    };
-  }
-  // 사용자 수동 입력 카드 (예측 신뢰도 없음)
-  return {
-    finalKbims: session.userCandidate?.kbims_code ?? null,
-    finalPps: session.userCandidate?.pps_code ?? null,
-    kbimsConfidence: null,
-    ppsConfidence: null,
-  };
-}
 
 export function buildReportData(
   objects: BIMObject[],
@@ -55,7 +31,15 @@ export function buildReportData(
         ppsConfidence: null,
       };
     }
-    return { object, session, ...resolveFinal(session) };
+    const sel = getSelectedPrediction(session);
+    return {
+      object,
+      session,
+      finalKbims: sel.kbims_code,
+      finalPps: sel.pps_code,
+      kbimsConfidence: sel.kbims_confidence,
+      ppsConfidence: sel.pps_confidence,
+    };
   });
 
   return {

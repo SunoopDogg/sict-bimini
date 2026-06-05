@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import type { BIMObject } from '@/5entities/bim-object';
 import { EMPTY_BIM_OBJECT } from '@/5entities/bim-object';
 import type { PredictionSession, SelectionFileInfo, UserSelection } from '@/5entities/prediction';
-import { getPairCount } from '@/5entities/prediction';
+import { getPairCount, getSelectedPrediction } from '@/5entities/prediction';
 import {
   saveUserSelectionsAction,
   loadUserSelectionsAction,
@@ -18,13 +18,9 @@ function buildUserSelection(
 ): UserSelection | null {
   if (!session.userCandidate) return null;
   const obj = objects[objectIndex];
-  const pairCount = getPairCount(session.prediction);
-  const kbimsConf = session.selectedIndex < pairCount
-    ? (session.prediction.kbims.candidates[session.selectedIndex]?.llm_confidence ?? 0)
-    : 0;
-  const ppsConf = session.selectedIndex < pairCount
-    ? (session.prediction.pps.candidates[session.selectedIndex]?.llm_confidence ?? 0)
-    : 0;
+  const sel = getSelectedPrediction(session);
+  const kbimsConf = sel.kbims_confidence ?? 0;
+  const ppsConf = sel.pps_confidence ?? 0;
   return {
     objectIndex,
     objectName: obj?.name,

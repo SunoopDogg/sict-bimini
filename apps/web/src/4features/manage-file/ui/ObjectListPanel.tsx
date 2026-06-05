@@ -13,7 +13,7 @@ import { useState } from 'react';
 
 import type { BIMObject } from '@/5entities/bim-object';
 import type { PredictionSession } from '@/5entities/prediction';
-import { getPairCount } from '@/5entities/prediction';
+import { getSelectedPrediction } from '@/5entities/prediction';
 import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 import { Button } from '@/6shared/ui/primitive/button';
@@ -56,7 +56,7 @@ interface ObjectListPanelProps {
 
 const PAGE_SIZE = 20;
 
-function PredictionMatchIcon({
+function PredictionResultCell({
   predictionMap,
   index,
   actualCode,
@@ -70,33 +70,31 @@ function PredictionMatchIcon({
   const sessions = predictionMap[index];
   const latestSession = sessions?.[sessions.length - 1];
 
+  const notPredicted = (
+    <span className="text-muted-foreground inline-flex items-center justify-center">
+      <Minus className="h-3 w-3" />
+    </span>
+  );
+
   if (!latestSession || !latestSession.prediction) {
-    return (
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900">
-        <Minus className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
-      </span>
-    );
+    return notPredicted;
   }
 
-  const pairCount = getPairCount(latestSession.prediction);
-  const isUserCard = latestSession.selectedIndex === pairCount;
-
-  let predictedCode: string | null = null;
-  if (isUserCard && latestSession.userCandidate) {
-    predictedCode = target === 'kbims'
-      ? latestSession.userCandidate.kbims_code
-      : latestSession.userCandidate.pps_code;
-  } else if (latestSession.selectedIndex < pairCount) {
-    const cand = target === 'kbims'
-      ? latestSession.prediction.kbims.candidates[latestSession.selectedIndex]
-      : latestSession.prediction.pps.candidates[latestSession.selectedIndex];
-    predictedCode = cand?.code ?? null;
-  }
+  const sel = getSelectedPrediction(latestSession);
+  const predictedCode = target === 'kbims' ? sel.kbims_code : sel.pps_code;
 
   if (!predictedCode) {
+    return notPredicted;
+  }
+
+  // No ground truth → can't judge; show the predicted code instead.
+  if (!actualCode) {
     return (
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900">
-        <Minus className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
+      <span
+        className="truncate font-mono text-xs text-blue-600 dark:text-blue-400"
+        title={predictedCode}
+      >
+        {predictedCode}
       </span>
     );
   }
@@ -143,7 +141,7 @@ export function ObjectListPanel({
   const paginatedObjects = objects.slice(startIndex, startIndex + PAGE_SIZE);
 
   const getPageNumbers = () => {
-    const maxVisible = 5;
+    const maxVisible = 10;
     if (totalPages <= maxVisible) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
@@ -211,7 +209,13 @@ export function ObjectListPanel({
                 <TableHead className="text-center">#</TableHead>
                 <TableHead>{t.object.colName}</TableHead>
                 <TableHead>{t.object.colPartCode}</TableHead>
+                <TableHead className="text-center">
+                  {t.object.colPredPartCode}
+                </TableHead>
                 <TableHead>{t.object.colPpsCode}</TableHead>
+                <TableHead className="text-center">
+                  {t.object.colPredPpsCode}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -253,12 +257,12 @@ export function ObjectListPanel({
                     <TableCell className="max-w-50 truncate" title={obj.name}>
                       {obj.name || '-'}
                     </TableCell>
+                    <TableCell className="max-w-30 truncate">
+                      {obj.kbims_code || '-'}
+                    </TableCell>
                     <TableCell className="max-w-30">
-                      <div className="flex items-center gap-1.5">
-                        <span className="truncate">
-                          {obj.kbims_code || '-'}
-                        </span>
-                        <PredictionMatchIcon
+                      <div className="flex items-center justify-center">
+                        <PredictionResultCell
                           predictionMap={predictionMap}
                           index={globalIndex}
                           actualCode={obj.kbims_code}
@@ -266,10 +270,12 @@ export function ObjectListPanel({
                         />
                       </div>
                     </TableCell>
+                    <TableCell className="max-w-30 truncate">
+                      {obj.pps_code || '-'}
+                    </TableCell>
                     <TableCell className="max-w-30">
-                      <div className="flex items-center gap-1.5">
-                        <span className="truncate">{obj.pps_code || '-'}</span>
-                        <PredictionMatchIcon
+                      <div className="flex items-center justify-center">
+                        <PredictionResultCell
                           predictionMap={predictionMap}
                           index={globalIndex}
                           actualCode={obj.pps_code}
