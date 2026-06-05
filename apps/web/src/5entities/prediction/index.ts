@@ -14,6 +14,7 @@ export type {
 
 export { getPairCount } from './lib/getPairCount';
 export { findSessionForVersion } from './lib/findSessionForVersion';
+export { sessionMatchesVersion } from './lib/sessionMatchesVersion';
 export {
   getSelectedPrediction,
   type SelectedPrediction,

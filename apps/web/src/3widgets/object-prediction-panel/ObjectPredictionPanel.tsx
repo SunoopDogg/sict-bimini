@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Database, Loader2 } from 'lucide-react';
 
 import type { BIMObject } from '@/5entities/bim-object';
 import type { PredictionSession, UserCandidate } from '@/5entities/prediction';
-import { getPairCount } from '@/5entities/prediction';
+import { getPairCount, sessionMatchesVersion } from '@/5entities/prediction';
 import { useLocale } from '@/6shared/i18n';
 import { Badge } from '@/6shared/ui/primitive/badge';
 import { Button } from '@/6shared/ui/primitive/button';
@@ -22,6 +22,8 @@ import { cn } from '@/6shared/lib/cn';
 interface ObjectPredictionPanelProps {
   object: BIMObject | null;
   sessions: PredictionSession[];
+  /** Show only sessions predicted against this DB version. */
+  selectedVersion?: string;
   isPredicting: boolean;
   onPredict: () => void;
   onSelectCandidate: (sessionIndex: number, candidateIndex: number) => void;
@@ -44,19 +46,31 @@ function ObjectInfo({ object }: { object: BIMObject }) {
   return (
     <div className="space-y-2 rounded-lg border p-4">
       <h3 className="text-muted-foreground text-sm font-medium">{t.object.info}</h3>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
         <dt className="text-muted-foreground">{t.object.name}</dt>
-        <dd>{object.name || '-'}</dd>
+        <dd className="truncate" title={object.name || undefined}>
+          {object.name || '-'}
+        </dd>
         <dt className="text-muted-foreground">{t.object.type}</dt>
-        <dd>{object.ifc_type || '-'}</dd>
+        <dd className="truncate" title={object.ifc_type || undefined}>
+          {object.ifc_type || '-'}
+        </dd>
         <dt className="text-muted-foreground">{t.object.category}</dt>
-        <dd>{object.category || '-'}</dd>
+        <dd className="truncate" title={object.category || undefined}>
+          {object.category || '-'}
+        </dd>
         <dt className="text-muted-foreground">{t.object.family}</dt>
-        <dd>{object.family_name || '-'}</dd>
+        <dd className="truncate" title={object.family_name || undefined}>
+          {object.family_name || '-'}
+        </dd>
         <dt className="text-muted-foreground">{t.object.partCode}</dt>
-        <dd>{object.kbims_code || '-'}</dd>
+        <dd className="truncate" title={object.kbims_code || undefined}>
+          {object.kbims_code || '-'}
+        </dd>
         <dt className="text-muted-foreground">{t.object.ppsCode}</dt>
-        <dd>{object.pps_code || '-'}</dd>
+        <dd className="truncate" title={object.pps_code || undefined}>
+          {object.pps_code || '-'}
+        </dd>
       </dl>
     </div>
   );
@@ -65,22 +79,32 @@ function ObjectInfo({ object }: { object: BIMObject }) {
 export function ObjectPredictionPanel({
   object,
   sessions,
+  selectedVersion,
   isPredicting,
   onPredict,
   onSelectCandidate,
   onUserCandidateChange,
 }: ObjectPredictionPanelProps) {
   const [sessionPage, setSessionPage] = useState(0);
-  const [previousSessionCount, setPreviousSessionCount] = useState(sessions.length);
   const { t } = useLocale();
 
-  // Reset paging when the session list changes (e.g. switching objects).
-  // setState during render does NOT update sessionPage for the rest of THIS
-  // render pass, so use the reset value locally too — otherwise a stale
-  // sessionPage can index past a now-shorter sessions array (undefined crash).
+  // Sessions predicted against the selected DB version, paired with their
+  // original index in `sessions` (callbacks index the unfiltered array, so the
+  // index must survive filtering). Chronological order; last = most recent.
+  const scoped = sessions
+    .map((session, originalIndex) => ({ session, originalIndex }))
+    .filter(({ session }) => sessionMatchesVersion(session, selectedVersion));
+
+  // Jump back to the newest prediction when the scoped list changes (switching
+  // object or DB version). setState during render does NOT update sessionPage
+  // for the rest of THIS render pass, so apply the reset value locally too. The
+  // out-of-range clamp below is what guards against a stale page index; this
+  // reset is purely the UX choice of starting on the newest entry.
+  const scopeKey = `${selectedVersion ?? ''}#${scoped.length}`;
+  const [previousScopeKey, setPreviousScopeKey] = useState(scopeKey);
   let activePage = sessionPage;
-  if (sessions.length !== previousSessionCount) {
-    setPreviousSessionCount(sessions.length);
+  if (scopeKey !== previousScopeKey) {
+    setPreviousScopeKey(scopeKey);
     setSessionPage(0);
     activePage = 0;
   }
@@ -98,7 +122,7 @@ export function ObjectPredictionPanel({
     );
   }
 
-  if (sessions.length === 0) {
+  if (scoped.length === 0) {
     return (
       <Card>
         <CardHeader><CardTitle>{t.predict.results}</CardTitle></CardHeader>
@@ -117,9 +141,13 @@ export function ObjectPredictionPanel({
     );
   }
 
-  const reversedSessions = [...sessions].reverse();
-  const currentSession = reversedSessions[activePage];
-  const currentSessionOriginalIndex = sessions.length - 1 - activePage;
+  // Page 0 = newest, so index from the end (no reversed-array copy).
+  activePage = Math.min(activePage, scoped.length - 1);
+  const current = scoped[scoped.length - 1 - activePage];
+  const currentSession = current.session;
+  const currentSessionOriginalIndex = current.originalIndex;
+  // 1-based chronological position within this version's predictions.
+  const scopedPosition = scoped.length - activePage;
 
   const kbims = currentSession.prediction?.kbims;
   const pps = currentSession.prediction?.pps;
@@ -136,19 +164,19 @@ export function ObjectPredictionPanel({
         <div className="space-y-4">
           <ObjectInfo object={object} />
 
-          {sessions.length > 1 && (
+          {scoped.length > 1 && (
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
                   <PaginationLink
                     onClick={(e) => {
                       e.preventDefault();
-                      if (sessionPage > 0) setSessionPage((p) => p - 1);
+                      if (sessionPage < scoped.length - 1) setSessionPage((p) => p + 1);
                     }}
                     aria-label={t.predict.prevSession}
                     className={cn(
                       'h-8 w-8 cursor-pointer p-0',
-                      sessionPage === 0 && 'pointer-events-none opacity-50',
+                      sessionPage === scoped.length - 1 && 'pointer-events-none opacity-50',
                     )}
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -156,19 +184,19 @@ export function ObjectPredictionPanel({
                 </PaginationItem>
                 <PaginationItem>
                   <span className="flex h-8 items-center px-2 text-sm text-muted-foreground">
-                    {t.predict.session(currentSessionOriginalIndex + 1, sessions.length)}
+                    {t.predict.session(scopedPosition, scoped.length)}
                   </span>
                 </PaginationItem>
                 <PaginationItem>
                   <PaginationLink
                     onClick={(e) => {
                       e.preventDefault();
-                      if (sessionPage < sessions.length - 1) setSessionPage((p) => p + 1);
+                      if (sessionPage > 0) setSessionPage((p) => p - 1);
                     }}
                     aria-label={t.predict.nextSession}
                     className={cn(
                       'h-8 w-8 cursor-pointer p-0',
-                      sessionPage === sessions.length - 1 && 'pointer-events-none opacity-50',
+                      sessionPage === 0 && 'pointer-events-none opacity-50',
                     )}
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -181,24 +209,19 @@ export function ObjectPredictionPanel({
           {currentSession && (
             <div className="space-y-3 rounded-lg border p-4">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <h3 className="text-muted-foreground text-sm font-medium">
-                    {t.predict.sessionLabel(currentSessionOriginalIndex + 1)}
-                  </h3>
-                  {currentSession.prediction?.version && (
-                    <Badge
-                      variant="outline"
-                      className="max-w-[160px] truncate font-normal"
-                      title={currentSession.prediction.version}
-                    >
-                      <Database className="mr-1 h-3 w-3 shrink-0" />
-                      {currentSession.prediction.version}
-                    </Badge>
-                  )}
-                </div>
-                <span className="text-muted-foreground shrink-0 text-xs">
-                  {new Date(currentSession.predicted_at).toLocaleString('ko-KR')}
-                </span>
+                <h3 className="text-muted-foreground min-w-0 truncate text-sm font-medium">
+                  {t.predict.sessionLabel(scopedPosition)}
+                </h3>
+                {currentSession.prediction?.version && (
+                  <Badge
+                    variant="outline"
+                    className="max-w-[160px] shrink-0 truncate font-normal"
+                    title={currentSession.prediction.version}
+                  >
+                    <Database className="mr-1 h-3 w-3 shrink-0" />
+                    {currentSession.prediction.version}
+                  </Badge>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -232,12 +255,22 @@ export function ObjectPredictionPanel({
                     </div>
                     <div className="mt-2 space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground text-xs w-14">{t.object.partCode}</span>
-                        <span className="text-sm font-semibold">{pair.kbims.code || '-'}</span>
+                        <span className="text-muted-foreground text-xs w-14 shrink-0">{t.object.partCode}</span>
+                        <span
+                          className="min-w-0 truncate text-sm font-semibold"
+                          title={pair.kbims.code || undefined}
+                        >
+                          {pair.kbims.code || '-'}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground text-xs w-14">{t.object.ppsCode}</span>
-                        <span className="text-sm font-semibold">{pair.pps.code || '-'}</span>
+                        <span className="text-muted-foreground text-xs w-14 shrink-0">{t.object.ppsCode}</span>
+                        <span
+                          className="min-w-0 truncate text-sm font-semibold"
+                          title={pair.pps.code || undefined}
+                        >
+                          {pair.pps.code || '-'}
+                        </span>
                       </div>
                     </div>
                     {(pair.kbims.reasoning || pair.pps.reasoning) && (
@@ -316,6 +349,10 @@ export function ObjectPredictionPanel({
                     </div>
                   </div>
                 </button>
+              </div>
+
+              <div className="text-muted-foreground text-right text-xs">
+                {new Date(currentSession.predicted_at).toLocaleString('ko-KR')}
               </div>
             </div>
           )}

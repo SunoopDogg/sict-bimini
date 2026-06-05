@@ -1,4 +1,5 @@
 import type { PredictionSession } from '../model/types';
+import { sessionMatchesVersion } from './sessionMatchesVersion';
 
 /**
  * The latest session predicted against a given DB version, or null if none.
@@ -12,10 +13,8 @@ export function findSessionForVersion(
   sessions: PredictionSession[],
   version: string | undefined,
 ): PredictionSession | null {
-  if (sessions.length === 0) return null;
-  if (!version) return sessions[sessions.length - 1];
   for (let i = sessions.length - 1; i >= 0; i--) {
-    if (sessions[i].prediction.version === version) return sessions[i];
+    if (sessionMatchesVersion(sessions[i], version)) return sessions[i];
   }
   return null;
 }

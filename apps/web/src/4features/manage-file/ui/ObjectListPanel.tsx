@@ -13,7 +13,7 @@ import { useState } from 'react';
 
 import type { BIMObject } from '@/5entities/bim-object';
 import type { PredictionSession } from '@/5entities/prediction';
-import { getSelectedPrediction } from '@/5entities/prediction';
+import { findSessionForVersion, getSelectedPrediction } from '@/5entities/prediction';
 import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 import { Button } from '@/6shared/ui/primitive/button';
@@ -52,35 +52,39 @@ interface ObjectListPanelProps {
   onRowClick: (obj: BIMObject, index: number) => void;
   predictionMap: Record<string, PredictionSession[]>;
   focusedIndex: number | null;
+  /** Match icon reflects the session predicted against this DB version. */
+  selectedVersion?: string;
 }
 
 const PAGE_SIZE = 20;
+// Column count of the object table — keep in sync with the TableHeader cells
+// below; used by the filler rows' colSpan so they span the full width.
+const COLUMN_COUNT = 7;
+
+// Stable reference for rows with no sessions yet — avoids allocating a fresh
+// empty array on every render of every unpredicted row.
+const EMPTY_SESSIONS: PredictionSession[] = [];
 
 function PredictionResultCell({
-  predictionMap,
-  index,
+  session,
   actualCode,
   target,
 }: {
-  predictionMap: Record<string, PredictionSession[]>;
-  index: number;
+  session: PredictionSession | null;
   actualCode: string;
   target: 'kbims' | 'pps';
 }) {
-  const sessions = predictionMap[index];
-  const latestSession = sessions?.[sessions.length - 1];
-
   const notPredicted = (
     <span className="text-muted-foreground inline-flex items-center justify-center">
       <Minus className="h-3 w-3" />
     </span>
   );
 
-  if (!latestSession || !latestSession.prediction) {
+  if (!session || !session.prediction) {
     return notPredicted;
   }
 
-  const sel = getSelectedPrediction(latestSession);
+  const sel = getSelectedPrediction(session);
   const predictedCode = target === 'kbims' ? sel.kbims_code : sel.pps_code;
 
   if (!predictedCode) {
@@ -91,7 +95,7 @@ function PredictionResultCell({
   if (!actualCode) {
     return (
       <span
-        className="truncate font-mono text-xs text-blue-600 dark:text-blue-400"
+        className="min-w-0 truncate font-mono text-xs text-blue-600 dark:text-blue-400"
         title={predictedCode}
       >
         {predictedCode}
@@ -126,6 +130,7 @@ export function ObjectListPanel({
   onRowClick,
   predictionMap,
   focusedIndex,
+  selectedVersion,
 }: ObjectListPanelProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [previousObjects, setPrevObjects] = useState(objects);
@@ -180,7 +185,7 @@ export function ObjectListPanel({
     return (
       <div className="flex flex-col gap-4">
         <div className="flex-1 overflow-y-auto">
-          <Table>
+          <Table className="table-fixed">
             <TableHeader className="bg-muted [&_th]:text-muted-foreground sticky top-0">
               <TableRow>
                 <TableHead className="w-10">
@@ -206,14 +211,14 @@ export function ObjectListPanel({
                     }}
                   />
                 </TableHead>
-                <TableHead className="text-center">#</TableHead>
+                <TableHead className="w-12 text-center">#</TableHead>
                 <TableHead>{t.object.colName}</TableHead>
-                <TableHead>{t.object.colPartCode}</TableHead>
-                <TableHead className="text-center">
+                <TableHead className="w-24">{t.object.colPartCode}</TableHead>
+                <TableHead className="w-24">
                   {t.object.colPredPartCode}
                 </TableHead>
-                <TableHead>{t.object.colPpsCode}</TableHead>
-                <TableHead className="text-center">
+                <TableHead className="w-24">{t.object.colPpsCode}</TableHead>
+                <TableHead className="w-24">
                   {t.object.colPredPpsCode}
                 </TableHead>
               </TableRow>
@@ -221,6 +226,12 @@ export function ObjectListPanel({
             <TableBody>
               {paginatedObjects.map((obj, index) => {
                 const globalIndex = startIndex + index;
+                // Resolve the selected-version session once per row; both code
+                // columns below render from the same session.
+                const versionSession = findSessionForVersion(
+                  predictionMap[globalIndex] ?? EMPTY_SESSIONS,
+                  selectedVersion,
+                );
                 return (
                   <TableRow
                     key={globalIndex}
@@ -254,30 +265,28 @@ export function ObjectListPanel({
                         <Loader2 className="ml-1 inline h-3 w-3 animate-spin" />
                       )}
                     </TableCell>
-                    <TableCell className="max-w-50 truncate" title={obj.name}>
+                    <TableCell className="truncate" title={obj.name}>
                       {obj.name || '-'}
                     </TableCell>
-                    <TableCell className="max-w-30 truncate">
+                    <TableCell className="truncate">
                       {obj.kbims_code || '-'}
                     </TableCell>
-                    <TableCell className="max-w-30">
-                      <div className="flex items-center justify-center">
+                    <TableCell>
+                      <div className="flex min-w-0 items-center">
                         <PredictionResultCell
-                          predictionMap={predictionMap}
-                          index={globalIndex}
+                          session={versionSession}
                           actualCode={obj.kbims_code}
                           target="kbims"
                         />
                       </div>
                     </TableCell>
-                    <TableCell className="max-w-30 truncate">
+                    <TableCell className="truncate">
                       {obj.pps_code || '-'}
                     </TableCell>
-                    <TableCell className="max-w-30">
-                      <div className="flex items-center justify-center">
+                    <TableCell>
+                      <div className="flex min-w-0 items-center">
                         <PredictionResultCell
-                          predictionMap={predictionMap}
-                          index={globalIndex}
+                          session={versionSession}
                           actualCode={obj.pps_code}
                           target="pps"
                         />
@@ -286,6 +295,22 @@ export function ObjectListPanel({
                   </TableRow>
                 );
               })}
+              {/* Pad short pages to PAGE_SIZE so the table height — and thus the
+                  pagination bar below — stays put when flipping pages. */}
+              {totalPages > 1 &&
+                Array.from({
+                  length: PAGE_SIZE - paginatedObjects.length,
+                }).map((_, i) => (
+                  <TableRow
+                    key={`pad-${i}`}
+                    aria-hidden
+                    className="pointer-events-none"
+                  >
+                    <TableCell colSpan={COLUMN_COUNT}>
+                      <div className="h-5" />
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </div>

@@ -317,6 +317,7 @@ export default function PredictPage() {
             onSelectionChange={setSelectedIndices}
             predictionMap={predictionMap}
             focusedIndex={selectedObjectIndex}
+            selectedVersion={selectedVersion}
             onPredict={handleBatchPredict}
             onRowClick={(_obj: BIMObject, index: number) => {
               setSelectedObjectIndex(index);
@@ -337,6 +338,7 @@ export default function PredictPage() {
                 ? (predictionMap[selectedObjectIndex] ?? [])
                 : []
             }
+            selectedVersion={selectedVersion}
             isPredicting={
               predictingIndex === selectedObjectIndex || isPredicting
             }

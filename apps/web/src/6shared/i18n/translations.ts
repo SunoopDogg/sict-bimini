@@ -80,6 +80,8 @@ const ko = {
     colName: '객체 이름',
     colPartCode: '부위코드',
     colPpsCode: 'PPS 코드',
+    colPredPartCode: '예측(부위)',
+    colPredPpsCode: '예측(PPS)',
   },
 
   input: {
@@ -208,6 +210,8 @@ const en: typeof ko = {
     colName: 'Object Name',
     colPartCode: 'Part Code',
     colPpsCode: 'PPS Code',
+    colPredPartCode: 'Pred (Part)',
+    colPredPpsCode: 'Pred (PPS)',
   },
 
   input: {
