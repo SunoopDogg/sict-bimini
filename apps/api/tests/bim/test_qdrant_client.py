@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 from qdrant_client import QdrantClient
 
@@ -113,3 +115,41 @@ class TestQdrantWrapper:
         wrapper.ensure_collection("bim__test", dim=4)
         info = in_memory_client.get_collection("bim__test")
         assert info is not None
+
+
+def test_copy_collection_scrolls_and_upserts() -> None:
+    client = MagicMock(spec=QdrantClient)
+    p1 = MagicMock(id="id1", vector=[0.1, 0.2], payload={"kbims_code": "E1"})
+    p2 = MagicMock(id="id2", vector=[0.3, 0.4], payload={"kbims_code": "E2"})
+    # 첫 배치 (p1,p2)+offset, 둘째 배치 빈 목록 → 종료
+    client.scroll.side_effect = [([p1, p2], "next"), ([], None)]
+
+    copied = QdrantWrapper(client).copy_collection("bim__a", "bim__b", batch=2)
+
+    assert copied == 2
+    client.upsert.assert_called_once()
+    _, kwargs = client.upsert.call_args
+    assert kwargs["collection_name"] == "bim__b"
+    assert [pt.id for pt in kwargs["points"]] == ["id1", "id2"]
+
+
+def test_copy_collection_empty_source() -> None:
+    client = MagicMock(spec=QdrantClient)
+    client.scroll.return_value = ([], None)
+    copied = QdrantWrapper(client).copy_collection("bim__a", "bim__b")
+    assert copied == 0
+    client.upsert.assert_not_called()
+
+
+def test_init_collection_creates_with_indexes() -> None:
+    client = MagicMock(spec=QdrantClient)
+    QdrantWrapper(client).init_collection("bim__new", dim=2048)
+    client.create_collection.assert_called_once()
+    # 인덱스: ifc_type, category, kbims_code, pps_code, family = 5개
+    assert client.create_payload_index.call_count == 5
+
+
+def test_delete_collection() -> None:
+    client = MagicMock(spec=QdrantClient)
+    QdrantWrapper(client).delete_collection("bim__gone")
+    client.delete_collection.assert_called_once_with(collection_name="bim__gone")

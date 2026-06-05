@@ -62,7 +62,14 @@ class QdrantWrapper:
                     f"or recreate the collection."
                 )
             return
+        self.init_collection(name, dim=dim)
 
+    def init_collection(self, name: str, *, dim: int) -> None:
+        """Unconditionally create a collection with vectors + payload indexes.
+
+        Caller guarantees the collection does not already exist (e.g. an
+        explicit collection_exists 409 precheck). Used by version creation.
+        """
         self._client.create_collection(
             collection_name=name,
             vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
@@ -80,6 +87,40 @@ class QdrantWrapper:
             dim,
             list(_INDEXED_PAYLOAD_FIELDS),
         )
+
+    def copy_collection(self, src: str, dst: str, *, batch: int = 256) -> int:
+        """Copy all points (vectors + payload) from src into dst via scroll.
+
+        Server-side relay: payloads never leave Qdrant's process boundary on
+        our side beyond this client. Returns the number of points copied.
+        """
+        copied = 0
+        offset = None
+        while True:
+            points, offset = self._client.scroll(
+                collection_name=src,
+                limit=batch,
+                offset=offset,
+                with_payload=True,
+                with_vectors=True,
+            )
+            if not points:
+                break
+            self._client.upsert(
+                collection_name=dst,
+                points=[
+                    PointStruct(id=p.id, vector=p.vector, payload=p.payload)
+                    for p in points
+                ],
+                wait=True,
+            )
+            copied += len(points)
+            if offset is None:
+                break
+        return copied
+
+    def delete_collection(self, name: str) -> None:
+        self._client.delete_collection(collection_name=name)
 
     def upsert_batch(
         self,
