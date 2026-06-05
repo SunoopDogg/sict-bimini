@@ -19,8 +19,7 @@ import {
 import { loadPredictionsAction } from '@/4features/predict-code';
 import { ExportReportButton } from '@/4features/export-report';
 import type { BIMObject } from '@/5entities/bim-object';
-import type { BatchItemResult, PredictionSession } from '@/5entities/prediction';
-import { findSessionForVersion } from '@/5entities/prediction';
+import type { PredictionSession } from '@/5entities/prediction';
 import type { XlsxFileInfo } from '@/5entities/xlsx-file';
 import { batchPredictCode, predictSingleCode } from '@/6shared/api';
 import { cn } from '@/6shared/lib/cn';
@@ -35,12 +34,6 @@ import {
 } from '@/6shared/ui/primitive/card';
 
 type DataSource = { type: 'xlsx'; fileName: string } | null;
-
-// Objects predicted per /batch-predict request during "export". Kept small so
-// progress updates often (the report can cover a whole file); the server
-// processes a batch sequentially anyway, so smaller chunks barely change total
-// time. Stays well under the API's 100-object cap (Field max_length=100).
-const PREDICT_CHUNK = 5;
 
 export default function PredictPage() {
   const [files, setFiles] = useState<XlsxFileInfo[]>([]);
@@ -87,6 +80,8 @@ export default function PredictPage() {
     predictionMap,
     setPredictionMap,
     appendSessions,
+    toEntries,
+    ensureAllPredicted,
     handleSelectCandidate,
     handleUserCandidateChange,
     toSession,
@@ -138,19 +133,6 @@ export default function PredictPage() {
     setDataSource({ type: 'xlsx', fileName });
   };
 
-  // Zip /batch-predict results back to their object indices. The endpoint
-  // preserves request order, so `indices[i]` is the source index of `results[i]`.
-  const toEntries = (results: BatchItemResult[], indices: number[]) =>
-    results
-      .map((item, i) =>
-        item.prediction
-          ? { index: indices[i], session: toSession(item.prediction) }
-          : null,
-      )
-      .filter(
-        (e): e is { index: number; session: PredictionSession } => e !== null,
-      );
-
   const handleBatchPredict = () => {
     setError(undefined);
     // Ascending order so this lines up with `objects.filter` (and thus the
@@ -186,58 +168,6 @@ export default function PredictPage() {
       }
       setPredictingIndex(null);
     });
-  };
-
-  // Predict every object that has no result yet, then return the fresh map so
-  // the report can be built from it immediately (state would be stale). Chunks
-  // by PREDICT_CHUNK and persists each chunk, so a later failure (or cancel)
-  // keeps earlier work; `onProgress` fires after each chunk for a live
-  // "done / total" count; `shouldCancel` is polled before each chunk so the
-  // user can stop at a chunk boundary (the returned map is then partial).
-  const ensureAllPredicted = async (
-    onProgress?: (done: number, total: number) => void,
-    shouldCancel?: () => boolean,
-  ): Promise<Record<string, PredictionSession[]>> => {
-    // "Already predicted" is version-aware: an object counts as done only when
-    // it has a session for the *currently selected* DB. Switching DBs re-predicts
-    // just the objects missing a session for that DB; switching back reuses the
-    // earlier one (sessions accumulate, none are overwritten).
-    const missing = objects
-      .map((object, index) => ({ object, index }))
-      .filter(
-        ({ index }) =>
-          findSessionForVersion(predictionMap[index] ?? [], selectedVersion) ===
-          null,
-      );
-    if (missing.length === 0) return predictionMap;
-
-    const total = missing.length;
-    onProgress?.(0, total);
-
-    let map = predictionMap;
-    let done = 0;
-    for (let i = 0; i < missing.length; i += PREDICT_CHUNK) {
-      if (shouldCancel?.()) break;
-      const chunk = missing.slice(i, i + PREDICT_CHUNK);
-      const response = await batchPredictCode(
-        chunk.map((m) => m.object),
-        5,
-        selectedVersion,
-      );
-      if (!response.success || !response.data) {
-        throw new Error(response.error || t.predict.failed);
-      }
-      map = appendSessions(
-        toEntries(
-          response.data.results,
-          chunk.map((m) => m.index),
-        ),
-        map,
-      );
-      done += chunk.length;
-      onProgress?.(done, total);
-    }
-    return map;
   };
 
   // Initial load
@@ -305,7 +235,7 @@ export default function PredictPage() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-[280px_1.2fr_1fr] gap-4">
+      <div className="grid grid-cols-[280px_1fr_380px] gap-4">
         {/* Panel 1: DB Version + File List + Report */}
         <div className="flex flex-col gap-4 min-h-0">
           <Card className={cn('flex flex-col', lockClass)}>
@@ -359,7 +289,14 @@ export default function PredictPage() {
                 className="w-full"
                 objects={objects}
                 predictionMap={predictionMap}
-                onEnsureAllPredicted={ensureAllPredicted}
+                onEnsureAllPredicted={(onProgress, shouldCancel) =>
+                  ensureAllPredicted(
+                    objects,
+                    selectedVersion,
+                    onProgress,
+                    shouldCancel,
+                  )
+                }
                 onBusyChange={setIsExporting}
                 version={selectedVersion}
                 fileName={activeSource?.fileName}
