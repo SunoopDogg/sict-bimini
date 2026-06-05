@@ -13,7 +13,11 @@ import { useState } from 'react';
 
 import type { BIMObject } from '@/5entities/bim-object';
 import type { PredictionSession } from '@/5entities/prediction';
-import { findSessionForVersion, getSelectedPrediction } from '@/5entities/prediction';
+import {
+  classifyPredictionMatch,
+  findSessionForVersion,
+  getSelectedPrediction,
+} from '@/5entities/prediction';
 import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
 import { Button } from '@/6shared/ui/primitive/button';
@@ -86,24 +90,25 @@ function PredictionResultCell({
 
   const sel = getSelectedPrediction(session);
   const predictedCode = target === 'kbims' ? sel.kbims_code : sel.pps_code;
+  const status = classifyPredictionMatch(predictedCode, actualCode);
 
-  if (!predictedCode) {
+  if (status === 'unpredicted') {
     return notPredicted;
   }
 
   // No ground truth → can't judge; show the predicted code instead.
-  if (!actualCode) {
+  if (status === 'no-truth') {
     return (
       <span
         className="min-w-0 truncate font-mono text-xs text-blue-600 dark:text-blue-400"
-        title={predictedCode}
+        title={predictedCode ?? undefined}
       >
         {predictedCode}
       </span>
     );
   }
 
-  if (predictedCode === actualCode) {
+  if (status === 'match') {
     return (
       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
         <Check className="h-3 w-3 text-green-600 dark:text-green-400" />

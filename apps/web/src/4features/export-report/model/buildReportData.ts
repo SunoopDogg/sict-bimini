@@ -5,6 +5,7 @@ import {
   getSelectedPrediction,
 } from '@/5entities/prediction';
 
+import { computeReportStats } from './computeReportStats';
 import type { ReportData, ReportObjectRow } from './types';
 
 export function buildReportData(
@@ -42,6 +43,8 @@ export function buildReportData(
     };
   });
 
+  const stats = computeReportStats(rows);
+
   return {
     meta: {
       version: opts.version,
@@ -49,9 +52,8 @@ export function buildReportData(
       llmModel: opts.llmModel,
       embeddingModel: opts.embeddingModel,
       generatedAt: opts.generatedAt,
-      objectCount: rows.length,
-      predictedCount: rows.filter((r) => r.session !== null).length,
     },
+    stats,
     rows,
   };
 }

@@ -13,6 +13,10 @@ export type {
 } from './model/types';
 
 export { getPairCount } from './lib/getPairCount';
+export {
+  classifyPredictionMatch,
+  type PredictionMatchStatus,
+} from './lib/classifyPredictionMatch';
 export { findSessionForVersion } from './lib/findSessionForVersion';
 export { sessionMatchesVersion } from './lib/sessionMatchesVersion';
 export {
