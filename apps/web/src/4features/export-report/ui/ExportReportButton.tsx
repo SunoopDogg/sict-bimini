@@ -7,6 +7,7 @@ import type { BIMObject } from '@/5entities/bim-object';
 import type { PredictionSession } from '@/5entities/prediction';
 import { fetchMeta } from '@/6shared/api';
 import { useLocale } from '@/6shared/i18n';
+import { cn } from '@/6shared/lib/cn';
 import { Button } from '@/6shared/ui/primitive/button';
 
 import { buildReportData } from '../model/buildReportData';
@@ -110,7 +111,7 @@ export function ExportReportButton({
   const showCancel = busy && progress !== undefined;
 
   return (
-    <div className={`flex items-center gap-2${className ? ` ${className}` : ''}`}>
+    <div className={cn('flex items-center gap-2', className)}>
       <Button
         variant="outline"
         size="sm"

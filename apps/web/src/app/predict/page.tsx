@@ -15,15 +15,15 @@ import {
   listXlsxFilesAction,
   readJsonFileAction,
   uploadAndConvertXlsxAction,
-  loadUserSelectionsAction,
 } from '@/4features/manage-file';
 import { loadPredictionsAction } from '@/4features/predict-code';
 import { ExportReportButton } from '@/4features/export-report';
 import type { BIMObject } from '@/5entities/bim-object';
 import type { BatchItemResult, PredictionSession } from '@/5entities/prediction';
-import { buildSelectionSessionMap } from '@/5entities/prediction';
+import { findSessionForVersion } from '@/5entities/prediction';
 import type { XlsxFileInfo } from '@/5entities/xlsx-file';
 import { batchPredictCode, predictSingleCode } from '@/6shared/api';
+import { cn } from '@/6shared/lib/cn';
 import { useLocale } from '@/6shared/i18n';
 import { SettingsDropdown } from '@/6shared/ui/SettingsDropdown';
 import { Alert, AlertDescription } from '@/6shared/ui/primitive/alert';
@@ -34,10 +34,7 @@ import {
   CardTitle,
 } from '@/6shared/ui/primitive/card';
 
-type DataSource =
-  | { type: 'xlsx'; fileName: string }
-  | { type: 'selection'; fileName: string }
-  | null;
+type DataSource = { type: 'xlsx'; fileName: string } | null;
 
 // Objects predicted per /batch-predict request during "export". Kept small so
 // progress updates often (the report can cover a whole file); the server
@@ -70,6 +67,8 @@ export default function PredictPage() {
   // True while a report export (predict + PDF) runs — locks file/version
   // switching so an in-flight export can't clobber a freshly loaded file.
   const [isExporting, setIsExporting] = useState(false);
+  // Visual + interaction lock applied to the file/version cards while exporting.
+  const lockClass = cn(isExporting && 'pointer-events-none opacity-50');
   // Effective version: user's pick, else default to the first available.
   const selectedVersion = pickedVersion ?? versions[0]?.name;
 
@@ -81,7 +80,6 @@ export default function PredictPage() {
     addToSelections,
     removeFromSelections,
     loadInitialSelections,
-    setSelectionsFromData,
     syncSelectionsFromMap,
   } = useUserSelections(objects);
 
@@ -113,6 +111,7 @@ export default function PredictPage() {
   };
 
   const handleFileUpload = async (file: File) => {
+    if (isExporting) return;
     setUploadStatus('uploading');
     setError(undefined);
 
@@ -135,6 +134,7 @@ export default function PredictPage() {
   };
 
   const handleSelectXlsxFile = (fileName: string) => {
+    if (isExporting) return;
     setDataSource({ type: 'xlsx', fileName });
   };
 
@@ -204,12 +204,11 @@ export default function PredictPage() {
     // earlier one (sessions accumulate, none are overwritten).
     const missing = objects
       .map((object, index) => ({ object, index }))
-      .filter(({ index }) => {
-        const sessions = predictionMap[index] ?? [];
-        return selectedVersion
-          ? !sessions.some((s) => s.prediction.version === selectedVersion)
-          : sessions.length === 0;
-      });
+      .filter(
+        ({ index }) =>
+          findSessionForVersion(predictionMap[index] ?? [], selectedVersion) ===
+          null,
+      );
     if (missing.length === 0) return predictionMap;
 
     const total = missing.length;
@@ -288,35 +287,6 @@ export default function PredictPage() {
     loadObjects();
   }, [activeSource?.type === 'xlsx' ? activeSource.fileName : null]);
 
-  // Load selections when selection file is selected
-  useEffect(() => {
-    if (activeSource?.type !== 'selection') return;
-
-    const loadSelections = async () => {
-      setSelectedObjectIndex(null);
-      setError(undefined);
-      setSelectedIndices(new Set());
-      setIsLoadingObjects(true);
-
-      const response = await loadUserSelectionsAction();
-
-      if (response.success && response.data) {
-        setSelectionsFromData(response.data);
-        setObjects(response.data.map((sel) => sel.object));
-        setPredictionMap(buildSelectionSessionMap(response.data));
-      } else {
-        setSelectionsFromData([]);
-        setObjects([]);
-        setPredictionMap({});
-        setError(response.error || t.errors.loadSelectionsFailed);
-      }
-
-      setIsLoadingObjects(false);
-    };
-
-    loadSelections();
-  }, [activeSource?.type === 'selection' ? activeSource.fileName : null]);
-
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="relative mb-8 flex items-center justify-center">
@@ -338,9 +308,7 @@ export default function PredictPage() {
       <div className="grid grid-cols-[280px_1.2fr_1fr] gap-4">
         {/* Panel 1: DB Version + File List + Report */}
         <div className="flex flex-col gap-4 min-h-0">
-          <Card
-            className={`flex flex-col${isExporting ? ' pointer-events-none opacity-50' : ''}`}
-          >
+          <Card className={cn('flex flex-col', lockClass)}>
             <CardHeader>
               <CardTitle>{t.version.title}</CardTitle>
             </CardHeader>
@@ -349,16 +317,16 @@ export default function PredictPage() {
                 <VersionSelect
                   versions={versions}
                   value={selectedVersion}
-                  onChange={setPickedVersion}
+                  onChange={(v) => {
+                    if (!isExporting) setPickedVersion(v);
+                  }}
                   isLoading={versionsLoading}
                   error={versionsError}
                 />
               </div>
             </CardContent>
           </Card>
-          <Card
-            className={`flex flex-col${isExporting ? ' pointer-events-none opacity-50' : ''}`}
-          >
+          <Card className={cn('flex flex-col', lockClass)}>
             <CardHeader>
               <CardTitle>{t.file.sectionTitle}</CardTitle>
             </CardHeader>

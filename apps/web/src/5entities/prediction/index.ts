@@ -13,6 +13,7 @@ export type {
 } from './model/types';
 
 export { getPairCount } from './lib/getPairCount';
+export { findSessionForVersion } from './lib/findSessionForVersion';
 export {
   EMPTY_COMBINED_PREDICTION_RESPONSE,
   buildSelectionSessionMap,
