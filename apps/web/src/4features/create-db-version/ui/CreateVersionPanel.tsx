@@ -188,84 +188,85 @@ export function CreateVersionPanel({
           </div>
         )}
 
-        {objects.length === 0 ? (
-          <div className="text-muted-foreground py-6 text-center text-sm">
-            {t.createVersion.noObjects}
+        <div>
+          <div className="text-muted-foreground mb-2 text-sm">
+            {t.createVersion.targetList(rows.length)}
           </div>
-        ) : (
-          <div>
-            <div className="text-muted-foreground mb-2 text-sm">
-              {t.createVersion.targetList(rows.length)}
-            </div>
-            {rows.length === 0 ? (
-              <div className="text-muted-foreground py-4 text-center text-sm">
-                {t.createVersion.empty}
-              </div>
-            ) : (
-              <div className="max-h-64 overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">#</TableHead>
-                      <TableHead>{t.createVersion.colName}</TableHead>
-                      <TableHead className="w-28">
-                        {t.createVersion.colKbims}
-                      </TableHead>
-                      <TableHead className="w-28">
-                        {t.createVersion.colPps}
-                      </TableHead>
-                      <TableHead className="w-24">
-                        {t.createVersion.colSource}
-                      </TableHead>
-                      <TableHead className="w-12">
-                        {t.createVersion.colRemove}
-                      </TableHead>
+          <div className="max-h-64 overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">#</TableHead>
+                  <TableHead>{t.createVersion.colName}</TableHead>
+                  <TableHead className="w-28">
+                    {t.createVersion.colKbims}
+                  </TableHead>
+                  <TableHead className="w-28">
+                    {t.createVersion.colPps}
+                  </TableHead>
+                  <TableHead className="w-24">
+                    {t.createVersion.colSource}
+                  </TableHead>
+                  <TableHead className="w-12">
+                    {t.createVersion.colRemove}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-muted-foreground py-6 text-center text-sm"
+                    >
+                      {objects.length === 0
+                        ? t.createVersion.noObjects
+                        : t.createVersion.empty}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((r, i) => (
+                    <TableRow key={r.globalIndex}>
+                      <TableCell className="text-muted-foreground">
+                        {i + 1}
+                      </TableCell>
+                      <TableCell className="truncate" title={r.name}>
+                        {r.name || '-'}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {r.item.kbims_code || '-'}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {r.item.pps_code || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            r.source === 'user' ? 'default' : 'secondary'
+                          }
+                        >
+                          {r.source === 'user'
+                            ? t.createVersion.sourceUser
+                            : t.createVersion.sourceConfidence}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(r.globalIndex)}
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label={t.createVersion.colRemove}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((r, i) => (
-                      <TableRow key={r.globalIndex}>
-                        <TableCell className="text-muted-foreground">
-                          {i + 1}
-                        </TableCell>
-                        <TableCell className="truncate" title={r.name}>
-                          {r.name || '-'}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {r.item.kbims_code || '-'}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {r.item.pps_code || '-'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              r.source === 'user' ? 'default' : 'secondary'
-                            }
-                          >
-                            {r.source === 'user'
-                              ? t.createVersion.sourceUser
-                              : t.createVersion.sourceConfidence}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <button
-                            type="button"
-                            onClick={() => handleRemove(r.globalIndex)}
-                            className="text-muted-foreground hover:text-destructive"
-                            aria-label={t.createVersion.colRemove}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   );
