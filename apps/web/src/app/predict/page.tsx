@@ -220,8 +220,8 @@ export default function PredictPage() {
   }, [activeSource?.type === 'xlsx' ? activeSource.fileName : null]);
 
   return (
-    <main className="container mx-auto px-4 py-8">
-      <div className="relative mb-8 flex items-center justify-center">
+    <main className="container mx-auto flex h-screen flex-col px-4 py-6">
+      <div className="relative mb-6 flex shrink-0 items-center justify-center">
         <div className="absolute left-0">
           <ServerStatusBadge />
         </div>
@@ -232,12 +232,12 @@ export default function PredictPage() {
       </div>
 
       {error && (
-        <Alert variant="destructive" className="mb-4">
+        <Alert variant="destructive" className="mb-4 shrink-0">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <div className="grid grid-cols-[280px_1fr_380px] gap-4">
+      <div className="grid min-h-0 flex-1 grid-cols-[280px_1fr_380px] gap-4 overflow-y-auto">
         {/* Panel 1: DB Version + File List + Report */}
         <div className="flex flex-col gap-4 min-h-0">
           <Card className={cn('flex flex-col', lockClass)}>
@@ -370,13 +370,15 @@ export default function PredictPage() {
           />
         </div>
       </div>
-      <CreateVersionPanel
-        objects={objects}
-        predictionMap={predictionMap}
-        selectedVersion={selectedVersion}
-        versions={versions}
-        onCreated={refetchVersions}
-      />
+      <div className="shrink-0">
+        <CreateVersionPanel
+          objects={objects}
+          predictionMap={predictionMap}
+          selectedVersion={selectedVersion}
+          versions={versions}
+          onCreated={refetchVersions}
+        />
+      </div>
     </main>
   );
 }
