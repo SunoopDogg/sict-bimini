@@ -170,7 +170,7 @@ export function CreateVersionPanel({
           <Button variant="outline" onClick={handleAddByConfidence}>
             {t.createVersion.addByConfidence(threshold)}
           </Button>
-          <Button onClick={handleCreate} disabled={!canCreate}>
+          <Button className="ml-auto" onClick={handleCreate} disabled={!canCreate}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {submitting ? t.createVersion.creating : t.createVersion.create}
           </Button>
