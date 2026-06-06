@@ -172,3 +172,15 @@ def test_create_version_vector_count_mismatch_503(create_client: TestClient) -> 
         app.state.embed.embed.return_value = [[0.1] * 10]
     assert resp.status_code == 503
     app.state.qdrant.delete_collection.assert_called_once()
+
+
+def test_create_version_init_failure_cleans_up(create_client: TestClient) -> None:
+    app.state.qdrant.create_payload_index.side_effect = RuntimeError("boom")
+    try:
+        with pytest.raises(RuntimeError):
+            create_client.post(
+                "/versions", json={"name": "v_new", "items": [_attr_payload()]}
+            )
+    finally:
+        app.state.qdrant.create_payload_index.side_effect = None
+    app.state.qdrant.delete_collection.assert_called_once()

@@ -91,8 +91,9 @@ class QdrantWrapper:
     def copy_collection(self, src: str, dst: str, *, batch: int = 256) -> int:
         """Copy all points (vectors + payload) from src into dst via scroll.
 
-        Server-side relay: payloads never leave Qdrant's process boundary on
-        our side beyond this client. Returns the number of points copied.
+        Relays points server-to-server through this client: scrolls full points
+        (vectors + payload) from src and re-upserts them into dst in batches.
+        Returns the number of points copied.
         """
         copied = 0
         offset = None

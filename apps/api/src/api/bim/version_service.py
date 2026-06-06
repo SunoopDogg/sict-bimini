@@ -37,8 +37,8 @@ def create_version(
     embedding failure (route maps to 503).
     """
     wrapper = QdrantWrapper(qdrant)
-    wrapper.init_collection(new_collection, dim=dim)
     try:
+        wrapper.init_collection(new_collection, dim=dim)
         copied = (
             wrapper.copy_collection(base_collection, new_collection)
             if base_collection is not None

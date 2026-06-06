@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from qdrant_client import QdrantClient
+from qdrant_client.models import PointStruct
 
 from api.bim.clients.qdrant import (
     DimensionMismatchError,
@@ -153,3 +154,24 @@ def test_delete_collection() -> None:
     client = MagicMock(spec=QdrantClient)
     QdrantWrapper(client).delete_collection("bim__gone")
     client.delete_collection.assert_called_once_with(collection_name="bim__gone")
+
+
+def test_copy_collection_live_in_memory(in_memory_client: QdrantClient) -> None:
+    """Live test: copy_collection against in-memory client (validates scroll shape)."""
+    w = QdrantWrapper(in_memory_client)
+    w.init_collection("bim__src", dim=4)
+    in_memory_client.upsert(
+        collection_name="bim__src",
+        points=[
+            PointStruct(
+                id=1,
+                vector=[0.1, 0.2, 0.3, 0.4],
+                payload={"kbims_code": "E1"},
+            )
+        ],
+        wait=True,
+    )
+    w.init_collection("bim__dst", dim=4)
+    copied = w.copy_collection("bim__src", "bim__dst")
+    assert copied == 1
+    assert in_memory_client.count(collection_name="bim__dst", exact=True).count == 1

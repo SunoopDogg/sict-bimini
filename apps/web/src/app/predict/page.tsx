@@ -370,13 +370,13 @@ export default function PredictPage() {
           />
         </div>
       </div>
-        <CreateVersionPanel
-          objects={objects}
-          predictionMap={predictionMap}
-          selectedVersion={selectedVersion}
-          versions={versions}
-          onCreated={refetchVersions}
-        />
+      <CreateVersionPanel
+        objects={objects}
+        predictionMap={predictionMap}
+        selectedVersion={selectedVersion}
+        versions={versions}
+        onCreated={refetchVersions}
+      />
     </main>
   );
 }

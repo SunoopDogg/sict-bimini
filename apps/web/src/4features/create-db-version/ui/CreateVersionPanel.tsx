@@ -163,7 +163,7 @@ export function CreateVersionPanel({
               min={0}
               max={100}
               value={threshold}
-              onChange={(e) => setThreshold(Number(e.target.value))}
+              onChange={(e) => setThreshold(Number(e.target.value) || 0)}
               className="w-24"
             />
           </div>
