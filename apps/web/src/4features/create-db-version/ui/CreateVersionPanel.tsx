@@ -39,6 +39,11 @@ interface CreateVersionPanelProps {
   onCreated: () => void;
 }
 
+// Reserve a stable space of N rows in the update-target table (mirrors the
+// object-list panel in 1height/plane-2): short lists pad with filler rows so
+// the panel height stays put; longer lists grow past it.
+const RESERVED_ROWS = 10;
+
 export function CreateVersionPanel({
   objects,
   predictionMap,
@@ -192,7 +197,7 @@ export function CreateVersionPanel({
           <div className="text-muted-foreground mb-2 text-sm">
             {t.createVersion.targetList(rows.length)}
           </div>
-          <div className="max-h-64 overflow-y-auto">
+          <div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -263,6 +268,24 @@ export function CreateVersionPanel({
                     </TableRow>
                   ))
                 )}
+                {/* Pad to RESERVED_ROWS so the table holds a stable height —
+                    the empty/placeholder state counts as one occupied row. */}
+                {Array.from({
+                  length: Math.max(
+                    0,
+                    RESERVED_ROWS - Math.max(rows.length, 1),
+                  ),
+                }).map((_, i) => (
+                  <TableRow
+                    key={`pad-${i}`}
+                    aria-hidden
+                    className="pointer-events-none"
+                  >
+                    <TableCell colSpan={6}>
+                      <div className="h-5" />
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
