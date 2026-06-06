@@ -42,6 +42,30 @@ const ko = {
     items: (n: number) => `${n}개`,
   },
 
+  createVersion: {
+    title: 'DB 버전 생성',
+    dbName: 'DB 이름',
+    dbNamePlaceholder: '새 버전 이름 (영문/숫자/_/-)',
+    baseDb: '기반 DB',
+    baseNone: '(없음 · 빈 DB)',
+    threshold: '신뢰도 임계값',
+    addByConfidence: (n: number) => `신뢰도 ≥${n}% 객체 추가`,
+    create: '버전 생성',
+    creating: '생성 중…',
+    targetList: (n: number) => `업데이트 대상 (${n})`,
+    colName: '객체 이름',
+    colKbims: '부위코드',
+    colPps: 'PPS 코드',
+    colSource: '출처',
+    colRemove: '삭제',
+    sourceUser: '사용자입력',
+    sourceConfidence: '신뢰도',
+    empty: '업데이트 대상이 없습니다. 사용자 입력 또는 신뢰도 추가 버튼을 사용하세요.',
+    noObjects: '파일을 선택하고 예측을 실행하세요.',
+    success: (v: string, added: number, total: number) =>
+      `'${v}' 생성 완료 — 추가 ${added}, 전체 ${total}`,
+  },
+
   predict: {
     results: '예측 결과',
     predict: '예측하기',
@@ -170,6 +194,30 @@ const en: typeof ko = {
     title: 'DB Version',
     none: 'No versions',
     items: (n: number) => `${n}`,
+  },
+
+  createVersion: {
+    title: 'Create DB Version',
+    dbName: 'DB name',
+    dbNamePlaceholder: 'New version name (A–Z, 0–9, _, -)',
+    baseDb: 'Base DB',
+    baseNone: '(none · empty DB)',
+    threshold: 'Confidence threshold',
+    addByConfidence: (n: number) => `Add objects ≥${n}%`,
+    create: 'Create version',
+    creating: 'Creating…',
+    targetList: (n: number) => `Update targets (${n})`,
+    colName: 'Object name',
+    colKbims: 'Part code',
+    colPps: 'PPS code',
+    colSource: 'Source',
+    colRemove: 'Remove',
+    sourceUser: 'User input',
+    sourceConfidence: 'Confidence',
+    empty: 'No update targets. Use user input or the confidence-add button.',
+    noObjects: 'Select a file and run predictions.',
+    success: (v: string, added: number, total: number) =>
+      `Created '${v}' — added ${added}, total ${total}`,
   },
 
   predict: {
