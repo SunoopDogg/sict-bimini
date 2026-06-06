@@ -6,6 +6,7 @@ import { usePredictionSessions } from '@/2pages/predict/hooks/usePredictionSessi
 import { useUserSelections } from '@/2pages/predict/hooks/useUserSelections';
 import { ObjectPredictionPanel } from '@/3widgets/object-prediction-panel';
 import { useVersions, VersionSelect } from '@/4features/select-db-version';
+import { CreateVersionPanel } from '@/4features/create-db-version';
 import { ServerStatusBadge } from '@/4features/server-status';
 import {
   FileListSelect,
@@ -55,6 +56,7 @@ export default function PredictPage() {
     versions,
     isLoading: versionsLoading,
     error: versionsError,
+    refetch: refetchVersions,
   } = useVersions();
   const [pickedVersion, setPickedVersion] = useState<string>();
   // True while a report export (predict + PDF) runs — locks file/version
@@ -368,6 +370,13 @@ export default function PredictPage() {
           />
         </div>
       </div>
+        <CreateVersionPanel
+          objects={objects}
+          predictionMap={predictionMap}
+          selectedVersion={selectedVersion}
+          versions={versions}
+          onCreated={refetchVersions}
+        />
     </main>
   );
 }
