@@ -2,7 +2,7 @@
 
 import { Database, Loader2, X } from 'lucide-react';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { BIMObject } from '@/5entities/bim-object';
 import type { DbVersion } from '@/5entities/db-version';
@@ -55,6 +55,17 @@ export function CreateVersionPanel({
   const { t } = useLocale();
   const [name, setName] = useState('');
   const [base, setBase] = useState(''); // '' = none
+  // Prediction source version for the update list — owned by this panel so the
+  // table is decoupled from the 1height view version. Seeded once from the
+  // page's selectedVersion, then independent (changing 1height won't reset it).
+  const [sourceVersion, setSourceVersion] = useState<string | undefined>(
+    selectedVersion,
+  );
+  useEffect(() => {
+    if (sourceVersion === undefined && selectedVersion !== undefined) {
+      setSourceVersion(selectedVersion);
+    }
+  }, [selectedVersion, sourceVersion]);
   const [threshold, setThreshold] = useState(70);
   // index → threshold (%) it was added at, so the source column can show it.
   const [manualAdded, setManualAdded] = useState<Map<number, number>>(new Map());
@@ -65,18 +76,18 @@ export function CreateVersionPanel({
 
   const rows = useMemo(
     () =>
-      buildUpdateList(objects, predictionMap, selectedVersion, {
+      buildUpdateList(objects, predictionMap, sourceVersion, {
         manualAdded,
         dismissed,
       }),
-    [objects, predictionMap, selectedVersion, manualAdded, dismissed],
+    [objects, predictionMap, sourceVersion, manualAdded, dismissed],
   );
 
   const handleAddByConfidence = () => {
     const picked = selectByConfidence(
       objects,
       predictionMap,
-      selectedVersion,
+      sourceVersion,
       threshold,
     );
     setManualAdded((prev) => {
@@ -217,6 +228,25 @@ export function CreateVersionPanel({
             <CardTitle>{t.createVersion.targetList(rows.length)}</CardTitle>
             {/* threshold + confidence-add populate the list (not DB metadata) */}
             <div className="flex items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="cv-src" className="text-xs">
+                  {t.createVersion.sourceVersion}
+                </Label>
+                <select
+                  id="cv-src"
+                  value={sourceVersion ?? ''}
+                  onChange={(e) =>
+                    setSourceVersion(e.target.value || undefined)
+                  }
+                  className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+                >
+                  {versions.map((v) => (
+                    <option key={v.name} value={v.name}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex flex-col gap-1">
                 <Label htmlFor="cv-th" className="text-xs">
                   {t.createVersion.threshold} (%)
