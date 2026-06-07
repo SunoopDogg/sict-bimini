@@ -302,12 +302,13 @@ export function CreateVersionPanel({
                                   r.threshold ?? 0,
                                 )}
                           </Badge>
-                          <span
-                            className="text-muted-foreground max-w-full truncate font-mono text-[10px]"
+                          <Badge
+                            variant="outline"
+                            className="min-w-0 max-w-full truncate font-mono text-[10px]"
                             title={r.version || undefined}
                           >
                             {r.version || '—'}
-                          </span>
+                          </Badge>
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
