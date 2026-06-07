@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/6shared/ui/primitive/card';
+import { Checkbox } from '@/6shared/ui/primitive/checkbox';
 import { Input } from '@/6shared/ui/primitive/input';
 import { Label } from '@/6shared/ui/primitive/label';
 import { SelectableCardList } from '@/6shared/ui/SelectableCardList';
@@ -70,6 +71,9 @@ export function CreateVersionPanel({
   // index → threshold (%) it was added at, so the source column can show it.
   const [manualAdded, setManualAdded] = useState<Map<number, number>>(new Map());
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
+  // Rows opted out of creation (still visible, just unchecked). Opt-out keeps
+  // newly added rows included by default.
+  const [deselected, setDeselected] = useState<Set<number>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -82,6 +86,23 @@ export function CreateVersionPanel({
       }),
     [objects, predictionMap, sourceVersion, manualAdded, dismissed],
   );
+
+  const selectedRows = rows.filter((r) => !deselected.has(r.globalIndex));
+  const allSelected =
+    rows.length > 0 && rows.every((r) => !deselected.has(r.globalIndex));
+
+  const toggleAll = (checked: boolean) => {
+    setDeselected(checked ? new Set() : new Set(rows.map((r) => r.globalIndex)));
+  };
+
+  const toggleRow = (globalIndex: number, checked: boolean) => {
+    setDeselected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.delete(globalIndex);
+      else next.add(globalIndex);
+      return next;
+    });
+  };
 
   const handleAddByConfidence = () => {
     const picked = selectByConfidence(
@@ -115,6 +136,7 @@ export function CreateVersionPanel({
     setName('');
     setManualAdded(new Map());
     setDismissed(new Set());
+    setDeselected(new Set());
   };
 
   const handleCreate = async () => {
@@ -123,7 +145,7 @@ export function CreateVersionPanel({
     const res = await createVersion({
       name: name.trim(),
       base: base === '' ? null : base,
-      items: rows.map((r) => r.item),
+      items: selectedRows.map((r) => r.item),
     });
     setSubmitting(false);
     if (res.success && res.data) {
@@ -142,7 +164,7 @@ export function CreateVersionPanel({
   const canCreate =
     name.trim() !== '' &&
     !submitting &&
-    (rows.length > 0 || base !== '');
+    (selectedRows.length > 0 || base !== '');
 
   // Base-DB options for the reused card list: a synthetic "none" entry (empty
   // DB) followed by the real versions. Empty name === the "no base" choice.
@@ -276,6 +298,13 @@ export function CreateVersionPanel({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10 text-center">
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={(c) => toggleAll(c === true)}
+                      aria-label="select-all"
+                    />
+                  </TableHead>
                   <TableHead className="w-10 text-center">#</TableHead>
                   <TableHead>{t.createVersion.colName}</TableHead>
                   <TableHead className="w-28">
@@ -296,7 +325,7 @@ export function CreateVersionPanel({
                 {rows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="text-muted-foreground py-6 text-center text-sm"
                     >
                       {objects.length === 0
@@ -307,6 +336,15 @@ export function CreateVersionPanel({
                 ) : (
                   rows.map((r, i) => (
                     <TableRow key={r.globalIndex}>
+                      <TableCell className="text-center">
+                        <Checkbox
+                          checked={!deselected.has(r.globalIndex)}
+                          onCheckedChange={(c) =>
+                            toggleRow(r.globalIndex, c === true)
+                          }
+                          aria-label={r.name || `row-${r.globalIndex}`}
+                        />
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-center">
                         {i + 1}
                       </TableCell>
@@ -368,7 +406,7 @@ export function CreateVersionPanel({
                     aria-hidden
                     className="pointer-events-none"
                   >
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={7}>
                       <div className="h-5" />
                     </TableCell>
                   </TableRow>
