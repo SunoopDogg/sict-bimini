@@ -60,6 +60,7 @@ const ko = {
     colRemove: '삭제',
     sourceUser: '사용자입력',
     sourceConfidence: '신뢰도',
+    sourceConfidenceThreshold: (n: number) => `신뢰도 ≥${n}%`,
     empty: '업데이트 대상이 없습니다. 사용자 입력 또는 신뢰도 추가 버튼을 사용하세요.',
     noObjects: '파일을 선택하고 예측을 실행하세요.',
     success: (v: string, added: number, total: number) =>
@@ -214,6 +215,7 @@ const en: typeof ko = {
     colRemove: 'Remove',
     sourceUser: 'User input',
     sourceConfidence: 'Confidence',
+    sourceConfidenceThreshold: (n: number) => `Confidence ≥${n}%`,
     empty: 'No update targets. Use user input or the confidence-add button.',
     noObjects: 'Select a file and run predictions.',
     success: (v: string, added: number, total: number) =>

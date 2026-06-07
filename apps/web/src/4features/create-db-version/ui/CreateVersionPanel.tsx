@@ -56,7 +56,8 @@ export function CreateVersionPanel({
   const [name, setName] = useState('');
   const [base, setBase] = useState(''); // '' = none
   const [threshold, setThreshold] = useState(70);
-  const [manualAdded, setManualAdded] = useState<Set<number>>(new Set());
+  // index → threshold (%) it was added at, so the source column can show it.
+  const [manualAdded, setManualAdded] = useState<Map<number, number>>(new Map());
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -78,7 +79,11 @@ export function CreateVersionPanel({
       selectedVersion,
       threshold,
     );
-    setManualAdded((prev) => new Set([...prev, ...picked]));
+    setManualAdded((prev) => {
+      const next = new Map(prev);
+      picked.forEach((i) => next.set(i, threshold));
+      return next;
+    });
     setDismissed((prev) => {
       const next = new Set(prev);
       picked.forEach((i) => next.delete(i));
@@ -89,7 +94,7 @@ export function CreateVersionPanel({
   const handleRemove = (globalIndex: number) => {
     setDismissed((prev) => new Set(prev).add(globalIndex));
     setManualAdded((prev) => {
-      const next = new Set(prev);
+      const next = new Map(prev);
       next.delete(globalIndex);
       return next;
     });
@@ -97,7 +102,7 @@ export function CreateVersionPanel({
 
   const reset = () => {
     setName('');
-    setManualAdded(new Set());
+    setManualAdded(new Map());
     setDismissed(new Set());
   };
 
@@ -249,7 +254,7 @@ export function CreateVersionPanel({
                   <TableHead className="w-28">
                     {t.createVersion.colPps}
                   </TableHead>
-                  <TableHead className="w-24">
+                  <TableHead className="w-40">
                     {t.createVersion.colSource}
                   </TableHead>
                   <TableHead className="w-12 text-center">
@@ -285,15 +290,25 @@ export function CreateVersionPanel({
                         {r.item.pps_code || '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={
-                            r.source === 'user' ? 'default' : 'secondary'
-                          }
-                        >
-                          {r.source === 'user'
-                            ? t.createVersion.sourceUser
-                            : t.createVersion.sourceConfidence}
-                        </Badge>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <Badge
+                            variant={
+                              r.source === 'user' ? 'default' : 'secondary'
+                            }
+                          >
+                            {r.source === 'user'
+                              ? t.createVersion.sourceUser
+                              : t.createVersion.sourceConfidenceThreshold(
+                                  r.threshold ?? 0,
+                                )}
+                          </Badge>
+                          <span
+                            className="text-muted-foreground max-w-full truncate font-mono text-[10px]"
+                            title={r.version || undefined}
+                          >
+                            {r.version || '—'}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <button
