@@ -201,7 +201,7 @@ export function CreateVersionPanel({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-10">#</TableHead>
+                  <TableHead className="w-10 text-center">#</TableHead>
                   <TableHead>{t.createVersion.colName}</TableHead>
                   <TableHead className="w-28">
                     {t.createVersion.colKbims}
@@ -212,7 +212,7 @@ export function CreateVersionPanel({
                   <TableHead className="w-24">
                     {t.createVersion.colSource}
                   </TableHead>
-                  <TableHead className="w-12">
+                  <TableHead className="w-12 text-center">
                     {t.createVersion.colRemove}
                   </TableHead>
                 </TableRow>
@@ -232,7 +232,7 @@ export function CreateVersionPanel({
                 ) : (
                   rows.map((r, i) => (
                     <TableRow key={r.globalIndex}>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-muted-foreground text-center">
                         {i + 1}
                       </TableCell>
                       <TableCell className="truncate" title={r.name}>
@@ -255,11 +255,11 @@ export function CreateVersionPanel({
                             : t.createVersion.sourceConfidence}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <button
                           type="button"
                           onClick={() => handleRemove(r.globalIndex)}
-                          className="text-muted-foreground hover:text-destructive"
+                          className="text-muted-foreground hover:text-destructive mx-auto block"
                           aria-label={t.createVersion.colRemove}
                         >
                           <X className="h-4 w-4" />
