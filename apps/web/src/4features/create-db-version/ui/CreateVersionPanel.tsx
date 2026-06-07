@@ -1,12 +1,13 @@
 'use client';
 
-import { Database, Loader2, X } from 'lucide-react';
+import { Database, Eye, Loader2, X } from 'lucide-react';
 
 import { useEffect, useMemo, useState } from 'react';
 
 import type { BIMObject } from '@/5entities/bim-object';
 import type { DbVersion } from '@/5entities/db-version';
 import type { PredictionSession } from '@/5entities/prediction';
+import type { XlsxFileInfo } from '@/5entities/xlsx-file';
 import { createVersion } from '@/6shared/api';
 import { useLocale } from '@/6shared/i18n';
 import { Badge } from '@/6shared/ui/primitive/badge';
@@ -34,11 +35,19 @@ import { buildUpdateList } from '../model/buildUpdateList';
 import { selectByConfidence } from '../model/selectByConfidence';
 
 interface CreateVersionPanelProps {
+  /** Available xlsx files to source predictions from (independent of 1height). */
+  files: XlsxFileInfo[];
+  sourceFile: string | undefined;
+  onSourceFileChange: (fileName: string) => void;
+  /** Objects + predictions of the chosen source file (loaded by the page). */
   objects: BIMObject[];
   predictionMap: Record<string, PredictionSession[]>;
+  /** Seeds the source DB version once; thereafter panel-owned. */
   selectedVersion: string | undefined;
   versions: DbVersion[];
   onCreated: () => void;
+  /** Opens the version-contents viewer (eye icon on each base DB). */
+  onViewVersion?: (version: string) => void;
 }
 
 // Reserve a stable space of N rows in the update-target table (mirrors the
@@ -47,11 +56,15 @@ interface CreateVersionPanelProps {
 const RESERVED_ROWS = 10;
 
 export function CreateVersionPanel({
+  files,
+  sourceFile,
+  onSourceFileChange,
   objects,
   predictionMap,
   selectedVersion,
   versions,
   onCreated,
+  onViewVersion,
 }: CreateVersionPanelProps) {
   const { t } = useLocale();
   const [name, setName] = useState('');
@@ -174,8 +187,54 @@ export function CreateVersionPanel({
     // 2height mirrors 1height: a left control plane (stacked cards) + a right
     // list plane (the update-target table, like the object-list panel).
     <div className="grid grid-cols-[280px_1fr] gap-4">
-      {/* Plane 1: DB name + base DB + create action */}
+      {/* Plane 1: prediction source + DB name + base DB + create action */}
       <div className="flex flex-col gap-4">
+        {/* Prediction source: file + DB, fully independent of the 1height view */}
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle>{t.createVersion.sourceVersion}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="cv-srcfile" className="text-xs">
+                {t.createVersion.sourceFile}
+              </Label>
+              <select
+                id="cv-srcfile"
+                value={sourceFile ?? ''}
+                onChange={(e) => onSourceFileChange(e.target.value)}
+                className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+              >
+                <option value="" disabled>
+                  {t.createVersion.selectFile}
+                </option>
+                {files.map((f) => (
+                  <option key={f.name} value={f.name}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="cv-src" className="text-xs">
+                {t.createVersion.sourceDb}
+              </Label>
+              <select
+                id="cv-src"
+                value={sourceVersion ?? ''}
+                onChange={(e) => setSourceVersion(e.target.value || undefined)}
+                className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+              >
+                {versions.map((v) => (
+                  <option key={v.name} value={v.name}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>{t.createVersion.dbName}</CardTitle>
@@ -209,6 +268,22 @@ export function CreateVersionPanel({
                 }
                 renderSubtitle={(v) =>
                   v.name === '' ? null : t.version.items(v.points)
+                }
+                renderAction={
+                  onViewVersion
+                    ? (v) =>
+                        v.name === '' ? null : (
+                          <button
+                            type="button"
+                            onClick={() => onViewVersion(v.name)}
+                            className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1.5 transition-colors"
+                            aria-label={t.bimAttr.view}
+                            title={t.bimAttr.view}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        )
+                    : undefined
                 }
               />
             </div>
@@ -250,25 +325,6 @@ export function CreateVersionPanel({
             <CardTitle>{t.createVersion.targetList(rows.length)}</CardTitle>
             {/* threshold + confidence-add populate the list (not DB metadata) */}
             <div className="flex items-end gap-2">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="cv-src" className="text-xs">
-                  {t.createVersion.sourceVersion}
-                </Label>
-                <select
-                  id="cv-src"
-                  value={sourceVersion ?? ''}
-                  onChange={(e) =>
-                    setSourceVersion(e.target.value || undefined)
-                  }
-                  className="border-input bg-background h-8 rounded-md border px-2 text-sm"
-                >
-                  {versions.map((v) => (
-                    <option key={v.name} value={v.name}>
-                      {v.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="flex flex-col gap-1">
                 <Label htmlFor="cv-th" className="text-xs">
                   {t.createVersion.threshold} (%)

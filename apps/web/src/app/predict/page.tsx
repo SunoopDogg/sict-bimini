@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { usePredictionSessions } from '@/2pages/predict/hooks/usePredictionSessions';
 import { useUserSelections } from '@/2pages/predict/hooks/useUserSelections';
 import { ObjectPredictionPanel } from '@/3widgets/object-prediction-panel';
+import { BimAttributeTableModal } from '@/4features/bim-attribute-viewer';
 import { useVersions, VersionSelect } from '@/4features/select-db-version';
 import { CreateVersionPanel } from '@/4features/create-db-version';
 import { ServerStatusBadge } from '@/4features/server-status';
@@ -43,6 +44,13 @@ export default function PredictPage() {
   const [selectedObjectIndex, setSelectedObjectIndex] = useState<number | null>(
     null,
   );
+  // Independent prediction source for the create-version panel — file chosen
+  // separately from the 1height view, so the update list is fully decoupled.
+  const [createSourceFile, setCreateSourceFile] = useState<string>();
+  const [createObjects, setCreateObjects] = useState<BIMObject[]>([]);
+  const [createPredictionMap, setCreatePredictionMap] = useState<
+    Record<string, PredictionSession[]>
+  >({});
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>('idle');
   const [isLoadingObjects, setIsLoadingObjects] = useState(false);
   const [error, setError] = useState<string>();
@@ -62,6 +70,8 @@ export default function PredictPage() {
   // True while a report export (predict + PDF) runs — locks file/version
   // switching so an in-flight export can't clobber a freshly loaded file.
   const [isExporting, setIsExporting] = useState(false);
+  // DB version whose contents are shown in the viewer modal (eye icon).
+  const [viewVersion, setViewVersion] = useState<string | null>(null);
   // Visual + interaction lock applied to the file/version cards while exporting.
   const lockClass = cn(isExporting && 'pointer-events-none opacity-50');
   // Effective version: user's pick, else default to the first available.
@@ -219,6 +229,30 @@ export default function PredictPage() {
     loadObjects();
   }, [activeSource?.type === 'xlsx' ? activeSource.fileName : null]);
 
+  // Load the create-version source file independently of the 1height file.
+  useEffect(() => {
+    if (!createSourceFile) {
+      setCreateObjects([]);
+      setCreatePredictionMap({});
+      return;
+    }
+    let active = true;
+    const load = async () => {
+      const objRes = await readJsonFileAction(createSourceFile);
+      if (!active) return;
+      setCreateObjects(objRes.success && objRes.data ? objRes.data : []);
+      const predRes = await loadPredictionsAction(createSourceFile);
+      if (!active) return;
+      setCreatePredictionMap(
+        predRes.success && predRes.data ? predRes.data : {},
+      );
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, [createSourceFile]);
+
   return (
     <main className="container mx-auto px-4 py-6">
       <div className="relative mb-6 flex items-center justify-center">
@@ -255,6 +289,7 @@ export default function PredictPage() {
                   }}
                   isLoading={versionsLoading}
                   error={versionsError}
+                  onView={setViewVersion}
                 />
               </div>
             </CardContent>
@@ -375,13 +410,26 @@ export default function PredictPage() {
       {/* 2height: DB version create band, below the 3-panel screen */}
       <div className="mt-6">
         <CreateVersionPanel
-          objects={objects}
-          predictionMap={predictionMap}
+          files={files}
+          sourceFile={createSourceFile}
+          onSourceFileChange={setCreateSourceFile}
+          objects={createObjects}
+          predictionMap={createPredictionMap}
           selectedVersion={selectedVersion}
           versions={versions}
           onCreated={refetchVersions}
+          onViewVersion={setViewVersion}
         />
       </div>
+
+      {/* Version-scoped contents viewer, opened by the eye icon in VersionSelect */}
+      <BimAttributeTableModal
+        version={viewVersion ?? undefined}
+        open={viewVersion !== null}
+        onOpenChange={(o) => {
+          if (!o) setViewVersion(null);
+        }}
+      />
     </main>
   );
 }
