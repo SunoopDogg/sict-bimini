@@ -160,21 +160,6 @@ export function CreateVersionPanel({
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="cv-th">{t.createVersion.threshold} (%)</Label>
-            <Input
-              id="cv-th"
-              type="number"
-              min={0}
-              max={100}
-              value={threshold}
-              onChange={(e) => setThreshold(Number(e.target.value) || 0)}
-              className="w-24"
-            />
-          </div>
-          <Button variant="outline" onClick={handleAddByConfidence}>
-            {t.createVersion.addByConfidence(threshold)}
-          </Button>
           <Button className="ml-auto" onClick={handleCreate} disabled={!canCreate}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {submitting ? t.createVersion.creating : t.createVersion.create}
@@ -194,8 +179,35 @@ export function CreateVersionPanel({
         )}
 
         <div>
-          <div className="text-muted-foreground mb-2 text-sm">
-            {t.createVersion.targetList(rows.length)}
+          {/* List toolbar: threshold + confidence-add belong to populating the
+              update list, kept separate from the new-DB metadata above. */}
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
+            <div className="text-muted-foreground text-sm">
+              {t.createVersion.targetList(rows.length)}
+            </div>
+            <div className="flex items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="cv-th" className="text-xs">
+                  {t.createVersion.threshold} (%)
+                </Label>
+                <Input
+                  id="cv-th"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={threshold}
+                  onChange={(e) => setThreshold(Number(e.target.value) || 0)}
+                  className="h-8 w-20"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddByConfidence}
+              >
+                {t.createVersion.addByConfidence(threshold)}
+              </Button>
+            </div>
           </div>
           <div>
             <Table>
