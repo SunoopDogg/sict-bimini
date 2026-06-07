@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, X } from 'lucide-react';
+import { Database, Loader2, X } from 'lucide-react';
 
 import { useMemo, useState } from 'react';
 
@@ -19,6 +19,7 @@ import {
 } from '@/6shared/ui/primitive/card';
 import { Input } from '@/6shared/ui/primitive/input';
 import { Label } from '@/6shared/ui/primitive/label';
+import { SelectableCardList } from '@/6shared/ui/SelectableCardList';
 import {
   Table,
   TableBody,
@@ -127,64 +128,89 @@ export function CreateVersionPanel({
     !submitting &&
     (rows.length > 0 || base !== '');
 
+  // Base-DB options for the reused card list: a synthetic "none" entry (empty
+  // DB) followed by the real versions. Empty name === the "no base" choice.
+  const baseItems: DbVersion[] = [{ name: '', points: 0 }, ...versions];
+
   return (
-    <Card className="mt-4 flex flex-col">
-      <CardHeader>
-        <CardTitle>{t.createVersion.title}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="cv-name">{t.createVersion.dbName}</Label>
+    // 2height mirrors 1height: a left control plane (stacked cards) + a right
+    // list plane (the update-target table, like the object-list panel).
+    <div className="grid grid-cols-[280px_1fr] gap-4">
+      {/* Plane 1: DB name + base DB + create action */}
+      <div className="flex flex-col gap-4">
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle>{t.createVersion.dbName}</CardTitle>
+          </CardHeader>
+          <CardContent>
             <Input
               id="cv-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t.createVersion.dbNamePlaceholder}
-              className="w-64"
             />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="cv-base">{t.createVersion.baseDb}</Label>
-            <select
-              id="cv-base"
-              value={base}
-              onChange={(e) => setBase(e.target.value)}
-              className="border-input bg-background h-9 rounded-md border px-3 text-sm"
-            >
-              <option value="">{t.createVersion.baseNone}</option>
-              {versions.map((v) => (
-                <option key={v.name} value={v.name}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button className="ml-auto" onClick={handleCreate} disabled={!canCreate}>
-            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {submitting ? t.createVersion.creating : t.createVersion.create}
-          </Button>
-        </div>
+          </CardContent>
+        </Card>
 
-        {message && (
-          <div
-            className={
-              isError
-                ? 'text-destructive text-sm'
-                : 'text-sm text-green-600 dark:text-green-400'
-            }
-          >
-            {message}
-          </div>
-        )}
-
-        <div>
-          {/* List toolbar: threshold + confidence-add belong to populating the
-              update list, kept separate from the new-DB metadata above. */}
-          <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-            <div className="text-muted-foreground text-sm">
-              {t.createVersion.targetList(rows.length)}
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle>{t.createVersion.baseDb}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-48 overflow-y-auto">
+              <SelectableCardList
+                items={baseItems}
+                getKey={(v) => v.name}
+                selectedKey={base}
+                onSelect={setBase}
+                renderIcon={() => (
+                  <Database className="h-7 w-7 shrink-0 text-blue-600" />
+                )}
+                renderTitle={(v) =>
+                  v.name === '' ? t.createVersion.baseNone : v.name
+                }
+                renderSubtitle={(v) =>
+                  v.name === '' ? null : t.version.items(v.points)
+                }
+              />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle>{t.createVersion.title}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button
+              className="w-full"
+              onClick={handleCreate}
+              disabled={!canCreate}
+            >
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {submitting ? t.createVersion.creating : t.createVersion.create}
+            </Button>
+            {message && (
+              <div
+                className={
+                  isError
+                    ? 'text-destructive text-sm'
+                    : 'text-sm text-green-600 dark:text-green-400'
+                }
+              >
+                {message}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Plane 2: update-target list */}
+      <Card className="flex flex-col">
+        <CardHeader>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <CardTitle>{t.createVersion.targetList(rows.length)}</CardTitle>
+            {/* threshold + confidence-add populate the list (not DB metadata) */}
             <div className="flex items-end gap-2">
               <div className="flex flex-col gap-1">
                 <Label htmlFor="cv-th" className="text-xs">
@@ -209,6 +235,8 @@ export function CreateVersionPanel({
               </Button>
             </div>
           </div>
+        </CardHeader>
+        <CardContent>
           <div>
             <Table>
               <TableHeader>
@@ -301,8 +329,8 @@ export function CreateVersionPanel({
               </TableBody>
             </Table>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
