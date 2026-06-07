@@ -290,8 +290,16 @@ export function CreateVersionPanel({
                         {r.item.pps_code || '-'}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col items-start gap-0.5">
+                        <div className="flex items-center gap-1">
                           <Badge
+                            variant="outline"
+                            className="min-w-0 truncate font-mono text-[10px]"
+                            title={r.version || undefined}
+                          >
+                            {r.version || '—'}
+                          </Badge>
+                          <Badge
+                            className="shrink-0"
                             variant={
                               r.source === 'user' ? 'default' : 'secondary'
                             }
@@ -301,13 +309,6 @@ export function CreateVersionPanel({
                               : t.createVersion.sourceConfidenceThreshold(
                                   r.threshold ?? 0,
                                 )}
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className="min-w-0 max-w-full truncate font-mono text-[10px]"
-                            title={r.version || undefined}
-                          >
-                            {r.version || '—'}
                           </Badge>
                         </div>
                       </TableCell>
