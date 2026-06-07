@@ -42,8 +42,6 @@ interface CreateVersionPanelProps {
   /** Objects + predictions of the chosen source file (loaded by the page). */
   objects: BIMObject[];
   predictionMap: Record<string, PredictionSession[]>;
-  /** Seeds the source DB version once; thereafter panel-owned. */
-  selectedVersion: string | undefined;
   versions: DbVersion[];
   onCreated: () => void;
   /** Opens the version-contents viewer (eye icon on each base DB). */
@@ -61,7 +59,6 @@ export function CreateVersionPanel({
   onSourceFileChange,
   objects,
   predictionMap,
-  selectedVersion,
   versions,
   onCreated,
   onViewVersion,
@@ -69,17 +66,16 @@ export function CreateVersionPanel({
   const { t } = useLocale();
   const [name, setName] = useState('');
   const [base, setBase] = useState(''); // '' = none
-  // Prediction source version for the update list — owned by this panel so the
-  // table is decoupled from the 1height view version. Seeded once from the
-  // page's selectedVersion, then independent (changing 1height won't reset it).
+  // Prediction source version — fully owned by this panel (independent of the
+  // 1height view). Defaults to the first available version once loaded.
   const [sourceVersion, setSourceVersion] = useState<string | undefined>(
-    selectedVersion,
+    undefined,
   );
   useEffect(() => {
-    if (sourceVersion === undefined && selectedVersion !== undefined) {
-      setSourceVersion(selectedVersion);
+    if (sourceVersion === undefined && versions.length > 0) {
+      setSourceVersion(versions[0].name);
     }
-  }, [selectedVersion, sourceVersion]);
+  }, [versions, sourceVersion]);
   const [threshold, setThreshold] = useState(70);
   // index → threshold (%) it was added at, so the source column can show it.
   const [manualAdded, setManualAdded] = useState<Map<number, number>>(new Map());

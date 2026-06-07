@@ -415,7 +415,6 @@ export default function PredictPage() {
           onSourceFileChange={setCreateSourceFile}
           objects={createObjects}
           predictionMap={createPredictionMap}
-          selectedVersion={selectedVersion}
           versions={versions}
           onCreated={refetchVersions}
           onViewVersion={setViewVersion}
