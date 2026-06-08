@@ -1,6 +1,6 @@
 'use client';
 
-import { Database, Eye, Loader2, X } from 'lucide-react';
+import { Database, Loader2, X } from 'lucide-react';
 
 import { useEffect, useMemo, useState } from 'react';
 
@@ -21,6 +21,7 @@ import {
 import { Checkbox } from '@/6shared/ui/primitive/checkbox';
 import { Input } from '@/6shared/ui/primitive/input';
 import { Label } from '@/6shared/ui/primitive/label';
+import { DbVersionViewButton } from '@/6shared/ui/DbVersionViewButton';
 import { SelectableCardList } from '@/6shared/ui/SelectableCardList';
 import {
   Table,
@@ -177,7 +178,10 @@ export function CreateVersionPanel({
 
   // Base-DB options for the reused card list: a synthetic "none" entry (empty
   // DB) followed by the real versions. Empty name === the "no base" choice.
-  const baseItems: DbVersion[] = [{ name: '', points: 0 }, ...versions];
+  const baseItems = useMemo<DbVersion[]>(
+    () => [{ name: '', points: 0 }, ...versions],
+    [versions],
+  );
 
   return (
     // 2height mirrors 1height: a left control plane (stacked cards) + a right
@@ -185,6 +189,56 @@ export function CreateVersionPanel({
     <div className="grid grid-cols-[280px_1fr] gap-4">
       {/* Plane 1: prediction source + DB name + base DB + create action */}
       <div className="flex flex-col gap-4">
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle>{t.createVersion.dbName}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Input
+              id="cv-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t.createVersion.dbNamePlaceholder}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle>{t.createVersion.baseDb}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-48 overflow-y-auto">
+              <SelectableCardList
+                items={baseItems}
+                getKey={(v) => v.name}
+                selectedKey={base}
+                onSelect={setBase}
+                renderIcon={() => (
+                  <Database className="h-7 w-7 shrink-0 text-blue-600" />
+                )}
+                renderTitle={(v) =>
+                  v.name === '' ? t.createVersion.baseNone : v.name
+                }
+                renderSubtitle={(v) =>
+                  v.name === '' ? null : t.version.items(v.points)
+                }
+                renderAction={
+                  onViewVersion
+                    ? (v) =>
+                        v.name === '' ? null : (
+                          <DbVersionViewButton
+                            version={v.name}
+                            onView={onViewVersion}
+                          />
+                        )
+                    : undefined
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Prediction source: file + DB, fully independent of the 1height view */}
         <Card className="flex flex-col">
           <CardHeader>
@@ -227,61 +281,6 @@ export function CreateVersionPanel({
                   </option>
                 ))}
               </select>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle>{t.createVersion.dbName}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Input
-              id="cv-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t.createVersion.dbNamePlaceholder}
-            />
-          </CardContent>
-        </Card>
-
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle>{t.createVersion.baseDb}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-48 overflow-y-auto">
-              <SelectableCardList
-                items={baseItems}
-                getKey={(v) => v.name}
-                selectedKey={base}
-                onSelect={setBase}
-                renderIcon={() => (
-                  <Database className="h-7 w-7 shrink-0 text-blue-600" />
-                )}
-                renderTitle={(v) =>
-                  v.name === '' ? t.createVersion.baseNone : v.name
-                }
-                renderSubtitle={(v) =>
-                  v.name === '' ? null : t.version.items(v.points)
-                }
-                renderAction={
-                  onViewVersion
-                    ? (v) =>
-                        v.name === '' ? null : (
-                          <button
-                            type="button"
-                            onClick={() => onViewVersion(v.name)}
-                            className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1.5 transition-colors"
-                            aria-label={t.bimAttr.view}
-                            title={t.bimAttr.view}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                        )
-                    : undefined
-                }
-              />
             </div>
           </CardContent>
         </Card>
