@@ -2,7 +2,7 @@
 
 import { CheckCircle, Loader2, Upload } from 'lucide-react';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useLocale } from '@/6shared/i18n';
 import { cn } from '@/6shared/lib/cn';
@@ -19,9 +19,11 @@ export function FileUploadZone({
   uploadStatus = 'idle',
 }: FileUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { t } = useLocale();
 
   const isProcessing = uploadStatus === 'uploading';
+  const isIdle = uploadStatus === 'idle';
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -82,15 +84,9 @@ export function FileUploadZone({
             <Upload className="text-muted-foreground h-10 w-10" />
             <div className="text-center">
               <p className="text-sm font-medium">{t.upload.dragOrClick}</p>
-              <label className="text-primary cursor-pointer text-sm hover:underline">
+              <span className="text-primary text-sm hover:underline">
                 {t.upload.selectFile}
-                <input
-                  type="file"
-                  accept=".xlsx"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
+              </span>
             </div>
             <p className="text-muted-foreground text-xs">{t.upload.xlsxOnly}</p>
           </>
@@ -103,15 +99,24 @@ export function FileUploadZone({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onClick={isIdle ? () => inputRef.current?.click() : undefined}
       className={cn(
         'flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed p-8 transition-colors',
         isDragging
           ? 'border-primary bg-primary/5'
           : 'border-muted-foreground/25 hover:border-primary/50',
+        isIdle && 'cursor-pointer',
         isProcessing && 'pointer-events-none',
         uploadStatus === 'done' && 'border-green-500 bg-green-50 dark:bg-green-950/20',
       )}
     >
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".xlsx"
+        onChange={handleFileChange}
+        className="hidden"
+      />
       {renderContent()}
     </div>
   );
