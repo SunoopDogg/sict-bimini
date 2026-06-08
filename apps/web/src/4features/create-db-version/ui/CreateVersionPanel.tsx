@@ -1,8 +1,8 @@
 'use client';
 
-import { Database, Loader2, X } from 'lucide-react';
+import { Database, Loader2 } from 'lucide-react';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { BIMObject } from '@/5entities/bim-object';
 import type { DbVersion } from '@/5entities/db-version';
@@ -57,6 +57,10 @@ interface CreateVersionPanelProps {
 // the panel height stays put; longer lists grow past it.
 const RESERVED_ROWS = 10;
 
+// Shared styling for the native <select>s in the prediction-source card.
+const SELECT_CLS =
+  'border-input bg-background h-9 rounded-md border px-2 text-sm';
+
 export function CreateVersionPanel({
   files,
   sourceFile,
@@ -75,11 +79,8 @@ export function CreateVersionPanel({
   const [sourceVersion, setSourceVersion] = useState<string | undefined>(
     undefined,
   );
-  useEffect(() => {
-    if (sourceVersion === undefined && versions.length > 0) {
-      setSourceVersion(versions[0].name);
-    }
-  }, [versions, sourceVersion]);
+  // Default to the first version until the user picks one — derived, no effect.
+  const effectiveSourceVersion = sourceVersion ?? versions[0]?.name;
   const [threshold, setThreshold] = useState(70);
   // Accumulated update rows (full snapshots), persisted across source changes
   // and keyed by BIM identity so the same object isn't added twice. Adding from
@@ -87,17 +88,18 @@ export function CreateVersionPanel({
   const [accumulated, setAccumulated] = useState<Map<string, UpdateRow>>(
     new Map(),
   );
-  // Rows opted out of creation (still listed, just unchecked); keyed by identity.
-  const [deselected, setDeselected] = useState<Set<string>>(new Set());
+  // Rows ticked for bulk deletion (default none). The whole list is the create
+  // target; checkboxes only select rows to prune via the header delete action.
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
 
   const rows = useMemo(() => [...accumulated.values()], [accumulated]);
 
-  const selectedRows = rows.filter((r) => !deselected.has(r.identityKey));
   const allSelected =
-    rows.length > 0 && rows.every((r) => !deselected.has(r.identityKey));
+    rows.length > 0 && rows.every((r) => checked.has(r.identityKey));
+  const hasChecked = checked.size > 0;
 
   // Merge freshly collected snapshots into the accumulator (dedup by identity;
   // re-adding a previously-unchecked row re-selects it).
@@ -108,53 +110,49 @@ export function CreateVersionPanel({
       collected.forEach((r) => next.set(r.identityKey, r));
       return next;
     });
-    setDeselected((prev) => {
-      const next = new Set(prev);
-      collected.forEach((r) => next.delete(r.identityKey));
-      return next;
-    });
   };
 
   const handleAddByConfidence = () =>
     mergeRows(
-      collectConfidenceRows(objects, predictionMap, sourceVersion, threshold),
+      collectConfidenceRows(
+        objects,
+        predictionMap,
+        effectiveSourceVersion,
+        threshold,
+      ),
     );
 
   const handleLoadUserInput = () =>
-    mergeRows(collectUserRows(objects, predictionMap, sourceVersion));
+    mergeRows(collectUserRows(objects, predictionMap, effectiveSourceVersion));
 
-  const toggleAll = (checked: boolean) => {
-    setDeselected(
-      checked ? new Set() : new Set(rows.map((r) => r.identityKey)),
-    );
+  const toggleAll = (on: boolean) => {
+    setChecked(on ? new Set(rows.map((r) => r.identityKey)) : new Set());
   };
 
-  const toggleRow = (identityKey: string, checked: boolean) => {
-    setDeselected((prev) => {
+  const toggleRow = (identityKey: string, on: boolean) => {
+    setChecked((prev) => {
       const next = new Set(prev);
-      if (checked) next.delete(identityKey);
-      else next.add(identityKey);
+      if (on) next.add(identityKey);
+      else next.delete(identityKey);
       return next;
     });
   };
 
-  const handleRemove = (identityKey: string) => {
+  // Bulk-remove the ticked rows from the list (replaces the per-row delete).
+  const handleRemoveChecked = () => {
+    if (checked.size === 0) return;
     setAccumulated((prev) => {
       const next = new Map(prev);
-      next.delete(identityKey);
+      checked.forEach((k) => next.delete(k));
       return next;
     });
-    setDeselected((prev) => {
-      const next = new Set(prev);
-      next.delete(identityKey);
-      return next;
-    });
+    setChecked(new Set());
   };
 
   const reset = () => {
     setName('');
     setAccumulated(new Map());
-    setDeselected(new Set());
+    setChecked(new Set());
   };
 
   const handleCreate = async () => {
@@ -163,7 +161,7 @@ export function CreateVersionPanel({
     const res = await createVersion({
       name: name.trim(),
       base: base === '' ? null : base,
-      items: selectedRows.map((r) => r.item),
+      items: rows.map((r) => r.item),
     });
     setSubmitting(false);
     if (res.success && res.data) {
@@ -182,7 +180,7 @@ export function CreateVersionPanel({
   const canCreate =
     name.trim() !== '' &&
     !submitting &&
-    (selectedRows.length > 0 || base !== '');
+    (rows.length > 0 || base !== '');
 
   // Base-DB options for the reused card list: a synthetic "none" entry (empty
   // DB) followed by the real versions. Empty name === the "no base" choice.
@@ -259,9 +257,9 @@ export function CreateVersionPanel({
               </Label>
               <select
                 id="cv-src"
-                value={sourceVersion ?? ''}
+                value={effectiveSourceVersion ?? ''}
                 onChange={(e) => setSourceVersion(e.target.value || undefined)}
-                className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+                className={SELECT_CLS}
               >
                 {versions.map((v) => (
                   <option key={v.name} value={v.name}>
@@ -278,7 +276,7 @@ export function CreateVersionPanel({
                 id="cv-srcfile"
                 value={sourceFile ?? ''}
                 onChange={(e) => onSourceFileChange(e.target.value)}
-                className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+                className={SELECT_CLS}
               >
                 <option value="" disabled>
                   {t.createVersion.selectFile}
@@ -355,12 +353,22 @@ export function CreateVersionPanel({
       {/* Plane 2: update-target list */}
       <Card className="flex flex-col">
         <CardHeader>
-          <CardTitle>{t.createVersion.targetList(rows.length)}</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>{t.createVersion.targetList(rows.length)}</CardTitle>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={!hasChecked}
+              onClick={handleRemoveChecked}
+            >
+              {t.createVersion.deleteSelected(checked.size)}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div>
-            <Table>
-              <TableHeader>
+          <div className="overflow-y-auto">
+            <Table className="table-fixed">
+              <TableHeader className="bg-muted [&_th]:text-muted-foreground sticky top-0">
                 <TableRow>
                   <TableHead className="w-10 text-center">
                     <Checkbox
@@ -377,11 +385,8 @@ export function CreateVersionPanel({
                   <TableHead className="w-28">
                     {t.createVersion.colPps}
                   </TableHead>
-                  <TableHead className="w-40">
+                  <TableHead className="w-56">
                     {t.createVersion.colSource}
-                  </TableHead>
-                  <TableHead className="w-12 text-center">
-                    {t.createVersion.colRemove}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -389,7 +394,7 @@ export function CreateVersionPanel({
                 {rows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={6}
                       className="text-muted-foreground py-6 text-center text-sm"
                     >
                       {objects.length === 0
@@ -402,7 +407,7 @@ export function CreateVersionPanel({
                     <TableRow key={r.identityKey}>
                       <TableCell className="text-center">
                         <Checkbox
-                          checked={!deselected.has(r.identityKey)}
+                          checked={checked.has(r.identityKey)}
                           onCheckedChange={(c) =>
                             toggleRow(r.identityKey, c === true)
                           }
@@ -430,12 +435,7 @@ export function CreateVersionPanel({
                           >
                             {r.version || '—'}
                           </Badge>
-                          <Badge
-                            className="shrink-0"
-                            variant={
-                              r.source === 'user' ? 'default' : 'secondary'
-                            }
-                          >
+                          <Badge className="shrink-0" variant="secondary">
                             {r.source === 'user'
                               ? t.createVersion.sourceUser
                               : t.createVersion.sourceConfidenceThreshold(
@@ -443,16 +443,6 @@ export function CreateVersionPanel({
                                 )}
                           </Badge>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleRemove(r.identityKey)}
-                          className="text-muted-foreground hover:text-destructive mx-auto block"
-                          aria-label={t.createVersion.colRemove}
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -470,7 +460,7 @@ export function CreateVersionPanel({
                     aria-hidden
                     className="pointer-events-none"
                   >
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={6}>
                       <div className="h-5" />
                     </TableCell>
                   </TableRow>

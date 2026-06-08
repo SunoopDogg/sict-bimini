@@ -58,6 +58,9 @@ def create_version(
             detail="items required when no base version is given",
         )
 
+    # When cloning a base, its vectors must match the embed dim we'll create the
+    # new collection at, else the copy/upsert would mix sizes. dim is therefore
+    # always settings.embedding_dim — the base check just rejects a mismatch.
     if base_collection is not None:
         base_dim = qdrant.get_collection(base_collection).config.params.vectors.size
         if base_dim != settings.embedding_dim:
@@ -68,9 +71,6 @@ def create_version(
                     f"{settings.embedding_dim}; cannot mix dimensions"
                 ),
             )
-        dim = base_dim
-    else:
-        dim = settings.embedding_dim
 
     try:
         copied, added, total = create_version_svc(
@@ -78,7 +78,7 @@ def create_version(
             request.app.state.embed,
             new_collection=new_collection,
             base_collection=base_collection,
-            dim=dim,
+            dim=settings.embedding_dim,
             items=body.items,
         )
     except (VLLMEmbedError, ValueError) as e:

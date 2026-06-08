@@ -238,11 +238,13 @@ export default function PredictPage() {
     }
     let active = true;
     const load = async () => {
-      const objRes = await readJsonFileAction(createSourceFile);
+      // Independent reads (separate data dirs) — fetch concurrently.
+      const [objRes, predRes] = await Promise.all([
+        readJsonFileAction(createSourceFile),
+        loadPredictionsAction(createSourceFile),
+      ]);
       if (!active) return;
       setCreateObjects(objRes.success && objRes.data ? objRes.data : []);
-      const predRes = await loadPredictionsAction(createSourceFile);
-      if (!active) return;
       setCreatePredictionMap(
         predRes.success && predRes.data ? predRes.data : {},
       );
