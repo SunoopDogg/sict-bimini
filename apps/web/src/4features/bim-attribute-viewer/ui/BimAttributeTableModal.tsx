@@ -37,19 +37,44 @@ import {
 
 const PAGE_SIZE = 20;
 
-export function BimAttributeTableModal() {
-  const [open, setOpen] = useState(false);
+interface BimAttributeTableModalProps {
+  /** Scope the list to a specific DB version. Omitted → default collection. */
+  version?: string;
+  /** Controlled open state. Omit both to use the built-in trigger button. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function BimAttributeTableModal({
+  version,
+  open: openProp,
+  onOpenChange,
+}: BimAttributeTableModalProps = {}) {
+  const controlled = openProp !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlled ? openProp : internalOpen;
   const [page, setPage] = useState(1);
   const [data, setData] = useState<BIMAttributeListResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { t } = useLocale();
 
+  // Reset to page 1 whenever the modal opens or the scoped version changes.
+  // Done during render (not in an effect) so the fetch effect below already
+  // sees page === 1 — avoids fetching a stale page from the previous viewing.
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [prevVersion, setPrevVersion] = useState(version);
+  if (open !== prevOpen || version !== prevVersion) {
+    setPrevOpen(open);
+    setPrevVersion(version);
+    if (open) setPage(1);
+  }
+
   const fetchData = async (pageNum: number) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchBimAttributes(pageNum, PAGE_SIZE);
+      const response = await fetchBimAttributes(pageNum, PAGE_SIZE, version);
       if (response.success && response.data) {
         setData(response.data);
       } else {
@@ -66,12 +91,13 @@ export function BimAttributeTableModal() {
     if (open) {
       fetchData(page);
     }
-  }, [open, page]);
+  }, [open, page, version]);
 
   const handleOpenChange = (newOpen: boolean) => {
-    setOpen(newOpen);
-    if (newOpen) {
-      setPage(1);
+    if (controlled) {
+      onOpenChange?.(newOpen);
+    } else {
+      setInternalOpen(newOpen);
     }
   };
 
@@ -129,15 +155,19 @@ export function BimAttributeTableModal() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <TableProperties className="mr-2 h-4 w-4" />
-          {t.bimAttr.trigger}
-        </Button>
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <TableProperties className="mr-2 h-4 w-4" />
+            {t.bimAttr.trigger}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="flex h-[80vh] max-w-6xl flex-col">
         <DialogHeader>
-          <DialogTitle>{t.bimAttr.title}</DialogTitle>
+          <DialogTitle>
+            {version ? t.bimAttr.versionTitle(version) : t.bimAttr.title}
+          </DialogTitle>
           <DialogDescription>
             {t.bimAttr.subtitle}
           </DialogDescription>

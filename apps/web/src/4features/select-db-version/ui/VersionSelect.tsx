@@ -4,6 +4,7 @@ import { Database, Loader2 } from 'lucide-react';
 
 import type { DbVersion } from '@/5entities/db-version';
 import { useLocale } from '@/6shared/i18n';
+import { DbVersionViewButton } from '@/6shared/ui/DbVersionViewButton';
 import { SelectableCardList } from '@/6shared/ui/SelectableCardList';
 
 interface VersionSelectProps {
@@ -12,6 +13,8 @@ interface VersionSelectProps {
   onChange: (version: string) => void;
   isLoading?: boolean;
   error?: string | null;
+  /** When provided, each version shows an eye button that views its contents. */
+  onView?: (version: string) => void;
 }
 
 export function VersionSelect({
@@ -20,6 +23,7 @@ export function VersionSelect({
   onChange,
   isLoading,
   error,
+  onView,
 }: VersionSelectProps) {
   const { t } = useLocale();
 
@@ -56,6 +60,11 @@ export function VersionSelect({
       )}
       renderTitle={(v) => v.name}
       renderSubtitle={(v) => t.version.items(v.points)}
+      renderAction={
+        onView
+          ? (v) => <DbVersionViewButton version={v.name} onView={onView} />
+          : undefined
+      }
     />
   );
 }

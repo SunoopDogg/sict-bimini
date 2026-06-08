@@ -13,6 +13,12 @@ interface SelectableCardListProps<T> {
   renderIcon: (item: T) => ReactNode;
   renderTitle: (item: T) => ReactNode;
   renderSubtitle?: (item: T) => ReactNode;
+  /**
+   * Optional trailing action rendered as a sibling of the select button (not
+   * nested inside it — nested buttons are invalid HTML). Use for per-item
+   * controls like a "view" eye icon that must not trigger selection.
+   */
+  renderAction?: (item: T) => ReactNode;
 }
 
 /**
@@ -28,6 +34,7 @@ export function SelectableCardList<T>({
   renderIcon,
   renderTitle,
   renderSubtitle,
+  renderAction,
 }: SelectableCardListProps<T>) {
   return (
     <ul className="space-y-2">
@@ -35,13 +42,14 @@ export function SelectableCardList<T>({
         const key = getKey(item);
         const selected = selectedKey === key;
         return (
-          <li key={key}>
+          <li key={key} className="relative">
             <button
               type="button"
               onClick={() => onSelect(key)}
               className={cn(
                 'hover:bg-accent flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors',
                 selected ? 'border-primary bg-primary/5' : 'border-border',
+                renderAction && 'pr-12',
               )}
             >
               {renderIcon(item)}
@@ -55,6 +63,11 @@ export function SelectableCardList<T>({
               </div>
               {selected && <Check className="text-primary h-5 w-5 shrink-0" />}
             </button>
+            {renderAction && (
+              <div className="absolute inset-y-0 right-3 flex items-center">
+                {renderAction(item)}
+              </div>
+            )}
           </li>
         );
       })}
