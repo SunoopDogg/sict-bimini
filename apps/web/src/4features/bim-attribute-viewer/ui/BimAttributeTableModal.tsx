@@ -1,20 +1,16 @@
 'use client';
 
-import { TableProperties } from 'lucide-react';
-
 import { useEffect, useState } from 'react';
 
 import type { BIMAttributeListResponse } from '@/5entities/bim-attribute';
 import { fetchBimAttributes } from '@/6shared/api';
 import { useLocale } from '@/6shared/i18n';
-import { Button } from '@/6shared/ui/primitive/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/6shared/ui/primitive/dialog';
 import {
   Pagination,
@@ -40,19 +36,15 @@ const PAGE_SIZE = 20;
 interface BimAttributeTableModalProps {
   /** Scope the list to a specific DB version. Omitted → default collection. */
   version?: string;
-  /** Controlled open state. Omit both to use the built-in trigger button. */
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function BimAttributeTableModal({
   version,
-  open: openProp,
+  open,
   onOpenChange,
-}: BimAttributeTableModalProps = {}) {
-  const controlled = openProp !== undefined;
-  const [internalOpen, setInternalOpen] = useState(false);
-  const open = controlled ? openProp : internalOpen;
+}: BimAttributeTableModalProps) {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<BIMAttributeListResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -92,14 +84,6 @@ export function BimAttributeTableModal({
       fetchData(page);
     }
   }, [open, page, version]);
-
-  const handleOpenChange = (newOpen: boolean) => {
-    if (controlled) {
-      onOpenChange?.(newOpen);
-    } else {
-      setInternalOpen(newOpen);
-    }
-  };
 
   const renderPageNumbers = () => {
     if (!data) return null;
@@ -154,15 +138,7 @@ export function BimAttributeTableModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      {!controlled && (
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
-            <TableProperties className="mr-2 h-4 w-4" />
-            {t.bimAttr.trigger}
-          </Button>
-        </DialogTrigger>
-      )}
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[80vh] max-w-6xl flex-col">
         <DialogHeader>
           <DialogTitle>
