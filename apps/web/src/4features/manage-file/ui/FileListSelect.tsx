@@ -18,7 +18,7 @@ export function FileListSelect({
   selectedFile,
   onSelect,
 }: FileListSelectProps) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
 
   if (files.length === 0) {
     return (
@@ -43,7 +43,7 @@ export function FileListSelect({
         )}
         renderTitle={(file) => file.name}
         renderSubtitle={(file) =>
-          `${formatFileSize(file.size)} · ${formatDateTime(file.modifiedAt)}`
+          `${formatFileSize(file.size)} · ${formatDateTime(file.modifiedAt, locale)}`
         }
       />
     </div>

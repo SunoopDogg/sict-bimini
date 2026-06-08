@@ -86,7 +86,7 @@ export function ObjectPredictionPanel({
   onUserCandidateChange,
 }: ObjectPredictionPanelProps) {
   const [sessionPage, setSessionPage] = useState(0);
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
 
   // Sessions predicted against the selected DB version, paired with their
   // original index in `sessions` (callbacks index the unfiltered array, so the
@@ -352,7 +352,9 @@ export function ObjectPredictionPanel({
               </div>
 
               <div className="text-muted-foreground text-right text-xs">
-                {new Date(currentSession.predicted_at).toLocaleString('ko-KR')}
+                {new Date(currentSession.predicted_at).toLocaleString(
+                  locale === 'en' ? 'en-US' : 'ko-KR',
+                )}
               </div>
             </div>
           )}

@@ -24,7 +24,7 @@ export function UserSelectionPanel({
   selectedFile,
   onSelect,
 }: UserSelectionPanelProps) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
 
   return (
     <Card>
@@ -54,7 +54,7 @@ export function UserSelectionPanel({
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-sm">{file.name}</p>
                     <p className="text-muted-foreground text-xs">
-                      {t.userSel.items(file.itemCount)} · {formatDateTime(file.modifiedAt)}
+                      {t.userSel.items(file.itemCount)} · {formatDateTime(file.modifiedAt, locale)}
                     </p>
                   </div>
                   {selectedFile === file.name && (

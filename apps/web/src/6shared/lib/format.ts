@@ -1,13 +1,20 @@
-const koreanDateFormatter = new Intl.DateTimeFormat('ko-KR', {
+import type { Locale } from '@/6shared/i18n';
+
+const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
   hour: '2-digit',
   minute: '2-digit',
-});
+};
 
-export function formatDateTime(date: string): string {
-  return koreanDateFormatter.format(new Date(date));
+const dateFormatters: Record<Locale, Intl.DateTimeFormat> = {
+  ko: new Intl.DateTimeFormat('ko-KR', DATE_OPTIONS),
+  en: new Intl.DateTimeFormat('en-US', DATE_OPTIONS),
+};
+
+export function formatDateTime(date: string, locale: Locale = 'ko'): string {
+  return dateFormatters[locale].format(new Date(date));
 }
 
 export function formatFileSize(bytes: number): string {
