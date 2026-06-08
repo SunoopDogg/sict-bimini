@@ -32,8 +32,11 @@ import {
   TableRow,
 } from '@/6shared/ui/primitive/table';
 
-import { buildUpdateList } from '../model/buildUpdateList';
-import { selectByConfidence } from '../model/selectByConfidence';
+import {
+  collectConfidenceRows,
+  collectUserRows,
+  type UpdateRow,
+} from '../model/collectRows';
 
 interface CreateVersionPanelProps {
   /** Available xlsx files to source predictions from (independent of 1height). */
@@ -78,74 +81,79 @@ export function CreateVersionPanel({
     }
   }, [versions, sourceVersion]);
   const [threshold, setThreshold] = useState(70);
-  // index → threshold (%) it was added at, so the source column can show it.
-  const [manualAdded, setManualAdded] = useState<Map<number, number>>(new Map());
-  const [dismissed, setDismissed] = useState<Set<number>>(new Set());
-  // Rows opted out of creation (still visible, just unchecked). Opt-out keeps
-  // newly added rows included by default.
-  const [deselected, setDeselected] = useState<Set<number>>(new Set());
+  // Accumulated update rows (full snapshots), persisted across source changes
+  // and keyed by BIM identity so the same object isn't added twice. Adding from
+  // a different source file/DB merges into this list rather than replacing it.
+  const [accumulated, setAccumulated] = useState<Map<string, UpdateRow>>(
+    new Map(),
+  );
+  // Rows opted out of creation (still listed, just unchecked); keyed by identity.
+  const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
 
-  const rows = useMemo(
-    () =>
-      buildUpdateList(objects, predictionMap, sourceVersion, {
-        manualAdded,
-        dismissed,
-      }),
-    [objects, predictionMap, sourceVersion, manualAdded, dismissed],
-  );
+  const rows = useMemo(() => [...accumulated.values()], [accumulated]);
 
-  const selectedRows = rows.filter((r) => !deselected.has(r.globalIndex));
+  const selectedRows = rows.filter((r) => !deselected.has(r.identityKey));
   const allSelected =
-    rows.length > 0 && rows.every((r) => !deselected.has(r.globalIndex));
+    rows.length > 0 && rows.every((r) => !deselected.has(r.identityKey));
 
-  const toggleAll = (checked: boolean) => {
-    setDeselected(checked ? new Set() : new Set(rows.map((r) => r.globalIndex)));
-  };
-
-  const toggleRow = (globalIndex: number, checked: boolean) => {
+  // Merge freshly collected snapshots into the accumulator (dedup by identity;
+  // re-adding a previously-unchecked row re-selects it).
+  const mergeRows = (collected: UpdateRow[]) => {
+    if (collected.length === 0) return;
+    setAccumulated((prev) => {
+      const next = new Map(prev);
+      collected.forEach((r) => next.set(r.identityKey, r));
+      return next;
+    });
     setDeselected((prev) => {
       const next = new Set(prev);
-      if (checked) next.delete(globalIndex);
-      else next.add(globalIndex);
+      collected.forEach((r) => next.delete(r.identityKey));
       return next;
     });
   };
 
-  const handleAddByConfidence = () => {
-    const picked = selectByConfidence(
-      objects,
-      predictionMap,
-      sourceVersion,
-      threshold,
+  const handleAddByConfidence = () =>
+    mergeRows(
+      collectConfidenceRows(objects, predictionMap, sourceVersion, threshold),
     );
-    setManualAdded((prev) => {
-      const next = new Map(prev);
-      picked.forEach((i) => next.set(i, threshold));
-      return next;
-    });
-    setDismissed((prev) => {
+
+  const handleLoadUserInput = () =>
+    mergeRows(collectUserRows(objects, predictionMap, sourceVersion));
+
+  const toggleAll = (checked: boolean) => {
+    setDeselected(
+      checked ? new Set() : new Set(rows.map((r) => r.identityKey)),
+    );
+  };
+
+  const toggleRow = (identityKey: string, checked: boolean) => {
+    setDeselected((prev) => {
       const next = new Set(prev);
-      picked.forEach((i) => next.delete(i));
+      if (checked) next.delete(identityKey);
+      else next.add(identityKey);
       return next;
     });
   };
 
-  const handleRemove = (globalIndex: number) => {
-    setDismissed((prev) => new Set(prev).add(globalIndex));
-    setManualAdded((prev) => {
+  const handleRemove = (identityKey: string) => {
+    setAccumulated((prev) => {
       const next = new Map(prev);
-      next.delete(globalIndex);
+      next.delete(identityKey);
+      return next;
+    });
+    setDeselected((prev) => {
+      const next = new Set(prev);
+      next.delete(identityKey);
       return next;
     });
   };
 
   const reset = () => {
     setName('');
-    setManualAdded(new Map());
-    setDismissed(new Set());
+    setAccumulated(new Map());
     setDeselected(new Set());
   };
 
@@ -305,6 +313,14 @@ export function CreateVersionPanel({
               />
               <span>{t.createVersion.addByConfidenceSuffix}</span>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={handleLoadUserInput}
+            >
+              {t.createVersion.loadUserInput}
+            </Button>
           </CardContent>
         </Card>
 
@@ -383,14 +399,14 @@ export function CreateVersionPanel({
                   </TableRow>
                 ) : (
                   rows.map((r, i) => (
-                    <TableRow key={r.globalIndex}>
+                    <TableRow key={r.identityKey}>
                       <TableCell className="text-center">
                         <Checkbox
-                          checked={!deselected.has(r.globalIndex)}
+                          checked={!deselected.has(r.identityKey)}
                           onCheckedChange={(c) =>
-                            toggleRow(r.globalIndex, c === true)
+                            toggleRow(r.identityKey, c === true)
                           }
-                          aria-label={r.name || `row-${r.globalIndex}`}
+                          aria-label={r.name || r.identityKey}
                         />
                       </TableCell>
                       <TableCell className="text-muted-foreground text-center">
@@ -431,7 +447,7 @@ export function CreateVersionPanel({
                       <TableCell className="text-center">
                         <button
                           type="button"
-                          onClick={() => handleRemove(r.globalIndex)}
+                          onClick={() => handleRemove(r.identityKey)}
                           className="text-muted-foreground hover:text-destructive mx-auto block"
                           aria-label={t.createVersion.colRemove}
                         >
