@@ -246,6 +246,23 @@ export function CreateVersionPanel({
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             <div className="flex flex-col gap-1">
+              <Label htmlFor="cv-src" className="text-xs">
+                {t.createVersion.sourceDb}
+              </Label>
+              <select
+                id="cv-src"
+                value={sourceVersion ?? ''}
+                onChange={(e) => setSourceVersion(e.target.value || undefined)}
+                className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+              >
+                {versions.map((v) => (
+                  <option key={v.name} value={v.name}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
               <Label htmlFor="cv-srcfile" className="text-xs">
                 {t.createVersion.sourceFile}
               </Label>
@@ -265,22 +282,28 @@ export function CreateVersionPanel({
                 ))}
               </select>
             </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="cv-src" className="text-xs">
-                {t.createVersion.sourceDb}
-              </Label>
-              <select
-                id="cv-src"
-                value={sourceVersion ?? ''}
-                onChange={(e) => setSourceVersion(e.target.value || undefined)}
-                className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-              >
-                {versions.map((v) => (
-                  <option key={v.name} value={v.name}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
+            {/* Confidence-add with the threshold input embedded in the button */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={handleAddByConfidence}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') handleAddByConfidence();
+              }}
+              className="border-input hover:bg-accent mt-1 flex h-9 cursor-pointer items-center justify-center gap-1 rounded-md border px-3 text-sm font-medium"
+            >
+              <span>{t.createVersion.addByConfidencePrefix}</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={threshold}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setThreshold(Number(e.target.value) || 0)}
+                className="w-10 bg-transparent text-center font-semibold outline-none"
+                aria-label={t.createVersion.threshold}
+              />
+              <span>{t.createVersion.addByConfidenceSuffix}</span>
             </div>
           </CardContent>
         </Card>
@@ -316,33 +339,7 @@ export function CreateVersionPanel({
       {/* Plane 2: update-target list */}
       <Card className="flex flex-col">
         <CardHeader>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <CardTitle>{t.createVersion.targetList(rows.length)}</CardTitle>
-            {/* threshold + confidence-add populate the list (not DB metadata) */}
-            <div className="flex items-end gap-2">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="cv-th" className="text-xs">
-                  {t.createVersion.threshold} (%)
-                </Label>
-                <Input
-                  id="cv-th"
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={threshold}
-                  onChange={(e) => setThreshold(Number(e.target.value) || 0)}
-                  className="h-8 w-20"
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddByConfidence}
-              >
-                {t.createVersion.addByConfidence(threshold)}
-              </Button>
-            </div>
-          </div>
+          <CardTitle>{t.createVersion.targetList(rows.length)}</CardTitle>
         </CardHeader>
         <CardContent>
           <div>
