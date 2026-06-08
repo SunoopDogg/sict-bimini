@@ -74,29 +74,34 @@ async def predict(
     return await _predict_both(request, body, collection)
 
 
+async def _predict_one(
+    request: Request, attr, n: int, collection: str
+) -> BatchItemResult:
+    pred_req = PredictionRequest(attribute=attr, n=n)
+    try:
+        prediction = await _predict_both(request, pred_req, collection)
+        return BatchItemResult(input=attr, prediction=prediction)
+    except HTTPException as e:
+        return BatchItemResult(input=attr, error=e.detail)
+    except Exception as e:
+        logger.error("Batch prediction error: %s", e)
+        return BatchItemResult(input=attr, error=str(e))
+
+
 @router.post("/batch-predict", response_model=BatchPredictResult)
 async def batch_predict(
     request: Request,
     body: BatchPredictRequest,
     collection: str = Depends(resolve_collection),
 ) -> BatchPredictResult:
-    results: list[BatchItemResult] = []
-    successful = 0
-    failed = 0
-
-    for attr in body.objects:
-        pred_req = PredictionRequest(attribute=attr, n=body.n)
-        try:
-            prediction = await _predict_both(request, pred_req, collection)
-            results.append(BatchItemResult(input=attr, prediction=prediction))
-            successful += 1
-        except HTTPException as e:
-            results.append(BatchItemResult(input=attr, error=e.detail))
-            failed += 1
-        except Exception as e:
-            logger.error("Batch prediction error: %s", e)
-            results.append(BatchItemResult(input=attr, error=str(e)))
-            failed += 1
+    # Predict all objects in the request concurrently (order preserved by gather).
+    # The client sends them in small chunks (PREDICT_CHUNK), so each chunk's
+    # objects fan out together; downstream vLLM batches the concurrent load.
+    results = await asyncio.gather(
+        *(_predict_one(request, attr, body.n, collection) for attr in body.objects)
+    )
+    successful = sum(1 for r in results if r.error is None)
+    failed = len(results) - successful
 
     return BatchPredictResult(
         results=results,
