@@ -97,6 +97,24 @@ export function CreateVersionPanel({
 
   const rows = useMemo(() => [...accumulated.values()], [accumulated]);
 
+  // Distinct source tags for the list header: one per (version, source,
+  // threshold) combo with its row count, so the header summarizes where the
+  // accumulated rows came from instead of listing object names.
+  const sourceTags = useMemo(() => {
+    const map = new Map<string, { label: string; count: number }>();
+    rows.forEach((r) => {
+      const tail =
+        r.source === 'user'
+          ? t.createVersion.sourceUser
+          : t.createVersion.sourceConfidenceThreshold(r.threshold ?? 0);
+      const label = `${r.version || '—'} · ${tail}`;
+      const entry = map.get(label);
+      if (entry) entry.count += 1;
+      else map.set(label, { label, count: 1 });
+    });
+    return [...map.values()];
+  }, [rows, t]);
+
   const allSelected =
     rows.length > 0 && rows.every((r) => checked.has(r.identityKey));
   const hasChecked = checked.size > 0;
@@ -353,11 +371,26 @@ export function CreateVersionPanel({
       {/* Plane 2: update-target list */}
       <Card className="flex flex-col">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>{t.createVersion.targetList(rows.length)}</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <CardTitle className="shrink-0">
+                {t.createVersion.targetList(rows.length)}
+              </CardTitle>
+              {sourceTags.map((s) => (
+                <Badge
+                  key={s.label}
+                  variant="secondary"
+                  className="max-w-[14rem] truncate font-normal"
+                  title={s.label}
+                >
+                  {s.label} ({s.count})
+                </Badge>
+              ))}
+            </div>
             <Button
               variant="destructive"
               size="sm"
+              className="shrink-0"
               disabled={!hasChecked}
               onClick={handleRemoveChecked}
             >
