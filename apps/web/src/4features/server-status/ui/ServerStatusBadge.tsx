@@ -18,6 +18,11 @@ interface StatusInfo {
 
 const POLL_INTERVAL = 30_000;
 
+const SERVICE_LABELS: Record<string, string> = {
+  qdrant: 'Vector DB',
+  llm: 'LLM',
+};
+
 export function ServerStatusBadge() {
   const [statusInfo, setStatusInfo] = useState<StatusInfo>({
     health: null,
@@ -85,7 +90,9 @@ export function ServerStatusBadge() {
             <div className="space-y-2">
               {Object.entries(statusInfo.health.services).map(([name, svc]) => (
                 <div key={name} className="flex items-center justify-between">
-                  <span className="text-muted-foreground capitalize">{name}</span>
+                  <span className="text-muted-foreground capitalize">
+                    {SERVICE_LABELS[name] ?? name}
+                  </span>
                   <span className={svc.status === 'ok' ? 'text-green-500' : 'text-red-500'}>
                     {svc.status === 'ok'
                       ? t.server.connected
